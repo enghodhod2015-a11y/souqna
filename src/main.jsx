@@ -11,7 +11,7 @@ const queryClient = new QueryClient()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename="/souqna-web">
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <App />
