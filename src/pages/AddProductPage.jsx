@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom' // تم التعديل هنا
 import { useAuth } from '../contexts/AuthContext'
 import { addProduct, uploadProductImages, updateProduct } from '../services/productService'
 import { Button } from '../components/ui/Button'
@@ -9,6 +10,7 @@ const categories = ['electronics', 'fashion', 'beauty', 'vehicles', 'home', 'bab
 
 export default function AddProductPage() {
   const { user, profile } = useAuth()
+  const navigate = useNavigate() // تم التعديل هنا
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     title: '', description: '', price: '', discount_percentage: 0, category: categories[0],
@@ -57,8 +59,10 @@ export default function AddProductPage() {
         await updateProduct(newProduct.id, { images: imageUrls, cover_image: imageUrls[0] || '' })
       }
       toast.success('تم نشر المنتج بنجاح')
-      // استخدام window.location بدلاً من navigate لتجنب التجميد
-      window.location.href = `/product/${newProduct.id}`
+      
+      // تم التعديل هنا لاستخدام navigate بدلاً من window.location
+      navigate(`/product/${newProduct.id}`) 
+      
     } catch (err) {
       toast.error(err.message)
       setLoading(false)
