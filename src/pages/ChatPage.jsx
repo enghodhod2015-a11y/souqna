@@ -39,7 +39,7 @@ export default function ChatPage() {
           .eq('id', conversationId)
           .single()
 
-        if (convErr) throw convDataErr
+        if (convErr) throw convErr // ✅ تم التصحيح لمنع الانهيار
         
         currentConv = convData
         currentProduct = convData.product
