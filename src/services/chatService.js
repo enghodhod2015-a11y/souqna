@@ -1,7 +1,91 @@
 import { supabase } from './supabase'
 
+// ==========================================
+// خدمات المنتجات (productService)
+// ==========================================
+
+export const getProducts = async (filters = {}) => {
+  try {
+    let query = supabase
+      .from('products')
+      .select('*, seller:profiles(full_name)')
+      .eq('is_hidden', false)
+      .eq('is_approved', true)
+      .order('created_at', { ascending: false })
+
+    if (filters.category) query = query.eq('category', filters.category)
+    if (filters.search) query = query.ilike('title', `%${filters.search}%`)
+
+    const { data, error } = await query
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error("⚠️ فشل جلب البيانات بالربط، جاري تشغيل خطة الطوارئ البديلة:", error)
+    try {
+      let fallbackQuery = supabase
+        .from('products')
+        .select('*')
+        .eq('is_hidden', false)
+        .eq('is_approved', true)
+        .order('created_at', { ascending: false })
+
+      if (filters.category) fallbackQuery = fallbackQuery.eq('category', filters.category)
+      const { data: fallbackData } = await fallbackQuery
+      return fallbackData || []
+    } catch (fallbackErr) {
+      console.error("❌ فشل كامل في قاعدة البيانات:", fallbackErr)
+      return []
+    }
+  }
+}
+
+export const getSellerProducts = async (sellerId) => {
+  const { data, error } = await supabase.from('products').select('*').eq('seller_id', sellerId).order('created_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+export const getProductById = async (id) => {
+  const { data, error } = await supabase.from('products').select('*, seller:profiles(full_name)').eq('id', id).single()
+  if (error) throw error
+  return data
+}
+
+export const addProduct = async (productData) => {
+  const { data, error } = await supabase.from('products').insert([productData]).select().single()
+  if (error) throw error
+  return data
+}
+
+export const updateProduct = async (id, updates) => {
+  const { data, error } = await supabase.from('products').update(updates).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+export const deleteProduct = async (id) => {
+  const { error } = await supabase.from('products').delete().eq('id', id)
+  if (error) throw error
+  return true
+}
+
+export const uploadProductImages = async (files, productId) => {
+  const urls = []
+  for (const file of files) {
+    const fileName = `${productId}/${Date.now()}_${file.name}`
+    const { data, error } = await supabase.storage.from('product-images').upload(fileName, file)
+    if (error) throw error
+    const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(fileName)
+    urls.push(publicUrl)
+  }
+  return urls
+}
+
+// ==========================================
+// خدمات المحادثات (chatService)
+// ==========================================
+
 export const getOrCreateConversation = async (productId, buyerId, sellerId) => {
-  // البحث عن محادثة موجودة
   let { data, error } = await supabase
     .from('conversations')
     .select('*')
@@ -13,7 +97,6 @@ export const getOrCreateConversation = async (productId, buyerId, sellerId) => {
   if (error) throw error
   if (data) return data
 
-  // إنشاء محادثة جديدة
   const { data: newConv, error: insertError } = await supabase
     .from('conversations')
     .insert({ product_id: productId, buyer_id: buyerId, seller_id: sellerId })
@@ -31,7 +114,6 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
     .single()
   if (error) throw error
 
-  // تحديث آخر رسالة في المحادثة
   await supabase
     .from('conversations')
     .update({ last_message: message, last_message_at: new Date() })
@@ -69,3 +151,4 @@ export const markMessagesAsRead = async (conversationId, userId) => {
     .eq('is_read', false)
   if (error) throw error
 }
+
