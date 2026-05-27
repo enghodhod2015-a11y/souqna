@@ -7,45 +7,55 @@ import { ShoppingCart, MessageCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function ProductDetailsPage() {
-  const { id } = useParams()
+  // ✅ تم التعديل هنا: استقبال الاسم الجديد والقديم معاً لمنع الـ undefined والتعليق
+  const { id, productId } = useParams()
+  const targetId = id || productId // تحديد المعرّف المتوفر برمجياً
+  
   const navigate = useNavigate()
   const { user } = useAuth() 
   const [product, setProduct] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadProduct()
-  }, [id])
+    if (targetId) loadProduct()
+  }, [targetId])
 
   const loadProduct = async () => {
     try {
       setLoading(true);
-      const data = await getProductById(id);
+      console.log("جاري البحث عن المنتج بالرقم:", targetId); 
+      const data = await getProductById(targetId);
+      
+      if (!data) {
+        console.error("لم يتم العثور على بيانات للمنتج في Supabase");
+      }
+      
       setProduct(data);
     } catch (err) {
-      console.error(err);
+      console.error("خطأ أثناء جلب المنتج:", err);
       toast.error(err.message);
-    } fileStatus {
-      setLoading(false);
+    } finally {
+      setLoading(false); 
     }
   }
 
   const handleBuy = () => {
+    if (!product) return;
     navigate('/checkout', { state: { product, quantity: 1 } })
   }
 
-  // 🔒 تعديل أمني: إزالة معرف البائع من الرابط تماماً والاعتماد على معرف المنتج فقط
   const handleInquiry = () => {
     if (!user) {
       toast.error('يرجى تسجيل الدخول أولاً للمراسلة')
       navigate('/login')
       return
     }
+    if (!product?.id) return;
     navigate(`/chat/product/${product.id}`)
   }
 
-  if (loading) return <div className="text-center py-20">جاري التحميل...</div>
-  if (!product) return <div className="text-center py-20">المنتج غير موجود</div>
+  if (loading) return <div className="text-center py-20 text-text-secondary">جاري التحميل...</div>
+  if (!product) return <div className="text-center py-20 text-text-secondary">المنتج غير موجود</div>
 
   const isOwner = user && user.id === product.seller_id;
 
@@ -74,7 +84,6 @@ export default function ProductDetailsPage() {
             </Button>
           </div>
           <div className="mt-6 p-4 bg-primary-card rounded-xl">
-            {/* 🔒 تم حذف سطر اسم البائع الصريح لحماية خصوصيته عن المشترين */}
             <p><strong>المدينة:</strong> {product.city || 'غير محدد'}</p>
             <p><strong>الحالة:</strong> {product.condition === 'new' ? 'جديد' : product.condition === 'used' ? 'مستعمل' : 'مجدد'}</p>
             {isOwner && product.contact_number && (
