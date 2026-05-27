@@ -1,48 +1,97 @@
-import { Routes, Route } from 'react-router-dom'
-import { ProtectedRoute } from './ProtectedRoute'
-import HomePage from '../pages/HomePage'
-import LoginPage from '../pages/LoginPage'
-import RegisterPage from '../pages/RegisterPage'
-import ProfilePage from '../pages/ProfilePage'
-import AddProductPage from '../pages/AddProductPage'
-import MyProductsPage from '../pages/MyProductsPage'
-import ProductDetailsPage from '../pages/ProductDetailsPage'
-import EditProductPage from '../pages/EditProductPage'
-import CheckoutPage from '../pages/CheckoutPage'
-import PaymentPage from '../pages/PaymentPage'
-import OrdersPage from '../pages/OrdersPage'
-import SellerOrdersPage from '../pages/SellerOrdersPage'
-import ChatPage from '../pages/ChatPage'
-import InboxPage from '../pages/InboxPage'
-import SellerDashboardPage from '../pages/SellerDashboardPage'
-import AdminDashboardPage from '../pages/AdminDashboardPage'
+import { useEffect, useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
+import { getProductById } from '../services/productService'
+import { Button } from '../components/ui/Button'
+import { ShoppingCart, MessageCircle } from 'lucide-react'
+import toast from 'react-hot-toast'
 
-export const AppRoutes = () => (
-  <Routes>
-    <Route path="/" element={<HomePage />} />
-    <Route path="/login" element={<LoginPage />} />
-    <Route path="/register" element={<RegisterPage />} />
-    
-    {/* مسارات الحساب والطلب والدفع */}
-    <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-    <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
-    <Route path="/payment/:orderId" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
-    <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
-    
-    {/* مسارات المنتجات وتفاصيلها */}
-    <Route path="/product/:id" element={<ProductDetailsPage />} />
-    <Route path="/add-product" element={<ProtectedRoute allowedRoles={['seller', 'admin']}><AddProductPage /></ProtectedRoute>} />
-    <Route path="/my-products" element={<ProtectedRoute allowedRoles={['seller', 'admin']}><MyProductsPage /></ProtectedRoute>} />
-    <Route path="/edit-product/:id" element={<ProtectedRoute allowedRoles={['seller', 'admin']}><EditProductPage /></ProtectedRoute>} />
-    
-    {/* 🔒 مسارات الشات والرسائل الجديدة (تم التعديل والتأمين هنا لمنع الشاشة الزرقاء) */}
-    <Route path="/chat/product/:productId" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
-    <Route path="/chat/c/:conversationId" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
-    <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
-    
-    {/* مسارات لوحات التحكم الخاصة بالبائع والأدمن */}
-    <Route path="/seller-orders" element={<ProtectedRoute allowedRoles={['seller', 'admin']}><SellerOrdersPage /></ProtectedRoute>} />
-    <Route path="/seller/dashboard" element={<ProtectedRoute allowedRoles={['seller', 'admin']}><SellerDashboardPage /></ProtectedRoute>} />
-    <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboardPage /></ProtectedRoute>} />
-  </Routes>
-)
+export default function ProductDetailsPage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const { user } = useAuth() 
+  const [product, setProduct] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadProduct()
+  }, [id])
+
+  const loadProduct = async () => {
+    try {
+      setLoading(true);
+      console.log("جاري البحث عن المنتج بالرقم:", id); 
+      const data = await getProductById(id);
+      
+      if (!data) {
+        console.error("لم يتم العثور على بيانات للمنتج في Supabase");
+      }
+      
+      setProduct(data);
+    } catch (err) {
+      console.error("خطأ أثناء جلب المنتج:", err);
+      toast.error(err.message);
+    } finally {
+      // تم تصحيح الكلمة الإملائية هنا لإصلاح فشل بناء Vercel
+      setLoading(false); 
+    }
+  }
+
+  const handleBuy = () => {
+    navigate('/checkout', { state: { product, quantity: 1 } })
+  }
+
+  // 🔒 تعديل أمني: إزالة معرف البائع من الرابط تماماً والاعتماد على معرف المنتج فقط لحظر كشف الهويات
+  const handleInquiry = () => {
+    if (!user) {
+      toast.error('يرجى تسجيل الدخول أولاً للمراسلة')
+      navigate('/login')
+      return
+    }
+    navigate(`/chat/product/${product.id}`)
+  }
+
+  if (loading) return <div className="text-center py-20">جاري التحميل...</div>
+  if (!product) return <div className="text-center py-20">المنتج غير موجود</div>
+
+  const isOwner = user && user.id === product.seller_id;
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div>
+          <img src={product.cover_image || 'https://placehold.co'} alt={product.title} className="w-full rounded-2xl" />
+          <div className="flex gap-2 mt-4 flex-wrap">
+            {product.images?.map((img, i) => (
+              <img key={i} src={img} className="w-20 h-20 object-cover rounded cursor-pointer" onClick={() => window.open(img)} />
+            ))}
+          </div>
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold text-gold mb-2">{product.title}</h1>
+          <p className="text-text-secondary mb-4">{product.description}</p>
+          <p className="text-2xl font-bold text-gold">{product.final_price} ريال</p>
+          {product.discount_percentage > 0 && <p className="text-text-secondary line-through">{product.price} ريال</p>}
+          <div className="flex gap-4 mt-6">
+            <Button onClick={handleBuy}>
+              <ShoppingCart className="inline ml-2" /> شراء
+            </Button>
+            <Button variant="secondary" onClick={handleInquiry}>
+              <MessageCircle className="inline ml-2" /> استعلام
+            </Button>
+          </div>
+          <div className="mt-6 p-4 bg-primary-card rounded-xl">
+            {/* 🔒 تم حذف سطر اسم البائع الصريح لحماية الخصوصية وحظر كشف الهويات */}
+            <p><strong>المدينة:</strong> {product.city || 'غير محدد'}</p>
+            <p><strong>الحالة:</strong> {product.condition === 'new' ? 'جديد' : product.condition === 'used' ? 'مستعمل' : 'مجدد'}</p>
+            {isOwner && product.contact_number && (
+              <p className="mt-2 text-gold font-semibold bg-gold/10 p-2 rounded border border-gold/20">
+                <strong>رقم التواصل الخاص بك:</strong> {product.contact_number}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
