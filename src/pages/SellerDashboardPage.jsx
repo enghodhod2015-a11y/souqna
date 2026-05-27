@@ -5,7 +5,7 @@ import { getSellerStats, getMonthlySales } from '../services/orderService'
 import { getSellerProducts } from '../services/productService'
 import { getUserConversations } from '../services/chatService'
 import { Button } from '../components/ui/Button'
-import { Package, ShoppingBag, MessageCircle, DollarSign, TrendingUp, Eye, Edit, Trash2 } from 'lucide-react'
+import { Package, ShoppingBag, MessageCircle, DollarSign, TrendingUp, Eye, Edit } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import toast from 'react-hot-toast'
 
@@ -30,9 +30,9 @@ export default function SellerDashboardPage() {
         getUserConversations(user.id)
       ])
       setStats(statsData)
-      setMonthlySales(salesData)
-      setRecentProducts(productsData.slice(0, 5))
-      setRecentConversations(conversationsData.slice(0, 5))
+      setMonthlySales(salesData || [])
+      setRecentProducts(productsData ? productsData.slice(0, 5) : [])
+      setRecentConversations(conversationsData ? conversationsData.slice(0, 5) : [])
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -49,7 +49,7 @@ export default function SellerDashboardPage() {
         <Link to="/add-product"><Button>+ إضافة منتج</Button></Link>
       </div>
 
-      {/* بطاقات الإحصائيات */}
+      {/* الإحصائيات */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         <div className="bg-primary-card p-4 rounded-2xl border border-gold/30 text-center">
           <Package className="text-gold mx-auto mb-2" size={28} />
@@ -78,7 +78,7 @@ export default function SellerDashboardPage() {
         </div>
       </div>
 
-      {/* الرسم البياني للمبيعات */}
+      {/* الرسم البياني */}
       {monthlySales.length > 0 && (
         <div className="bg-primary-card p-4 rounded-2xl border border-gold/30 mb-8">
           <h2 className="text-xl font-bold mb-4">المبيعات الشهرية</h2>
@@ -104,19 +104,22 @@ export default function SellerDashboardPage() {
           <p className="text-center text-text-secondary">لا توجد منتجات بعد</p>
         ) : (
           <div className="space-y-3">
-            {recentProducts.map(product => (
-              <div key={product.id} className="flex justify-between items-center p-3 bg-secondary-blue/30 rounded-xl">
-                <div>
-                  <p className="font-bold">{product.title}</p>
-                  <p className="text-gold">{product.final_price} ريال</p>
-                  <p className="text-text-secondary text-sm">المشاهدات: {product.views_count || 0}</p>
+            {recentProducts.map(product => {
+              if (!product?.id) return null;
+              return (
+                <div key={product.id} className="flex justify-between items-center p-3 bg-secondary-blue/30 rounded-xl">
+                  <div>
+                    <p className="font-bold">{product.title}</p>
+                    <p className="text-gold">{product.final_price} ريال</p>
+                    <p className="text-text-secondary text-sm">المشاهدات: {product.views_count || 0}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link to={`/product/${product.id}`}><Eye size={18} className="text-gold" /></Link>
+                    <Link to={`/edit-product/${product.id}`}><Edit size={18} className="text-warning" /></Link>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Link to={`/product/${product.id}`}><Eye size={18} className="text-gold" /></Link>
-                  <Link to={`/edit-product/${product.id}`}><Edit size={18} className="text-warning" /></Link>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -132,14 +135,21 @@ export default function SellerDashboardPage() {
         ) : (
           <div className="space-y-3">
             {recentConversations.map(conv => {
-              const otherUser = conv.buyer_id === user.id ? conv.seller : conv.buyer
-              const unreadCount = conv.buyer_id === user.id ? conv.buyer_unread_count : conv.seller_unread_count
+              if (!conv?.id) return null;
+              
+              const isBuyer = conv.buyer_id === user?.id
+              const unreadCount = isBuyer ? conv.buyer_unread_count : conv.seller_unread_count
+              
+              // 🔒 حظر الهويات: استبدال الأسماء الصريحة بألقاب مجهولة
+              const anonymousLabel = isBuyer ? "البائع" : "مشتري محتمل";
+
+              // 🔒 حظر الهويات: التوجيه الآمن باستخدام معرف المحادثة بدلاً من الـ user.id
               return (
-                <Link to={`/chat/${conv.product_id}/${otherUser.id}`} key={conv.id}>
+                <Link to={`/chat/c/${conv.id}`} key={conv.id}>
                   <div className="flex justify-between items-center p-3 bg-secondary-blue/30 rounded-xl hover:bg-secondary-blue transition">
                     <div>
-                      <p className="font-bold">{conv.product?.title}</p>
-                      <p className="text-text-secondary text-sm">مع: {otherUser?.full_name}</p>
+                      <p className="font-bold">{conv.product?.title || 'منتج غير متوفر'}</p>
+                      <p className="text-text-secondary text-sm">الطرف الآخر: {anonymousLabel}</p>
                       <p className="text-text-secondary text-sm truncate">{conv.last_message || 'بدء المحادثة'}</p>
                     </div>
                     {unreadCount > 0 && (

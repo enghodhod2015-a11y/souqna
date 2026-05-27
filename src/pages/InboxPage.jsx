@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getUserConversations } from '../services/chatService'
-import { MessageCircle } from 'lucide-react'
 
 export default function InboxPage() {
   const { user } = useAuth()
@@ -10,15 +9,16 @@ export default function InboxPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadConversations()
-  }, [user])
+    if (user?.id) loadConversations()
+  }, [user?.id])
 
   const loadConversations = async () => {
     try {
+      setLoading(true)
       const data = await getUserConversations(user.id)
-      setConversations(data)
+      setConversations(data || [])
     } catch (err) {
-      console.error(err)
+      console.error("Error loading inbox conversations:", err)
     } finally {
       setLoading(false)
     }
@@ -34,19 +34,29 @@ export default function InboxPage() {
       ) : (
         <div className="space-y-3">
           {conversations.map(conv => {
-            const otherUser = conv.buyer_id === user.id ? conv.seller : conv.buyer
-            const unreadCount = conv.buyer_id === user.id ? conv.buyer_unread_count : conv.seller_unread_count
+            // فحص أمني لمنع انهيار الرندر إذا كانت المحادثة فارغة
+            if (!conv?.id) return null
+
+            const isBuyer = conv.buyer_id === user?.id
+            const unreadCount = isBuyer ? conv.buyer_unread_count : conv.seller_unread_count
+            
+            // 🔒 حظر الهويات: استبدال الاسم الصريح بلقب مبهم يحمي الخصوصية
+            const anonymousLabel = isBuyer ? "البائع" : "مشتري محتمل"
+
+            // 🔒 تأمين الرابط: التوجيه الآمن باستخدام معرف المحادثة الموحد لحماية معرف البائع والمشتري
             return (
-              <Link to={`/chat/${conv.product_id}/${otherUser.id}`} key={conv.id}>
+              <Link to={`/chat/c/${conv.id}`} key={conv.id}>
                 <div className="bg-primary-card p-4 rounded-2xl border border-gold/30 hover:border-gold transition">
                   <div className="flex justify-between items-center">
                     <div>
-                      <h3 className="font-bold">{conv.product?.title}</h3>
-                      <p className="text-text-secondary text-sm">مع: {otherUser.full_name}</p>
-                      <p className="text-sm text-text-secondary truncate">{conv.last_message || 'بدء المحادثة'}</p>
+                      <h3 className="font-bold text-gold">{conv.product?.title || 'منتج غير متوفر'}</h3>
+                      <p className="text-text-secondary text-sm">الطرف الآخر: {anonymousLabel}</p>
+                      <p className="text-sm text-text-secondary mt-1 truncate max-w-md">
+                        {conv.last_message || 'بدء المحادثة'}
+                      </p>
                     </div>
                     {unreadCount > 0 && (
-                      <span className="bg-danger text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">
+                      <span className="bg-danger text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-semibold">
                         {unreadCount}
                       </span>
                     )}

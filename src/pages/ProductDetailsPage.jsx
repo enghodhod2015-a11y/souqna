@@ -9,7 +9,7 @@ import toast from 'react-hot-toast'
 export default function ProductDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth() // جلب بيانات المستخدم الحالي للفحص الأمني
+  const { user } = useAuth() 
   const [product, setProduct] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -20,18 +20,12 @@ export default function ProductDetailsPage() {
   const loadProduct = async () => {
     try {
       setLoading(true);
-      console.log("جاري البحث عن المنتج بالرقم:", id); // للتأكد من وصول المعرف
       const data = await getProductById(id);
-      
-      if (!data) {
-        console.error("لم يتم العثور على بيانات للمنتج في Supabase");
-      }
-      
       setProduct(data);
     } catch (err) {
-      console.error("خطأ أثناء جلب المنتج:", err);
+      console.error(err);
       toast.error(err.message);
-    } finally {
+    } fileStatus {
       setLoading(false);
     }
   }
@@ -40,14 +34,19 @@ export default function ProductDetailsPage() {
     navigate('/checkout', { state: { product, quantity: 1 } })
   }
 
+  // 🔒 تعديل أمني: إزالة معرف البائع من الرابط تماماً والاعتماد على معرف المنتج فقط
   const handleInquiry = () => {
-    navigate(`/chat/${product.id}/${product.seller_id}`)
+    if (!user) {
+      toast.error('يرجى تسجيل الدخول أولاً للمراسلة')
+      navigate('/login')
+      return
+    }
+    navigate(`/chat/product/${product.id}`)
   }
 
   if (loading) return <div className="text-center py-20">جاري التحميل...</div>
   if (!product) return <div className="text-center py-20">المنتج غير موجود</div>
 
-  // فحص ما إذا كان الزائر الحالي هو بائع المنتج نفسه
   const isOwner = user && user.id === product.seller_id;
 
   return (
@@ -75,10 +74,9 @@ export default function ProductDetailsPage() {
             </Button>
           </div>
           <div className="mt-6 p-4 bg-primary-card rounded-xl">
-            <p><strong>البائع:</strong> {product.seller?.full_name}</p>
+            {/* 🔒 تم حذف سطر اسم البائع الصريح لحماية خصوصيته عن المشترين */}
             <p><strong>المدينة:</strong> {product.city || 'غير محدد'}</p>
             <p><strong>الحالة:</strong> {product.condition === 'new' ? 'جديد' : product.condition === 'used' ? 'مستعمل' : 'مجدد'}</p>
-            {/* شرط أمني: لا يظهر رقم التواصل إلا إذا كان الزائر هو صاحب المنتج نفسه */}
             {isOwner && product.contact_number && (
               <p className="mt-2 text-gold font-semibold bg-gold/10 p-2 rounded border border-gold/20">
                 <strong>رقم التواصل الخاص بك:</strong> {product.contact_number}
