@@ -5,37 +5,49 @@ import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
 
 export const Header = () => {
-  // تم جلب loading هنا لمنع اختفاء العناصر عند تحديث الصفحة
   const { user, profile, loading, logout } = useAuth()
   const navigate = useNavigate()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
   const [unreadCount, setUnreadCount] = useState(0)
 
-  // جلب عدد المحادثات غير المقروءة
+  // جلب عدد المحادثات غير المقروءة بأمان
   useEffect(() => {
-    if (!user) return
+    if (!user?.id) return // تأمين لمنع الاستعلام بمعرف فارغ
 
     const fetchUnreadCount = async () => {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('buyer_unread_count, seller_unread_count')
-        .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
-      if (error) {
-        console.error(error)
-        return
+      try {
+        const { data, error } = await supabase
+          .from('conversations')
+          .select('buyer_unread_count, seller_unread_count, buyer_id, seller_id')
+          .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+
+        if (error) {
+          console.error("❌ Error fetching unread conversions:", error)
+          return
+        }
+
+        let total = 0
+        // فحص أمني لضمان أن البيانات ليست فارغة قبل معالجتها
+        data?.forEach(conv => {
+          if (!conv) return // تخطي الكائنات الفارغة
+          
+          if (conv.buyer_unread_count && conv.buyer_id === user.id) {
+            total += conv.buyer_unread_count
+          }
+          if (conv.seller_unread_count && conv.seller_id === user.id) {
+            total += conv.seller_unread_count
+          }
+        })
+        setUnreadCount(total)
+      } catch (err) {
+        console.error("🚨 Filter error in Header sync:", err)
       }
-      let total = 0
-      data.forEach(conv => {
-        if (conv.buyer_unread_count && conv.buyer_id === user.id) total += conv.buyer_unread_count
-        if (conv.seller_unread_count && conv.seller_id === user.id) total += conv.seller_unread_count
-      })
-      setUnreadCount(total)
     }
 
     fetchUnreadCount()
 
-    // الاستماع للتغيرات في الوقت الفعلي (Realtime)
+    // الاستماع للتغيرات في الوقت الفعلي بأمان
     const channel = supabase
       .channel('public:conversations')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
@@ -43,8 +55,10 @@ export const Header = () => {
       })
       .subscribe()
 
-    return () => supabase.removeChannel(channel)
-  }, [user])
+    return () => {
+      if (channel) supabase.removeChannel(channel)
+    }
+  }, [user?.id])
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -117,7 +131,6 @@ export const Header = () => {
             </>
           ) : (
             <div className="flex gap-3">
-              {/* إغلاق الكود بالشكل البرمجي السليم لإظهار أزرار الزوار المعتادة */}
               <Link to="/login" className="px-4 py-2 rounded-full border border-gold text-gold hover:bg-gold/10 transition">تسجيل دخول</Link>
               <Link to="/register" className="px-4 py-2 rounded-full bg-gold text-black hover:bg-gold-light transition">إنشاء حساب</Link>
             </div>
