@@ -7,7 +7,8 @@ export const ProductCard = ({ product }) => {
     <div className="bg-primary-card rounded-2xl overflow-hidden border border-gold/30 hover:border-gold transition-all duration-300">
       <Link to={`/product/${product.id}`}>
         <img 
-          src={product.cover_image || 'https://placehold.co/400x300'} 
+          /* تم التعديل هنا لضمان قراءة أول صورة من مصفوفة الصور في حال كانت الـ cover_image فارغة */
+          src={product.cover_image || (product.images && product.images[0]) || 'https://placehold.co/400x300'} 
           alt={product.title} 
           className="w-full h-48 object-cover hover:scale-105 transition duration-300"
         />
