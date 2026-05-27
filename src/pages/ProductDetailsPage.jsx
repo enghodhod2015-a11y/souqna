@@ -16,14 +16,22 @@ export default function ProductDetailsPage() {
     loadProduct()
   }, [id])
 
-  const loadProduct = async () => {
+    const loadProduct = async () => {
     try {
-      const data = await getProductById(id)
-      setProduct(data)
+      setLoading(true);
+      console.log("جاري البحث عن المنتج بالرقم:", id); // للتأكد من وصول المعرف
+      const data = await getProductById(id);
+      
+      if (!data) {
+        console.error("لم يتم العثور على بيانات للمنتج في Supabase");
+      }
+      
+      setProduct(data);
     } catch (err) {
-      toast.error(err.message)
+      console.error("خطأ أثناء جلب المنتج:", err);
+      toast.error(err.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
