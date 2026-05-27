@@ -16,8 +16,8 @@ export const getSellerProducts = async (sellerId) => {
 }
 
 export const getProductById = async (id) => {
-  // تم تعديل هذا السطر لحذف حقل phone المتسبب في الخطأ وحماية البيانات، وجلب المدينة والاسم فقط
-  const { data, error } = await supabase.from('products').select('*, seller:profiles(full_name, city)').eq('id', id).single()
+  // الجديد هنا: تم حذف حقل city من علاقة profiles لأن المدينة تُجلب تلقائياً من جدول المنتجات الأساسي
+  const { data, error } = await supabase.from('products').select('*, seller:profiles(full_name)').eq('id', id).single()
   if (error) throw error
   return data
 }
@@ -51,3 +51,9 @@ export const uploadProductImages = async (files, productId) => {
   }
   return urls
 }
+
+
+
+
+
+
