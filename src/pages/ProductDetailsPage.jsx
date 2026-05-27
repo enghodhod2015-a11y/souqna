@@ -7,9 +7,11 @@ import { ShoppingCart, MessageCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function ProductDetailsPage() {
-  // ✅ تم التعديل هنا: استقبال الاسم الجديد والقديم معاً لمنع الـ undefined والتعليق
   const { id, productId } = useParams()
-  const targetId = id || productId // تحديد المعرّف المتوفر برمجياً
+  
+  // 🔒 فلتر الأمان الحاسم: إذا كانت القيمة فارغة أو تساوي نص "undefined"، نعتبرها null فورًا
+  const rawId = id || productId;
+  const targetId = rawId && rawId !== 'undefined' ? rawId : null;
   
   const navigate = useNavigate()
   const { user } = useAuth() 
@@ -17,13 +19,18 @@ export default function ProductDetailsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (targetId) loadProduct()
+    // لا يتم الاستعلام إلا إذا كان المعرف حقيقيًا وليس كلمة "undefined"
+    if (targetId) {
+      loadProduct()
+    } else {
+      setLoading(false)
+    }
   }, [targetId])
 
   const loadProduct = async () => {
     try {
       setLoading(true);
-      console.log("جاري البحث عن المنتج بالرقم:", targetId); 
+      console.log("جاري البحث عن المنتج بالرقم المصفى الآمن:", targetId); 
       const data = await getProductById(targetId);
       
       if (!data) {
@@ -55,7 +62,23 @@ export default function ProductDetailsPage() {
   }
 
   if (loading) return <div className="text-center py-20 text-text-secondary">جاري التحميل...</div>
-  if (!product) return <div className="text-center py-20 text-text-secondary">المنتج غير موجود</div>
+  
+  // 🔒 إرشاد ذكي للمطور بدلاً من إرسال نص تالف يعطل خادم قاعدة البيانات
+  if (!targetId) {
+    return (
+      <div className="text-center py-20 text-text-secondary space-y-3 max-w-md mx-auto bg-primary-card p-6 rounded-2xl border border-gold/20">
+        <p className="text-xl font-bold text-red-500">🚨 خطأ في توجيه المعرف (undefined)</p>
+        <p className="text-sm leading-relaxed">
+          الزر المخصص لفتح المنتج في الصفحة الرئيسية لا يرسل المعرف الفريد السليم. يرجى مراجعة وتعديل وسم الـ <code className="bg-secondary-blue px-1.5 py-0.5 rounded text-gold text-xs">Link</code> داخل ملف كرت المنتج ليكون:
+        </p>
+        <code className="block bg-secondary-blue p-2 rounded text-emerald-400 text-xs font-mono select-all">
+          {`to={\`/product/\${product?.id}\`}`}
+        </code>
+      </div>
+    )
+  }
+
+  if (!product) return <div className="text-center py-20 text-text-secondary">المنتج غير موجود في قاعدة البيانات</div>
 
   const isOwner = user && user.id === product.seller_id;
 
