@@ -102,6 +102,7 @@ export default function AddProductPage() {
         )
         
         const imageUrls = await uploadProductImages(processedFiles, newProduct.id)
+        // تم تصحيح هذا السطر لإرسال أول رابط نصي للصورة بدلاً من المصفوفة الكاملة لمنع انهيار الاستعلام
         await updateProduct(newProduct.id, { images: imageUrls, cover_image: imageUrls[0] || '' })
       }
       toast.success('تم نشر المنتج بنجاح')
