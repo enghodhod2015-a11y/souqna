@@ -117,7 +117,9 @@ export const Header = () => {
             </>
           ) : (
             <div className="flex gap-3">
-              {/* بقية كود أزرار تسجيل الدخول غير المسجلين يبقى كما هو دون تغيير */}
+              {/* إغلاق الكود بالشكل البرمجي السليم لإظهار أزرار الزوار المعتادة */}
+              <Link to="/login" className="px-4 py-2 rounded-full border border-gold text-gold hover:bg-gold/10 transition">تسجيل دخول</Link>
+              <Link to="/register" className="px-4 py-2 rounded-full bg-gold text-black hover:bg-gold-light transition">إنشاء حساب</Link>
             </div>
           )}
         </div>
