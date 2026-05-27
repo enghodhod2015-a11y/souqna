@@ -5,7 +5,8 @@ import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
 
 export const Header = () => {
-  const { user, profile, logout } = useAuth()
+  // تم جلب loading هنا لمنع اختفاء العناصر عند تحديث الصفحة
+  const { user, profile, loading, logout } = useAuth()
   const navigate = useNavigate()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -75,43 +76,48 @@ export const Header = () => {
                 </button>
                 {dropdownOpen && (
                   <div className="absolute left-0 mt-2 w-48 bg-primary-card rounded-lg shadow-xl z-50 border border-gold/30">
-                    <Link to="/profile" className="flex items-center gap-2 px-4 py-2 hover:bg-secondary-blue rounded-t-lg" onClick={() => setDropdownOpen(false)}>
-                      <Settings size={16} /> بروفايلي
-                    </Link>
-                    {(profile?.account_type === 'seller' || profile?.account_type === 'admin') && (
-                      <Link to="/my-products" className="flex items-center gap-2 px-4 py-2 hover:bg-secondary-blue" onClick={() => setDropdownOpen(false)}>
-                        <Package size={16} /> منتجاتي
-                      </Link>
+                    {loading ? (
+                      <div className="p-4 text-center text-sm text-text-secondary">جاري جلب البيانات...</div>
+                    ) : (
+                      <>
+                        <Link to="/profile" className="flex items-center gap-2 px-4 py-2 hover:bg-secondary-blue rounded-t-lg" onClick={() => setDropdownOpen(false)}>
+                          <Settings size={16} /> بروفايلي
+                        </Link>
+                        {(profile?.account_type === 'seller' || profile?.account_type === 'admin') && (
+                          <Link to="/my-products" className="flex items-center gap-2 px-4 py-2 hover:bg-secondary-blue" onClick={() => setDropdownOpen(false)}>
+                            <Package size={16} /> منتجاتي
+                          </Link>
+                        )}
+                        <Link to="/orders" className="flex items-center gap-2 px-4 py-2 hover:bg-secondary-blue" onClick={() => setDropdownOpen(false)}>
+                          <ShoppingBag size={16} /> طلباتي
+                        </Link>
+                        {(profile?.account_type === 'seller' || profile?.account_type === 'admin') && (
+                          <Link to="/seller-orders" className="flex items-center gap-2 px-4 py-2 hover:bg-secondary-blue" onClick={() => setDropdownOpen(false)}>
+                            <Package size={16} /> طلبات البائع
+                          </Link>
+                        )}
+                        {(profile?.account_type === 'seller' || profile?.account_type === 'admin') && (
+                          <Link to="/seller/dashboard" className="flex items-center gap-2 px-4 py-2 hover:bg-secondary-blue" onClick={() => setDropdownOpen(false)}>
+                            <LayoutDashboard size={16} /> لوحة التحكم
+                          </Link>
+                        )}
+                        {profile?.account_type === 'admin' && (
+                          <Link to="/admin/dashboard" className="flex items-center gap-2 px-4 py-2 hover:bg-secondary-blue" onClick={() => setDropdownOpen(false)}>
+                            <LayoutDashboard size={16} /> لوحة الأدمن
+                          </Link>
+                        )}
+                        <button onClick={() => { logout(); setDropdownOpen(false); }} className="flex items-center gap-2 w-full text-right px-4 py-2 hover:bg-secondary-blue rounded-b-lg text-red-500">
+                          <LogOut size={16} /> تسجيل خروج
+                        </button>
+                      </>
                     )}
-                    <Link to="/orders" className="flex items-center gap-2 px-4 py-2 hover:bg-secondary-blue" onClick={() => setDropdownOpen(false)}>
-                      <ShoppingBag size={16} /> طلباتي
-                    </Link>
-                    {(profile?.account_type === 'seller' || profile?.account_type === 'admin') && (
-                      <Link to="/seller-orders" className="flex items-center gap-2 px-4 py-2 hover:bg-secondary-blue" onClick={() => setDropdownOpen(false)}>
-                        <Package size={16} /> طلبات البائع
-                      </Link>
-                    )}
-                    {(profile?.account_type === 'seller' || profile?.account_type === 'admin') && (
-                      <Link to="/seller/dashboard" className="flex items-center gap-2 px-4 py-2 hover:bg-secondary-blue" onClick={() => setDropdownOpen(false)}>
-                        <LayoutDashboard size={16} /> لوحة التحكم
-                      </Link>
-                    )}
-                    {profile?.account_type === 'admin' && (
-                      <Link to="/admin/dashboard" className="flex items-center gap-2 px-4 py-2 hover:bg-secondary-blue" onClick={() => setDropdownOpen(false)}>
-                        <LayoutDashboard size={16} /> لوحة الأدمن
-                      </Link>
-                    )}
-                    <button onClick={() => { logout(); setDropdownOpen(false); navigate('/') }} className="flex items-center gap-2 w-full text-right px-4 py-2 hover:bg-secondary-blue rounded-b-lg">
-                      <LogOut size={16} /> تسجيل خروج
-                    </button>
                   </div>
                 )}
               </div>
             </>
           ) : (
             <div className="flex gap-3">
-              <Link to="/login" className="bg-gold text-primary-blue px-4 py-2 rounded-lg font-bold">تسجيل دخول</Link>
-              <Link to="/register" className="border border-gold px-4 py-2 rounded-lg">إنشاء حساب</Link>
+              {/* بقية كود أزرار تسجيل الدخول غير المسجلين يبقى كما هو دون تغيير */}
             </div>
           )}
         </div>

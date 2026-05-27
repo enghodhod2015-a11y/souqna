@@ -16,7 +16,8 @@ export const getSellerProducts = async (sellerId) => {
 }
 
 export const getProductById = async (id) => {
-  const { data, error } = await supabase.from('products').select('*, seller:profiles(full_name, phone, city)').eq('id', id).single()
+  // تم تعديل هذا السطر لحذف حقل phone المتسبب في الخطأ وحماية البيانات، وجلب المدينة والاسم فقط
+  const { data, error } = await supabase.from('products').select('*, seller:profiles(full_name, city)').eq('id', id).single()
   if (error) throw error
   return data
 }

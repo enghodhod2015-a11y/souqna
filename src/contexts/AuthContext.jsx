@@ -73,13 +73,17 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
+      setLoading(true)
       await supabase.auth.signOut()
       setUser(null)
       setProfile(null)
+      localStorage.clear() // تنظيف المتصفح بالكامل
       toast.success('تم تسجيل الخروج')
       window.location.href = '/'
     } catch (err) {
       toast.error(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 

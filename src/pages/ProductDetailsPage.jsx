@@ -9,6 +9,7 @@ import toast from 'react-hot-toast'
 export default function ProductDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth() // جلب بيانات المستخدم الحالي للفحص الأمني
   const [product, setProduct] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -16,7 +17,7 @@ export default function ProductDetailsPage() {
     loadProduct()
   }, [id])
 
-    const loadProduct = async () => {
+  const loadProduct = async () => {
     try {
       setLoading(true);
       console.log("جاري البحث عن المنتج بالرقم:", id); // للتأكد من وصول المعرف
@@ -46,11 +47,14 @@ export default function ProductDetailsPage() {
   if (loading) return <div className="text-center py-20">جاري التحميل...</div>
   if (!product) return <div className="text-center py-20">المنتج غير موجود</div>
 
+  // فحص ما إذا كان الزائر الحالي هو بائع المنتج نفسه
+  const isOwner = user && user.id === product.seller_id;
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div>
-          <img src={product.cover_image || 'https://placehold.co/600x400'} alt={product.title} className="w-full rounded-2xl" />
+          <img src={product.cover_image || 'https://placehold.co'} alt={product.title} className="w-full rounded-2xl" />
           <div className="flex gap-2 mt-4 flex-wrap">
             {product.images?.map((img, i) => (
               <img key={i} src={img} className="w-20 h-20 object-cover rounded cursor-pointer" onClick={() => window.open(img)} />
@@ -74,6 +78,12 @@ export default function ProductDetailsPage() {
             <p><strong>البائع:</strong> {product.seller?.full_name}</p>
             <p><strong>المدينة:</strong> {product.city || 'غير محدد'}</p>
             <p><strong>الحالة:</strong> {product.condition === 'new' ? 'جديد' : product.condition === 'used' ? 'مستعمل' : 'مجدد'}</p>
+            {/* شرط أمني: لا يظهر رقم التواصل إلا إذا كان الزائر هو صاحب المنتج نفسه */}
+            {isOwner && product.contact_number && (
+              <p className="mt-2 text-gold font-semibold bg-gold/10 p-2 rounded border border-gold/20">
+                <strong>رقم التواصل الخاص بك:</strong> {product.contact_number}
+              </p>
+            )}
           </div>
         </div>
       </div>

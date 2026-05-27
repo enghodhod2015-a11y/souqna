@@ -34,6 +34,47 @@ export default function AddProductPage() {
     setImagePreviews(files.map(file => URL.createObjectURL(file)))
   }
 
+  // دالة مضافة لضغط الصور وتحويلها إلى أسماء عشوائية آمنة بالإنجليزية
+  const compressAndRenameImage = (file, productId) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200; // تحديد أقصى عرض للصورة لتقليل الحجم
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // ضغط الصورة بجودة 75% وتحويلها لصيغة jpeg خفيفة
+          canvas.toBlob((blob) => {
+            const fileExtension = 'jpg';
+            const randomString = Math.random().toString(36).substring(2, 7);
+            const fileName = `${productId}/${Date.now()}_${randomString}.${fileExtension}`;
+            
+            const compressedFile = new File([blob], fileName, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          }, 'image/jpeg', 0.75); 
+        };
+      };
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -55,7 +96,12 @@ export default function AddProductPage() {
       }
       const newProduct = await addProduct(productData)
       if (imageFiles.length > 0) {
-        const imageUrls = await uploadProductImages(imageFiles, newProduct.id)
+        // معالجة كافة الصور وضغطها وتغيير أسمائها بالتوازي قبل إرسالها لخدمة الرفع
+        const processedFiles = await Promise.all(
+          imageFiles.map(file => compressAndRenameImage(file, newProduct.id))
+        )
+        
+        const imageUrls = await uploadProductImages(processedFiles, newProduct.id)
         await updateProduct(newProduct.id, { images: imageUrls, cover_image: imageUrls[0] || '' })
       }
       toast.success('تم نشر المنتج بنجاح')

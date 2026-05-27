@@ -8,7 +8,7 @@ export const ProductCard = ({ product }) => {
       <Link to={`/product/${product.id}`}>
         <img 
           /* تم التعديل هنا لضمان قراءة أول صورة من مصفوفة الصور في حال كانت الـ cover_image فارغة */
-          src={product.cover_image || (product.images && product.images[0]) || 'https://placehold.co/400x300'} 
+          src={product.cover_image || (product.images && product.images[0]) || 'https://placehold.co'} 
           alt={product.title} 
           className="w-full h-48 object-cover hover:scale-105 transition duration-300"
         />
