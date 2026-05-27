@@ -1,7 +1,11 @@
 import { Suspense } from 'react'
-import { AppRoutes } from './routes/AppRoutes'
+// ✅ استيراد مرن يتكيف مع الـ Default أو الـ Named export لمنع انهيار الـ Rollup فوراً
+import AppRoutesComponent from './routes/AppRoutes'
 import { Header } from './components/common/Header'
 import { Footer } from './components/common/Footer'
+
+// فحص أمني لتحديد الكائن الصحيح برمجياً قبل الاستخدام
+const AppRoutes = AppRoutesComponent.AppRoutes || AppRoutesComponent;
 
 function App() {
   return (
