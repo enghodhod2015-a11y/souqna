@@ -1,30 +1,18 @@
-import { Suspense, lazy } from 'react'
+import { Suspense } from 'react'
 import { AppRoutes } from './routes/AppRoutes'
-
-const Header = lazy(() => import('./components/common/Header').then(module => ({ 
-  default: module.Header || module.default 
-})))
-
-const Footer = lazy(() => import('./components/common/Footer').then(module => ({ 
-  default: module.Footer || module.default 
-})))
+import { Header } from './components/common/Header'
+import { Footer } from './components/common/Footer'
 
 function App() {
   return (
     <div className="min-h-screen flex flex-col">
-      <Suspense fallback={null}>
-        <Header />
-      </Suspense>
-
+      <Header />
       <main className="flex-grow">
         <Suspense fallback={<div className="text-center py-20">Loading...</div>}>
           <AppRoutes />
         </Suspense>
       </main>
-
-      <Suspense fallback={null}>
-        <Footer />
-      </Suspense>
+      <Footer />
     </div>
   )
 }
