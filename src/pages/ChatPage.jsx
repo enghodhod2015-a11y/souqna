@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getOrCreateConversation, sendMessage, getMessages, markMessagesAsRead } from '../services/chatService'
 import { getProductById } from '../services/productService'
-// ⬇️ تأكد من وجود هذا السطر بالظبط لاستيراد قاعدة البيانات ومنع خطأ الـ Rollup ⬇️
 import { supabase } from '../services/supabase' 
 import { Button } from '../components/ui/Button'
 import { Send } from 'lucide-react'
@@ -38,10 +37,11 @@ export default function ChatPage() {
           .eq('id', conversationId)
           .single()
 
-        if (convErr) throw convErr
+        // ✅ تم التصحيح هنا: رمي المتغير المعرّف الصحيح convErr لمنع خطأ Rollup
+        if (convErr) throw convErr 
         
         currentConv = convData
-        currentProduct = convData.product
+        currentProduct = convData?.product
       } 
       else if (productId) {
         currentProduct = await getProductById(productId)
@@ -118,8 +118,8 @@ export default function ChatPage() {
     }
   }
 
-  if (loading) return <div className="text-center py-20">جاري التحميل...</div>
-  if (!product) return <div className="text-center py-20">المنتج غير موجود</div>
+  if (loading) return <div className="text-center py-20 text-text-secondary">جاري التحميل...</div>
+  if (!product) return <div className="text-center py-20 text-text-secondary">المنتج غير موجود</div>
 
   const isBuyer = conversation?.buyer_id === user?.id
   const chatPartnerRole = isBuyer ? 'البائع' : 'المشتري المحتمل'
