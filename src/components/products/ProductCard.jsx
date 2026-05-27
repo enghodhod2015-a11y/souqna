@@ -3,11 +3,13 @@ import { ShoppingCart, MessageCircle, Star } from 'lucide-react'
 import { Button } from '../ui/Button'
 
 export const ProductCard = ({ product }) => {
+  // فحص أمني لضمان عدم تمرير حقول فارغة
+  if (!product || !product.id) return null;
+
   return (
     <div className="bg-primary-card rounded-2xl overflow-hidden border border-gold/30 hover:border-gold transition-all duration-300">
       <Link to={`/product/${product.id}`}>
         <img 
-          /* تم التعديل هنا لضمان قراءة أول صورة من مصفوفة الصور في حال كانت الـ cover_image فارغة */
           src={product.cover_image || (product.images && product.images[0]) || 'https://placehold.co'} 
           alt={product.title} 
           className="w-full h-48 object-cover hover:scale-105 transition duration-300"
@@ -15,7 +17,7 @@ export const ProductCard = ({ product }) => {
       </Link>
       <div className="p-4">
         <Link to={`/product/${product.id}`}>
-          <h3 className="text-lg font-bold mb-1 line-clamp-1">{product.title}</h3>
+          <h3 className="text-lg font-bold mb-1 line-clamp-1 text-white">{product.title}</h3>
         </Link>
         <div className="flex items-center gap-1 mb-2">
           {[...Array(5)].map((_, i) => (
@@ -35,7 +37,8 @@ export const ProductCard = ({ product }) => {
               <ShoppingCart size={16} className="inline ml-1" /> شراء
             </Button>
           </Link>
-          <Link to={`/chat/${product.id}/${product.seller_id}`} className="flex-1">
+          {/* 🔒 تم التعديل الأمني الحاسم هنا: التوجيه لحساب مسار المنتج المباشر المجهول حظراً لكشف الهويات */}
+          <Link to={`/chat/product/${product.id}`} className="flex-1">
             <Button variant="secondary" className="w-full text-sm py-1.5">
               <MessageCircle size={16} className="inline ml-1" /> استعلام
             </Button>

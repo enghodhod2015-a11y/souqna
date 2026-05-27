@@ -2,10 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getProducts } from '../services/productService'
 import { ProductCard } from '../components/products/ProductCard'
-import { Button } from '../components/ui/Button'
 import { ChevronLeft } from 'lucide-react'
 
-// قائمة الأقسام (يمكن جلبها من Supabase لاحقاً)
 const categories = [
   { id: 'electronics', name: 'الإلكترونيات', icon: '📱' },
   { id: 'fashion', name: 'الأزياء والموضة', icon: '👗' },
@@ -18,7 +16,6 @@ const categories = [
   { id: 'pets', name: 'الحيوانات الأليفة', icon: '🐶' }
 ]
 
-// قائمة تسويقية جانبية (مميزات)
 const sideLinks = [
   { name: 'الأكثر مبيعاً', slug: 'best-selling', icon: '🔥' },
   { name: 'عروض وخصومات', slug: 'offers', icon: '🏷️' },
@@ -42,7 +39,7 @@ export default function HomePage() {
       const filters = {}
       if (selectedCategory) filters.category = selectedCategory
       const data = await getProducts(filters)
-      setProducts(data)
+      setProducts(data || [])
     } catch (err) {
       console.error(err)
     } finally {
@@ -55,7 +52,6 @@ export default function HomePage() {
       <h1 className="text-3xl font-bold text-gold mb-8 text-center">مرحباً بكم في سوقنا</h1>
       
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* القائمة الجانبية اليمنى (الأقسام) */}
         <aside className="lg:w-1/4">
           <div className="bg-primary-card rounded-2xl p-4 border border-gold/30 sticky top-20">
             <h2 className="text-xl font-bold text-gold mb-4">الأقسام</h2>
@@ -82,7 +78,6 @@ export default function HomePage() {
           </div>
         </aside>
 
-        {/* شبكة المنتجات */}
         <main className="lg:w-2/4">
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -96,14 +91,15 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {products.map(product => (
-                <ProductCard key={product.id} product={product} />
-              ))}
+              {products.map(product => {
+                // 🔒 حماية ذكية: استثناء المنتجات التي لا تحتوي على id سليم لمنع انهيار الموقع
+                if (!product?.id) return null;
+                return <ProductCard key={product.id} product={product} />
+              })}
             </div>
           )}
         </main>
 
-        {/* القائمة الجانبية اليسرى (تسويقية) */}
         <aside className="lg:w-1/4">
           <div className="bg-primary-card rounded-2xl p-4 border border-gold/30 sticky top-20">
             <h2 className="text-xl font-bold text-gold mb-4">اكتشف</h2>
@@ -115,7 +111,6 @@ export default function HomePage() {
                     className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-secondary-blue transition"
                   >
                     <span>{link.icon}</span> {link.name}
-                    <ChevronLeft size={16} className="mr-auto" />
                   </Link>
                 </li>
               ))}
