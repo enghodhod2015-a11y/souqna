@@ -12,7 +12,7 @@ export default function AddProductPage() {
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     title: '', description: '', price: '', discount_percentage: 0, category: categories[0],
-    quantity: '', city: '', contact_number: '', condition: 'new', featured: false
+    stock_quantity: '', city: '', contact_number: '', condition: 'new', is_featured: false
   })
   const [imageFiles, setImageFiles] = useState([])
   const [imagePreviews, setImagePreviews] = useState([])
@@ -36,20 +36,24 @@ export default function AddProductPage() {
     e.preventDefault()
     setLoading(true)
     try {
+      // تعديل الأعمدة لتناسب الجدول
       const productData = {
         seller_id: user.id,
-        title: formData.title,
+        name: formData.title,              // <-- تغيير من title إلى name
+        slug: formData.title.toLowerCase().replace(/\s+/g, '-'), // <-- إضافة slug
         description: formData.description,
         price: parseFloat(formData.price),
-        discount_percentage: parseInt(formData.discount_percentage),
+        stock_quantity: parseInt(formData.stock_quantity) || 0,  // <-- تغيير من quantity
         category: formData.category,
-        quantity: parseInt(formData.quantity),
         city: formData.city,
-        contact_number: formData.contact_number,
         condition: formData.condition,
-        featured: formData.featured,
+        is_featured: formData.is_featured,  // <-- تغيير من featured
+        is_hidden: false,
+        is_approved: true,
+        is_active: true,
         images: [],
         cover_image: ''
+        // حذف: discount_percentage, contact_number, quantity, featured
       }
       const newProduct = await addProduct(productData)
       if (imageFiles.length > 0) {
@@ -57,7 +61,6 @@ export default function AddProductPage() {
         await updateProduct(newProduct.id, { images: imageUrls, cover_image: imageUrls[0] || '' })
       }
       toast.success('تم نشر المنتج بنجاح')
-      // استخدام window.location بدلاً من navigate لتجنب التجميد
       window.location.href = `/product/${newProduct.id}`
     } catch (err) {
       toast.error(err.message)
@@ -85,7 +88,7 @@ export default function AddProductPage() {
               {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
           </div>
-          <Input label="الكمية" name="quantity" type="number" value={formData.quantity} onChange={handleChange} required />
+          <Input label="الكمية" name="stock_quantity" type="number" value={formData.stock_quantity} onChange={handleChange} required />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input label="المدينة" name="city" value={formData.city} onChange={handleChange} />
@@ -100,7 +103,7 @@ export default function AddProductPage() {
           </select>
         </div>
         <div className="mb-4 flex items-center gap-2">
-          <input type="checkbox" name="featured" checked={formData.featured} onChange={handleChange} className="w-5 h-5" />
+          <input type="checkbox" name="is_featured" checked={formData.is_featured} onChange={handleChange} className="w-5 h-5" />
           <label>منتج مميز</label>
         </div>
         <div className="mb-4">
@@ -115,4 +118,3 @@ export default function AddProductPage() {
     </div>
   )
 }
-
