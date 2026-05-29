@@ -36,10 +36,9 @@ export default function AddProductPage() {
     e.preventDefault()
     setLoading(true)
     try {
-      // تغيير 'title' إلى 'name' ليتناسب مع جدول products
       const productData = {
         seller_id: user.id,
-        name: formData.title,           // <-- تغيير من title إلى name
+        title: formData.title,
         description: formData.description,
         price: parseFloat(formData.price),
         discount_percentage: parseInt(formData.discount_percentage),
@@ -49,8 +48,6 @@ export default function AddProductPage() {
         contact_number: formData.contact_number,
         condition: formData.condition,
         featured: formData.featured,
-        is_hidden: false,               // <-- إضافة افتراضية
-        is_approved: true,              // <-- إضافة افتراضية
         images: [],
         cover_image: ''
       }
@@ -60,6 +57,7 @@ export default function AddProductPage() {
         await updateProduct(newProduct.id, { images: imageUrls, cover_image: imageUrls[0] || '' })
       }
       toast.success('تم نشر المنتج بنجاح')
+      // استخدام window.location بدلاً من navigate لتجنب التجميد
       window.location.href = `/product/${newProduct.id}`
     } catch (err) {
       toast.error(err.message)
