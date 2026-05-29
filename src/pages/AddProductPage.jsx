@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'   // ✅ استخدام React Router بدلاً من window
 import { useAuth } from '../contexts/AuthContext'
 import { addProduct, uploadProductImages, updateProduct } from '../services/productService'
 import { Button } from '../components/ui/Button'
@@ -9,6 +10,7 @@ const categories = ['electronics', 'fashion', 'beauty', 'vehicles', 'home', 'bab
 
 export default function AddProductPage() {
   const { user, profile } = useAuth()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     title: '', description: '', price: '', discount_percentage: 0, category: categories[0],
@@ -36,34 +38,46 @@ export default function AddProductPage() {
     e.preventDefault()
     setLoading(true)
     try {
-      // تعديل الأعمدة لتناسب الجدول
+      // تحضير البيانات
       const productData = {
         seller_id: user.id,
-        name: formData.title,              // <-- تغيير من title إلى name
-        slug: formData.title.toLowerCase().replace(/\s+/g, '-'), // <-- إضافة slug
+        name: formData.title,
+        slug: formData.title.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
         description: formData.description,
         price: parseFloat(formData.price),
-        stock_quantity: parseInt(formData.stock_quantity) || 0,  // <-- تغيير من quantity
+        stock_quantity: parseInt(formData.stock_quantity) || 0,
         category: formData.category,
         city: formData.city,
         condition: formData.condition,
-        is_featured: formData.is_featured,  // <-- تغيير من featured
+        is_featured: formData.is_featured,
         is_hidden: false,
         is_approved: true,
         is_active: true,
         images: [],
         cover_image: ''
-        // حذف: discount_percentage, contact_number, quantity, featured
       }
+
       const newProduct = await addProduct(productData)
+
+      // ✅ التحقق من أن المنتج تم إنشاؤه وله معرف
+      if (!newProduct || !newProduct.id) {
+        throw new Error('لم يتم استلام معرف المنتج بعد الإضافة')
+      }
+
+      // رفع الصور إذا وجدت
       if (imageFiles.length > 0) {
         const imageUrls = await uploadProductImages(imageFiles, newProduct.id)
         await updateProduct(newProduct.id, { images: imageUrls, cover_image: imageUrls[0] || '' })
       }
+
       toast.success('تم نشر المنتج بنجاح')
-      window.location.href = `/product/${newProduct.id}`
+      
+      // ✅ التوجيه باستخدام React Router (بدون إعادة تحميل الصفحة)
+      navigate(`/product/${newProduct.id}`)
+      
     } catch (err) {
-      toast.error(err.message)
+      console.error('خطأ أثناء النشر:', err)
+      toast.error(err.message || 'حدث خطأ، يرجى المحاولة مرة أخرى')
       setLoading(false)
     }
   }
