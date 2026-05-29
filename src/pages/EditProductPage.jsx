@@ -15,8 +15,8 @@ export default function EditProductPage() {
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [formData, setFormData] = useState({
-    title: '', description: '', price: '', discount_percentage: 0, category: categories[0],
-    quantity: '', city: '', contact_number: '', condition: 'new', featured: false
+    name: '', description: '', price: '', discount_percentage: 0, category: categories[0],
+    stock_quantity: '', city: '', contact_number: '', condition: 'new', is_featured: false
   })
   const [existingImages, setExistingImages] = useState([])
   const [newImageFiles, setNewImageFiles] = useState([])
@@ -33,16 +33,16 @@ export default function EditProductPage() {
         return
       }
       setFormData({
-        title: product.title,
+        name: product.name || product.title,    // مرونة للبيانات القديمة
         description: product.description || '',
         price: product.price,
-        discount_percentage: product.discount_percentage,
+        discount_percentage: product.discount_percentage || 0,
         category: product.category,
-        quantity: product.quantity,
+        stock_quantity: product.stock_quantity ?? product.quantity ?? '',
         city: product.city || '',
         contact_number: product.contact_number || '',
         condition: product.condition,
-        featured: product.featured
+        is_featured: product.is_featured ?? product.featured ?? false
       })
       setExistingImages(product.images || [])
     } catch (err) {
@@ -78,10 +78,16 @@ export default function EditProductPage() {
         allImages = [...allImages, ...newUrls]
       }
       await updateProduct(id, {
-        ...formData,
+        name: formData.name,
+        description: formData.description,
         price: parseFloat(formData.price),
-        discount_percentage: parseInt(formData.discount_percentage),
-        quantity: parseInt(formData.quantity),
+        discount_percentage: parseInt(formData.discount_percentage) || 0,
+        category: formData.category,
+        stock_quantity: parseInt(formData.stock_quantity) || 0,
+        city: formData.city,
+        contact_number: formData.contact_number,
+        condition: formData.condition,
+        is_featured: formData.is_featured,
         images: allImages,
         cover_image: allImages[0] || ''
       })
@@ -94,13 +100,20 @@ export default function EditProductPage() {
     }
   }
 
+  // تحرير عناوين URL المؤقتة عند إلغاء تحميل المكون
+  useEffect(() => {
+    return () => {
+      newImagePreviews.forEach(url => URL.revokeObjectURL(url))
+    }
+  }, [newImagePreviews])
+
   if (initialLoading) return <div className="text-center py-20">جاري التحميل...</div>
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <h1 className="text-2xl font-bold text-gold mb-6">تعديل المنتج</h1>
       <form onSubmit={handleSubmit} className="bg-primary-card p-6 rounded-2xl border border-gold/30">
-        <Input label="اسم المنتج" name="title" value={formData.title} onChange={handleChange} required />
+        <Input label="اسم المنتج" name="name" value={formData.name} onChange={handleChange} required />
         <div className="mb-4">
           <label className="block mb-1 text-text-secondary">الوصف</label>
           <textarea name="description" value={formData.description} onChange={handleChange} rows="4" className="w-full px-4 py-2 rounded-lg bg-primary-card border border-gold/30 text-white" required />
@@ -116,7 +129,7 @@ export default function EditProductPage() {
               {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
           </div>
-          <Input label="الكمية" name="quantity" type="number" value={formData.quantity} onChange={handleChange} required />
+          <Input label="الكمية" name="stock_quantity" type="number" value={formData.stock_quantity} onChange={handleChange} required />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input label="المدينة" name="city" value={formData.city} onChange={handleChange} />
@@ -131,7 +144,7 @@ export default function EditProductPage() {
           </select>
         </div>
         <div className="mb-4 flex items-center gap-2">
-          <input type="checkbox" name="featured" checked={formData.featured} onChange={handleChange} className="w-5 h-5" />
+          <input type="checkbox" name="is_featured" checked={formData.is_featured} onChange={handleChange} className="w-5 h-5" />
           <label>منتج مميز</label>
         </div>
         <div className="mb-4">
@@ -157,3 +170,5 @@ export default function EditProductPage() {
     </div>
   )
 }
+
+
