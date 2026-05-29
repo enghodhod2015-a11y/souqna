@@ -3,12 +3,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { 
   User, 
   LogOut, 
-  Package, 
-  ShoppingBag, 
-  MessageCircle, 
-  LayoutDashboard,
-  Store,
-  ChevronDown
+  ChevronDown,
+  MessageCircle
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
@@ -79,31 +75,53 @@ export const Header = () => {
         {/* الشعار */}
         <Link to="/" className="text-2xl font-bold text-gold">سوقنا</Link>
 
-        {/* الأيقونات والمستخدم */}
+        {/* الأزرار والمستخدم */}
         <div className="flex items-center gap-3">
           {user ? (
             <>
-              {/* أيقونة المتجر - للبائع فقط */}
+              {/* ─── أزرار المشتري ─── */}
+              <Link 
+                to="/orders" 
+                className="px-4 py-2 rounded-full border border-gold text-gold hover:bg-gold/10 transition text-sm"
+              >
+                طلباتي
+              </Link>
+
+              {/* ─── أزرار البائع ─── */}
               {isSeller && (
+                <>
+                  <Link 
+                    to="/my-products" 
+                    className="px-4 py-2 rounded-full border border-gold text-gold hover:bg-gold/10 transition text-sm"
+                  >
+                    منتجاتي
+                  </Link>
+                  <Link 
+                    to="/seller-orders" 
+                    className="px-4 py-2 rounded-full border border-gold text-gold hover:bg-gold/10 transition text-sm"
+                  >
+                    طلبات البائع
+                  </Link>
+                  <Link 
+                    to="/seller/dashboard" 
+                    className="px-4 py-2 rounded-full border border-gold text-gold hover:bg-gold/10 transition text-sm"
+                  >
+                    لوحة التحكم
+                  </Link>
+                </>
+              )}
+
+              {/* ─── زر الأدمن ─── */}
+              {isAdmin && (
                 <Link 
-                  to="/my-products" 
-                  className="p-2 rounded-full hover:bg-primary-card transition-colors relative"
-                  title="منتجاتي"
+                  to="/admin/dashboard" 
+                  className="px-4 py-2 rounded-full border border-red-400 text-red-400 hover:bg-red-400/10 transition text-sm"
                 >
-                  <Store size={20} className="text-gold" />
+                  لوحة الأدمن
                 </Link>
               )}
 
-              {/* أيقونة طلباتي */}
-              <Link 
-                to="/orders" 
-                className="p-2 rounded-full hover:bg-primary-card transition-colors relative"
-                title="طلباتي"
-              >
-                <ShoppingBag size={20} className="text-gold" />
-              </Link>
-
-              {/* أيقونة الرسائل */}
+              {/* ─── الرسائل ─── */}
               <Link 
                 to="/inbox" 
                 className="p-2 rounded-full hover:bg-primary-card transition-colors relative"
@@ -117,42 +135,19 @@ export const Header = () => {
                 )}
               </Link>
 
-              {/* أيقونة لوحة التحكم - للبائع */}
-              {isSeller && (
-                <Link 
-                  to="/seller/dashboard" 
-                  className="p-2 rounded-full hover:bg-primary-card transition-colors relative"
-                  title="لوحة التحكم"
-                >
-                  <LayoutDashboard size={20} className="text-gold" />
-                </Link>
-              )}
-
-              {/* أيقونة لوحة الأدمن - للأدمن فقط */}
-              {isAdmin && (
-                <Link 
-                  to="/admin/dashboard" 
-                  className="p-2 rounded-full hover:bg-primary-card transition-colors relative"
-                  title="لوحة الأدمن"
-                >
-                  <LayoutDashboard size={20} className="text-red-400" />
-                </Link>
-              )}
-
-              {/* اسم المستخدم + منسدلة صغيرة (تسجيل خروج فقط) */}
+              {/* ─── اسم المستخدم + منسدلة صغيرة ─── */}
               <div className="relative" ref={dropdownRef}>
                 <button 
                   onClick={() => setDropdownOpen(!dropdownOpen)} 
-                  className="flex items-center gap-2 bg-primary-card rounded-full px-3 py-2 hover:bg-secondary-blue transition-colors"
+                  className="flex items-center gap-2 bg-primary-card rounded-full px-4 py-2 hover:bg-secondary-blue transition-colors"
                 >
                   <User size={18} className="text-gold" />
-                  <span className="text-sm hidden md:inline">{profile?.full_name || user.email?.split('@')[0]}</span>
+                  <span className="text-sm">{profile?.full_name || user.email?.split('@')[0]}</span>
                   <ChevronDown size={14} />
                 </button>
 
                 {dropdownOpen && (
                   <div className="absolute left-0 mt-2 w-48 bg-primary-card rounded-lg shadow-xl z-50 border border-gold/30">
-                    {/* البروفايل */}
                     <Link 
                       to="/profile" 
                       className="flex items-center gap-2 px-4 py-3 hover:bg-secondary-blue rounded-t-lg"
@@ -160,8 +155,6 @@ export const Header = () => {
                     >
                       <User size={16} /> بروفايلي
                     </Link>
-
-                    {/* تسجيل خروج */}
                     <button 
                       onClick={() => { logout(); setDropdownOpen(false); }} 
                       className="flex items-center gap-2 w-full text-right px-4 py-3 hover:bg-secondary-blue rounded-b-lg text-red-500"
