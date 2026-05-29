@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'   // ✅ استخدام React Router بدلاً من window
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { addProduct, uploadProductImages, updateProduct } from '../services/productService'
 import { Button } from '../components/ui/Button'
@@ -13,8 +13,16 @@ export default function AddProductPage() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    title: '', description: '', price: '', discount_percentage: 0, category: categories[0],
-    stock_quantity: '', city: '', contact_number: '', condition: 'new', is_featured: false
+    title: '',
+    description: '',
+    price: '',
+    discount_percentage: 0,
+    category: categories[0],
+    stock_quantity: '',
+    city: '',
+    contact_number: '',
+    condition: 'new',
+    is_featured: false
   })
   const [imageFiles, setImageFiles] = useState([])
   const [imagePreviews, setImagePreviews] = useState([])
@@ -38,13 +46,21 @@ export default function AddProductPage() {
     e.preventDefault()
     setLoading(true)
     try {
-      // تحضير البيانات
+      // حساب compare_at_price من نسبة الخصم
+      let compare_at_price = null
+      if (formData.discount_percentage > 0 && formData.price) {
+        const originalPrice = parseFloat(formData.price) / (1 - formData.discount_percentage / 100)
+        compare_at_price = parseFloat(originalPrice.toFixed(2))
+      }
+
+      // تحويل البيانات إلى ما يتوقعه الجدول
       const productData = {
         seller_id: user.id,
         name: formData.title,
         slug: formData.title.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
         description: formData.description,
         price: parseFloat(formData.price),
+        compare_at_price: compare_at_price,
         stock_quantity: parseInt(formData.stock_quantity) || 0,
         category: formData.category,
         city: formData.city,
@@ -58,26 +74,19 @@ export default function AddProductPage() {
       }
 
       const newProduct = await addProduct(productData)
+      if (!newProduct?.id) throw new Error('لم يتم استلام معرف المنتج')
 
-      // ✅ التحقق من أن المنتج تم إنشاؤه وله معرف
-      if (!newProduct || !newProduct.id) {
-        throw new Error('لم يتم استلام معرف المنتج بعد الإضافة')
-      }
-
-      // رفع الصور إذا وجدت
       if (imageFiles.length > 0) {
         const imageUrls = await uploadProductImages(imageFiles, newProduct.id)
         await updateProduct(newProduct.id, { images: imageUrls, cover_image: imageUrls[0] || '' })
       }
 
       toast.success('تم نشر المنتج بنجاح')
-      
-      // ✅ التوجيه باستخدام React Router (بدون إعادة تحميل الصفحة)
       navigate(`/product/${newProduct.id}`)
-      
     } catch (err) {
-      console.error('خطأ أثناء النشر:', err)
-      toast.error(err.message || 'حدث خطأ، يرجى المحاولة مرة أخرى')
+      console.error(err)
+      toast.error(err.message)
+    } finally {
       setLoading(false)
     }
   }
@@ -132,3 +141,4 @@ export default function AddProductPage() {
     </div>
   )
 }
+

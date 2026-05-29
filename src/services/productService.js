@@ -1,10 +1,5 @@
 import { supabase } from './supabase'
 
-/*
-|--------------------------------------------------------------------------
-| جلب جميع المنتجات
-|--------------------------------------------------------------------------
-*/
 export const getProducts = async (filters = {}) => {
   try {
     let query = supabase
@@ -14,38 +9,25 @@ export const getProducts = async (filters = {}) => {
       .eq('is_approved', true)
       .order('created_at', { ascending: false })
 
-    if (filters.category) {
-      query = query.eq('category', filters.category)
-    }
-
-    if (filters.search) {
-      query = query.ilike('name', '%' + filters.search + '%')
-    }
+    if (filters.category) query = query.eq('category', filters.category)
+    if (filters.search) query = query.ilike('name', '%' + filters.search + '%')
 
     const { data: products, error } = await query
+    if (error) throw error
 
-    if (error) {
-      console.error('❌ خطأ أثناء جلب المنتجات:', error)
-      throw error
-    }
-
-    if (products && products.length > 0) {
+    if (products?.length) {
       const sellerIds = [...new Set(products.map(p => p.seller_id))].filter(Boolean)
-      
-      if (sellerIds.length > 0) {
-        const { data: sellers, error: sellersError } = await supabase
+      if (sellerIds.length) {
+        const { data: sellers } = await supabase
           .from('profiles')
           .select('id, full_name, avatar_url')
           .in('id', sellerIds)
-
-        if (!sellersError && sellers) {
-          const sellersMap = {}
-          sellers.forEach(s => { sellersMap[s.id] = s })
-          products.forEach(product => { product.seller = sellersMap[product.seller_id] || null })
+        if (sellers) {
+          const sellersMap = Object.fromEntries(sellers.map(s => [s.id, s]))
+          products.forEach(p => { p.seller = sellersMap[p.seller_id] || null })
         }
       }
     }
-
     return products || []
   } catch (error) {
     console.error('⚠️ فشل جلب المنتجات:', error)
@@ -60,7 +42,6 @@ export const getSellerProducts = async (sellerId) => {
       .select('*')
       .eq('seller_id', sellerId)
       .order('created_at', { ascending: false })
-
     if (error) throw error
     return data || []
   } catch (error) {
@@ -71,30 +52,28 @@ export const getSellerProducts = async (sellerId) => {
 
 export const getProductById = async (id) => {
   try {
-    if (!id || id === 'undefined') {
-      throw new Error('معرف المنتج غير صالح')
-    }
-
+    if (!id || id === 'undefined') throw new Error('معرف المنتج غير صالح')
     const { data: product, error } = await supabase
       .from('products')
       .select('*')
       .eq('id', id)
       .single()
-
     if (error) throw error
-
-    if (product && product.seller_id) {
-      const { data: seller, error: sellerError } = await supabase
+    if (product?.seller_id) {
+      const { data: seller } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url, phone, city')
         .eq('id', product.seller_id)
         .maybeSingle()
-
-      if (!sellerError && seller) {
-        product.seller = seller
-      }
+      if (seller) product.seller = seller
     }
-
+    // حساب نسبة الخصم للعرض (إذا كان compare_at_price موجوداً)
+    if (product.compare_at_price && product.compare_at_price > product.price) {
+      product.discount_percentage = Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)
+    } else {
+      product.discount_percentage = 0
+    }
+    product.final_price = product.price
     return product
   } catch (error) {
     console.error('❌ فشل جلب المنتج:', error)
@@ -104,12 +83,13 @@ export const getProductById = async (id) => {
 
 export const addProduct = async (productData) => {
   try {
+    // إزالة الحقول غير الموجودة في الجدول
+    const { discount_percentage, final_price, contact_number, ...cleanData } = productData
     const { data, error } = await supabase
       .from('products')
-      .insert([productData])
+      .insert([cleanData])
       .select()
       .single()
-
     if (error) throw error
     return data
   } catch (error) {
@@ -120,13 +100,14 @@ export const addProduct = async (productData) => {
 
 export const updateProduct = async (id, updates) => {
   try {
+    // إزالة الحقول غير الموجودة في الجدول
+    const { discount_percentage, final_price, contact_number, ...cleanUpdates } = updates
     const { data, error } = await supabase
       .from('products')
-      .update(updates)
+      .update(cleanUpdates)
       .eq('id', id)
       .select()
       .single()
-
     if (error) throw error
     return data
   } catch (error) {
@@ -137,11 +118,7 @@ export const updateProduct = async (id, updates) => {
 
 export const deleteProduct = async (id) => {
   try {
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', id)
-
+    const { error } = await supabase.from('products').delete().eq('id', id)
     if (error) throw error
     return true
   } catch (error) {
@@ -166,3 +143,5 @@ export const uploadProductImages = async (files, productId) => {
     throw error
   }
 }
+
+
