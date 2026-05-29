@@ -15,14 +15,24 @@ export default function EditProductPage() {
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [formData, setFormData] = useState({
-    name: '', description: '', price: '', discount_percentage: 0, category: categories[0],
-    stock_quantity: '', city: '', contact_number: '', condition: 'new', is_featured: false
+    name: '',
+    description: '',
+    price: '',
+    discount_percentage: 0,
+    category: categories[0],
+    stock_quantity: '',
+    city: '',
+    contact_number: '',
+    condition: 'new',
+    is_featured: false
   })
   const [existingImages, setExistingImages] = useState([])
   const [newImageFiles, setNewImageFiles] = useState([])
   const [newImagePreviews, setNewImagePreviews] = useState([])
 
-  useEffect(() => { loadProduct() }, [id])
+  useEffect(() => {
+    loadProduct()
+  }, [id])
 
   const loadProduct = async () => {
     try {
@@ -33,7 +43,7 @@ export default function EditProductPage() {
         return
       }
       setFormData({
-        name: product.name || product.title,    // مرونة للبيانات القديمة
+        name: product.name || product.title,
         description: product.description || '',
         price: product.price,
         discount_percentage: product.discount_percentage || 0,
@@ -92,6 +102,8 @@ export default function EditProductPage() {
         cover_image: allImages[0] || ''
       })
       toast.success('تم تحديث المنتج بنجاح')
+
+      // ✅ التوجيه إلى صفحة تفاصيل المنتج بعد التعديل
       navigate(`/product/${id}`)
     } catch (err) {
       toast.error(err.message)
@@ -100,7 +112,7 @@ export default function EditProductPage() {
     }
   }
 
-  // تحرير عناوين URL المؤقتة عند إلغاء تحميل المكون
+  // تحرير عناوين URL المؤقتة
   useEffect(() => {
     return () => {
       newImagePreviews.forEach(url => URL.revokeObjectURL(url))
@@ -165,10 +177,10 @@ export default function EditProductPage() {
             {newImagePreviews.map((src, idx) => <img key={idx} src={src} className="w-20 h-20 object-cover rounded" />)}
           </div>
         </div>
-        <Button type="submit" disabled={loading} className="w-full">{loading ? 'جاري التحديث...' : 'تحديث المنتج'}</Button>
+        <Button type="submit" disabled={loading} className="w-full">
+          {loading ? 'جاري التحديث...' : 'حفظ التغييرات'}
+        </Button>
       </form>
     </div>
   )
 }
-
-
