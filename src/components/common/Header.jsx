@@ -10,7 +10,7 @@ import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
 
 export const Header = () => {
-  const { user, profile, loading, logout } = useAuth()
+  const { user, profile, logout } = useAuth()
   const navigate = useNavigate()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -20,38 +20,32 @@ export const Header = () => {
 
   // تحديث الصلاحيات بعد جلب البيانات
   useEffect(() => {
-    if (!loading && profile) {
+    if (profile) {
       setIsSellerReady(profile?.account_type === 'seller' || profile?.account_type === 'admin')
       setIsAdminReady(profile?.account_type === 'admin')
     }
-  }, [loading, profile])
+  }, [profile])
 
   // جلب عدد المحادثات غير المقروءة
   useEffect(() => {
-    if (!user?.id) return
+    if (!user) return
 
     const fetchUnreadCount = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('conversations')
-          .select('buyer_unread_count, seller_unread_count, buyer_id, seller_id')
-          .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
-
-        if (error) {
-          console.error("❌ Error fetching unread conversations:", error)
-          return
-        }
-
-        let total = 0
-        data?.forEach(conv => {
-          if (!conv) return
-          if (conv.buyer_id === user.id) total += conv.buyer_unread_count || 0
-          if (conv.seller_id === user.id) total += conv.seller_unread_count || 0
-        })
-        setUnreadCount(total)
-      } catch (err) {
-        console.error("🚨 Error in Header:", err)
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('buyer_unread_count, seller_unread_count, buyer_id, seller_id')
+        .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+      if (error) {
+        console.error(error)
+        return
       }
+      let total = 0
+      data?.forEach(conv => {
+        if (!conv) return
+        if (conv.buyer_id === user.id) total += conv.buyer_unread_count || 0
+        if (conv.seller_id === user.id) total += conv.seller_unread_count || 0
+      })
+      setUnreadCount(total)
     }
 
     fetchUnreadCount()
@@ -63,10 +57,8 @@ export const Header = () => {
       })
       .subscribe()
 
-    return () => {
-      if (channel) supabase.removeChannel(channel)
-    }
-  }, [user?.id])
+    return () => supabase.removeChannel(channel)
+  }, [user])
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -86,49 +78,49 @@ export const Header = () => {
         <div className="flex items-center gap-3">
           {user ? (
             <>
-              {/* ─── أزرار المشتري ─── */}
+              {/* ─── أزرار المشتري (نفس شكل تسجيل دخول) ─── */}
               <Link 
                 to="/orders" 
-                className="px-4 py-2 rounded-full border border-gold text-gold hover:bg-gold/10 transition text-sm"
+                className="bg-gold text-primary-blue px-4 py-2 rounded-lg font-bold hover:bg-gold/90 transition text-sm"
               >
                 طلباتي
               </Link>
 
-              {/* ─── أزرار البائع ─── */}
-              {!loading && isSellerReady && (
+              {/* ─── أزرار البائع (نفس الشكل) ─── */}
+              {isSellerReady && (
                 <>
                   <Link 
                     to="/my-products" 
-                    className="px-4 py-2 rounded-full border border-gold text-gold hover:bg-gold/10 transition text-sm"
+                    className="bg-gold text-primary-blue px-4 py-2 rounded-lg font-bold hover:bg-gold/90 transition text-sm"
                   >
                     منتجاتي
                   </Link>
                   <Link 
                     to="/seller-orders" 
-                    className="px-4 py-2 rounded-full border border-gold text-gold hover:bg-gold/10 transition text-sm"
+                    className="bg-gold text-primary-blue px-4 py-2 rounded-lg font-bold hover:bg-gold/90 transition text-sm"
                   >
                     طلبات البائع
                   </Link>
                   <Link 
                     to="/seller/dashboard" 
-                    className="px-4 py-2 rounded-full border border-gold text-gold hover:bg-gold/10 transition text-sm"
+                    className="bg-gold text-primary-blue px-4 py-2 rounded-lg font-bold hover:bg-gold/90 transition text-sm"
                   >
                     لوحة التحكم
                   </Link>
                 </>
               )}
 
-              {/* ─── زر الأدمن ─── */}
-              {!loading && isAdminReady && (
+              {/* ─── زر الأدمن (نفس الشكل بلون مختلف) ─── */}
+              {isAdminReady && (
                 <Link 
                   to="/admin/dashboard" 
-                  className="px-4 py-2 rounded-full border border-red-400 text-red-400 hover:bg-red-400/10 transition text-sm"
+                  className="bg-red-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-600 transition text-sm"
                 >
                   لوحة الأدمن
                 </Link>
               )}
 
-              {/* ─── الرسائل ─── */}
+              {/* ─── الرسائل (أيقونة فقط) ─── */}
               <Link 
                 to="/inbox" 
                 className="p-2 rounded-full hover:bg-primary-card transition-colors relative"
@@ -163,7 +155,7 @@ export const Header = () => {
                       <User size={16} /> بروفايلي
                     </Link>
                     <button 
-                      onClick={() => { logout(); setDropdownOpen(false); }} 
+                      onClick={() => { logout(); setDropdownOpen(false); navigate('/') }} 
                       className="flex items-center gap-2 w-full text-right px-4 py-3 hover:bg-secondary-blue rounded-b-lg text-red-500"
                     >
                       <LogOut size={16} /> تسجيل خروج
@@ -174,10 +166,10 @@ export const Header = () => {
             </>
           ) : (
             <div className="flex gap-3">
-              <Link to="/login" className="px-4 py-2 rounded-full border border-gold text-gold hover:bg-gold/10 transition">
+              <Link to="/login" className="bg-gold text-primary-blue px-4 py-2 rounded-lg font-bold hover:bg-gold/90 transition">
                 تسجيل دخول
               </Link>
-              <Link to="/register" className="px-4 py-2 rounded-full bg-gold text-black hover:bg-gold-light transition">
+              <Link to="/register" className="border border-gold px-4 py-2 rounded-lg text-gold hover:bg-gold/10 transition">
                 إنشاء حساب
               </Link>
             </div>
