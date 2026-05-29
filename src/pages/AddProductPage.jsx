@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { addProduct, uploadProductImages, updateProduct } from '../services/productService'
 import { Button } from '../components/ui/Button'
@@ -10,7 +9,6 @@ const categories = ['electronics', 'fashion', 'beauty', 'vehicles', 'home', 'bab
 
 export default function AddProductPage() {
   const { user, profile } = useAuth()
-  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     title: '', description: '', price: '', discount_percentage: 0, category: categories[0],
@@ -34,45 +32,6 @@ export default function AddProductPage() {
     setImagePreviews(files.map(file => URL.createObjectURL(file)))
   }
 
-  const compressAndRenameImage = (file, productId) => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target.result;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1200;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-
-          canvas.toBlob((blob) => {
-            const fileExtension = 'jpg';
-            const randomString = Math.random().toString(36).substring(2, 7);
-            const fileName = `${productId}/${Date.now()}_${randomString}.${fileExtension}`;
-            
-            const compressedFile = new File([blob], fileName, {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
-            });
-            resolve(compressedFile);
-          }, 'image/jpeg', 0.75); 
-        };
-      };
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -90,21 +49,18 @@ export default function AddProductPage() {
         contact_number: formData.contact_number,
         condition: formData.condition,
         featured: formData.featured,
+        is_hidden: false,               // <-- إضافة افتراضية
+        is_approved: true,              // <-- إضافة افتراضية
         images: [],
         cover_image: ''
       }
       const newProduct = await addProduct(productData)
       if (imageFiles.length > 0) {
-        const processedFiles = await Promise.all(
-          imageFiles.map(file => compressAndRenameImage(file, newProduct.id))
-        )
-        
-        const imageUrls = await uploadProductImages(processedFiles, newProduct.id)
+        const imageUrls = await uploadProductImages(imageFiles, newProduct.id)
         await updateProduct(newProduct.id, { images: imageUrls, cover_image: imageUrls[0] || '' })
       }
       toast.success('تم نشر المنتج بنجاح')
-      navigate(`/product/${newProduct.id}`) 
-      
+      window.location.href = `/product/${newProduct.id}`
     } catch (err) {
       toast.error(err.message)
       setLoading(false)
@@ -118,7 +74,7 @@ export default function AddProductPage() {
         <Input label="اسم المنتج" name="title" value={formData.title} onChange={handleChange} required />
         <div className="mb-4">
           <label className="block mb-1 text-text-secondary">الوصف</label>
-          <textarea name="description" value={formData.description} onChange={handleChange} rows="4" className="w-full px-4 py-2 rounded-lg bg-white border border-gold/30 text-gray-900 placeholder-gray-500 focus:outline-none focus:border-gold" />
+          <textarea name="description" value={formData.description} onChange={handleChange} rows="4" className="w-full px-4 py-2 rounded-lg bg-primary-card border border-gold/30 text-white" required />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input label="السعر (ريال)" name="price" type="number" step="0.01" value={formData.price} onChange={handleChange} required />
@@ -127,7 +83,7 @@ export default function AddProductPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="mb-4">
             <label className="block mb-1 text-text-secondary">القسم</label>
-            <select name="category" value={formData.category} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-white border border-gold/30 text-gray-900 focus:outline-none focus:border-gold">
+            <select name="category" value={formData.category} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-primary-card border border-gold/30 text-white">
               {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
           </div>
@@ -139,7 +95,7 @@ export default function AddProductPage() {
         </div>
         <div className="mb-4">
           <label className="block mb-1 text-text-secondary">حالة المنتج</label>
-          <select name="condition" value={formData.condition} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-white border border-gold/30 text-gray-900 focus:outline-none focus:border-gold">
+          <select name="condition" value={formData.condition} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-primary-card border border-gold/30 text-white">
             <option value="new">جديد</option>
             <option value="used">مستعمل</option>
             <option value="refurbished">مجدد</option>
