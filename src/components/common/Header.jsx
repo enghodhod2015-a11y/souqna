@@ -15,16 +15,10 @@ export const Header = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
   const [unreadCount, setUnreadCount] = useState(0)
-  const [isSellerReady, setIsSellerReady] = useState(false)
-  const [isAdminReady, setIsAdminReady] = useState(false)
 
-  // تحديث الصلاحيات بعد جلب البيانات
-  useEffect(() => {
-    if (profile) {
-      setIsSellerReady(profile?.account_type === 'seller' || profile?.account_type === 'admin')
-      setIsAdminReady(profile?.account_type === 'admin')
-    }
-  }, [profile])
+  // تحديد الصلاحيات مباشرة من profile
+  const isSeller = profile?.account_type === 'seller' || profile?.account_type === 'admin'
+  const isAdmin = profile?.account_type === 'admin'
 
   // جلب عدد المحادثات غير المقروءة
   useEffect(() => {
@@ -78,7 +72,7 @@ export const Header = () => {
         <div className="flex items-center gap-3">
           {user ? (
             <>
-              {/* ─── أزرار المشتري (نفس شكل تسجيل دخول) ─── */}
+              {/* ─── أزرار المشتري ─── */}
               <Link 
                 to="/orders" 
                 className="bg-gold text-primary-blue px-4 py-2 rounded-lg font-bold hover:bg-gold/90 transition text-sm"
@@ -86,8 +80,8 @@ export const Header = () => {
                 طلباتي
               </Link>
 
-              {/* ─── أزرار البائع (نفس الشكل) ─── */}
-              {isSellerReady && (
+              {/* ─── أزرار البائع ─── */}
+              {isSeller && (
                 <>
                   <Link 
                     to="/my-products" 
@@ -110,8 +104,8 @@ export const Header = () => {
                 </>
               )}
 
-              {/* ─── زر الأدمن (نفس الشكل بلون مختلف) ─── */}
-              {isAdminReady && (
+              {/* ─── زر الأدمن ─── */}
+              {isAdmin && (
                 <Link 
                   to="/admin/dashboard" 
                   className="bg-red-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-600 transition text-sm"
@@ -120,7 +114,7 @@ export const Header = () => {
                 </Link>
               )}
 
-              {/* ─── الرسائل (أيقونة فقط) ─── */}
+              {/* ─── الرسائل ─── */}
               <Link 
                 to="/inbox" 
                 className="p-2 rounded-full hover:bg-primary-card transition-colors relative"
@@ -155,7 +149,7 @@ export const Header = () => {
                       <User size={16} /> بروفايلي
                     </Link>
                     <button 
-                      onClick={() => { logout(); setDropdownOpen(false); navigate('/') }} 
+                      onClick={() => { logout(); setDropdownOpen(false); }} 
                       className="flex items-center gap-2 w-full text-right px-4 py-3 hover:bg-secondary-blue rounded-b-lg text-red-500"
                     >
                       <LogOut size={16} /> تسجيل خروج
@@ -179,3 +173,4 @@ export const Header = () => {
     </header>
   )
 }
+

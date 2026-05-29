@@ -12,22 +12,40 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     let isMounted = true
-    let timeoutId
 
     const fetchData = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (!isMounted) return
-        setUser(session?.user ?? null)
-        if (session?.user) {
+        
+        const currentUser = session?.user ?? null
+        setUser(currentUser)
+
+        if (currentUser) {
+          // جلب البروفايل
           const { data, error } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', session.user.id)
+            .eq('id', currentUser.id)
             .maybeSingle()
+
           if (!isMounted) return
-          if (error) throw error
-          setProfile(data || { id: session.user.id, account_type: 'buyer' })
+
+          if (error) {
+            console.error('Profile fetch error:', error)
+            // استخدام fallback من user_metadata
+            setProfile({
+              id: currentUser.id,
+              account_type: currentUser.user_metadata?.account_type || 'buyer',
+              full_name: currentUser.user_metadata?.full_name || currentUser.email
+            })
+          } else {
+            setProfile(data || {
+              id: currentUser.id,
+              account_type: currentUser.user_metadata?.account_type || 'buyer',
+              full_name: currentUser.user_metadata?.full_name || currentUser.email
+            })
+          }
         }
       } catch (err) {
         console.error('Auth init error:', err)
@@ -40,33 +58,42 @@ export const AuthProvider = ({ children }) => {
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return
-      setUser(session?.user ?? null)
-      if (session?.user) {
+      
+      const currentUser = session?.user ?? null
+      setUser(currentUser)
+
+      if (currentUser) {
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', session.user.id)
+          .eq('id', currentUser.id)
           .maybeSingle()
+
         if (!isMounted) return
-        if (error) console.error(error)
-        setProfile(data || { id: session.user.id, account_type: 'buyer' })
+
+        if (error) {
+          console.error('Profile fetch error:', error)
+          setProfile({
+            id: currentUser.id,
+            account_type: currentUser.user_metadata?.account_type || 'buyer',
+            full_name: currentUser.user_metadata?.full_name || currentUser.email
+          })
+        } else {
+          setProfile(data || {
+            id: currentUser.id,
+            account_type: currentUser.user_metadata?.account_type || 'buyer',
+            full_name: currentUser.user_metadata?.full_name || currentUser.email
+          })
+        }
       } else {
         setProfile(null)
       }
+      
       setLoading(false)
     })
 
-    // مهلة أمان: في حال بقيت loading=true لمدة 5 ثوانٍ، نعيد تعيينها
-    timeoutId = setTimeout(() => {
-      if (isMounted && loading) {
-        console.warn('Loading timeout - forcing loading=false')
-        setLoading(false)
-      }
-    }, 5000)
-
     return () => {
       isMounted = false
-      clearTimeout(timeoutId)
       listener?.subscription.unsubscribe()
     }
   }, [])
@@ -77,7 +104,7 @@ export const AuthProvider = ({ children }) => {
       await supabase.auth.signOut()
       setUser(null)
       setProfile(null)
-      localStorage.clear() // تنظيف المتصفح بالكامل
+      localStorage.clear()
       toast.success('تم تسجيل الخروج')
       window.location.href = '/'
     } catch (err) {
@@ -89,3 +116,4 @@ export const AuthProvider = ({ children }) => {
 
   return <AuthContext.Provider value={{ user, profile, loading, logout }}>{children}</AuthContext.Provider>
 }
+
