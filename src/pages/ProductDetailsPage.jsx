@@ -1,53 +1,50 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { getProductById } from '../services/productService'
+import { getProductById, deleteProduct } from '../services/productService'
 import { Button } from '../components/ui/Button'
-import { ShoppingCart, MessageCircle } from 'lucide-react'
+import { ShoppingCart, MessageCircle, Edit, Trash2, Share2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function ProductDetailsPage() {
   const { id, productId } = useParams()
-  
-  // 🔒 فلتر الأمان الحاسم: إذا كانت القيمة فارغة أو تساوي نص "undefined"، نعتبرها null فورًا
-  const rawId = id || productId;
-  const targetId = rawId && rawId !== 'undefined' ? rawId : null;
+  const rawId = id || productId
+  const targetId = rawId && rawId !== 'undefined' ? rawId : null
   
   const navigate = useNavigate()
-  const { user } = useAuth() 
+  const { user, profile } = useAuth()
   const [product, setProduct] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // لا يتم الاستعلام إلا إذا كان المعرف حقيقيًا وليس كلمة "undefined"
-    if (targetId) {
-      loadProduct()
-    } else {
-      setLoading(false)
-    }
+    if (targetId) loadProduct()
+    else setLoading(false)
   }, [targetId])
 
   const loadProduct = async () => {
     try {
-      setLoading(true);
-      console.log("جاري البحث عن المنتج بالرقم المصفى الآمن:", targetId); 
-      const data = await getProductById(targetId);
-      
-      if (!data) {
-        console.error("لم يتم العثور على بيانات للمنتج في Supabase");
-      }
-      
-      setProduct(data);
+      setLoading(true)
+      const data = await getProductById(targetId)
+      setProduct(data)
     } catch (err) {
-      console.error("خطأ أثناء جلب المنتج:", err);
-      toast.error(err.message);
+      console.error(err)
+      toast.error(err.message)
     } finally {
-      setLoading(false); 
+      setLoading(false)
     }
   }
 
   const handleBuy = () => {
-    if (!product) return;
+    if (!product) return
+    if (!user) {
+      toast.error('يرجى تسجيل الدخول أولاً للشراء')
+      navigate('/login')
+      return
+    }
+    if (user.id === product.seller_id) {
+      toast.error('لا يمكنك شراء منتجك الخاص')
+      return
+    }
     navigate('/checkout', { state: { product, quantity: 1 } })
   }
 
@@ -57,58 +54,115 @@ export default function ProductDetailsPage() {
       navigate('/login')
       return
     }
-    if (!product?.id) return;
+    if (user.id === product.seller_id) {
+      toast.error('لا يمكنك مراسلة نفسك')
+      return
+    }
     navigate(`/chat/product/${product.id}`)
   }
 
-  if (loading) return <div className="text-center py-20 text-text-secondary">جاري التحميل...</div>
-  
-  // 🔒 إرشاد ذكي للمطور بدلاً من إرسال نص تالف يعطل خادم قاعدة البيانات
-  if (!targetId) {
-    return (
-      <div className="text-center py-20 text-text-secondary space-y-3 max-w-md mx-auto bg-primary-card p-6 rounded-2xl border border-gold/20">
-        <p className="text-xl font-bold text-red-500">🚨 خطأ في توجيه المعرف (undefined)</p>
-        <p className="text-sm leading-relaxed">
-          الزر المخصص لفتح المنتج في الصفحة الرئيسية لا يرسل المعرف الفريد السليم. يرجى مراجعة وتعديل وسم الـ <code className="bg-secondary-blue px-1.5 py-0.5 rounded text-gold text-xs">Link</code> داخل ملف كرت المنتج ليكون:
-        </p>
-        <code className="block bg-secondary-blue p-2 rounded text-emerald-400 text-xs font-mono select-all">
-          {`to={\`/product/\${product?.id}\`}`}
-        </code>
-      </div>
-    )
+  const handleEdit = () => {
+    navigate(`/edit-product/${product.id}`)
   }
 
-  if (!product) return <div className="text-center py-20 text-text-secondary">المنتج غير موجود في قاعدة البيانات</div>
+  const handleDelete = async () => {
+    const confirmed = window.confirm('هل أنت متأكد من حذف هذا المنتج؟ لا يمكن التراجع.')
+    if (!confirmed) return
+    try {
+      await deleteProduct(product.id)
+      toast.success('تم حذف المنتج بنجاح')
+      navigate('/')
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
 
-  const isOwner = user && user.id === product.seller_id;
+  const handleShare = () => {
+    const url = `${window.location.origin}/product/${product.id}`
+    navigator.clipboard.writeText(url)
+    toast.success('تم نسخ رابط المنتج')
+  }
+
+  const isOwner = user && user.id === product?.seller_id
+  const isAdmin = profile?.account_type === 'admin'
+
+  if (loading) return <div className="text-center py-20">جاري التحميل...</div>
+  if (!targetId) return <div className="text-center py-20">رابط المنتج غير صالح</div>
+  if (!product) return <div className="text-center py-20">المنتج غير موجود</div>
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* الصور */}
         <div>
-          <img src={product.cover_image || 'https://placehold.co'} alt={product.title} className="w-full rounded-2xl" />
+          <img
+            src={product.cover_image || 'https://placehold.co/600x400'}
+            alt={product.name || product.title}
+            className="w-full rounded-2xl object-cover"
+          />
           <div className="flex gap-2 mt-4 flex-wrap">
-            {product.images?.map((img, i) => (
-              <img key={i} src={img} className="w-20 h-20 object-cover rounded cursor-pointer" onClick={() => window.open(img)} />
+            {(product.images || []).map((img, i) => (
+              <img
+                key={i}
+                src={img}
+                className="w-20 h-20 object-cover rounded cursor-pointer border border-gold/30"
+                onClick={() => window.open(img)}
+                alt={`صورة ${i + 1}`}
+              />
             ))}
           </div>
         </div>
+
+        {/* المعلومات */}
         <div>
-          <h1 className="text-3xl font-bold text-gold mb-2">{product.title}</h1>
+          <h1 className="text-3xl font-bold text-gold mb-2">
+            {product.name || product.title}
+          </h1>
           <p className="text-text-secondary mb-4">{product.description}</p>
-          <p className="text-2xl font-bold text-gold">{product.final_price} ريال</p>
-          {product.discount_percentage > 0 && <p className="text-text-secondary line-through">{product.price} ريال</p>}
-          <div className="flex gap-4 mt-6">
-            <Button onClick={handleBuy}>
-              <ShoppingCart className="inline ml-2" /> شراء
-            </Button>
-            <Button variant="secondary" onClick={handleInquiry}>
-              <MessageCircle className="inline ml-2" /> استعلام
-            </Button>
+          <p className="text-2xl font-bold text-gold">
+            {product.final_price || product.price} ريال
+          </p>
+          {product.discount_percentage > 0 && (
+            <p className="text-text-secondary line-through">
+              {product.price} ريال
+            </p>
+          )}
+
+          {/* الأزرار حسب الصلاحية */}
+          <div className="flex gap-4 mt-6 flex-wrap">
+            {isOwner || isAdmin ? (
+              // أزرار المالك / الأدمن
+              <>
+                <Button onClick={handleEdit} variant="secondary">
+                  <Edit className="inline ml-2" size={18} /> تعديل
+                </Button>
+                <Button onClick={handleDelete} variant="danger">
+                  <Trash2 className="inline ml-2" size={18} /> حذف
+                </Button>
+                <Button onClick={handleShare} variant="secondary">
+                  <Share2 className="inline ml-2" size={18} /> مشاركة
+                </Button>
+              </>
+            ) : (
+              // أزرار المشتري أو الزائر
+              <>
+                <Button onClick={handleBuy}>
+                  <ShoppingCart className="inline ml-2" size={18} /> شراء
+                </Button>
+                <Button onClick={handleInquiry} variant="secondary">
+                  <MessageCircle className="inline ml-2" size={18} /> استعلام
+                </Button>
+              </>
+            )}
           </div>
-          <div className="mt-6 p-4 bg-primary-card rounded-xl">
+
+          {/* تفاصيل إضافية */}
+          <div className="mt-6 p-4 bg-primary-card rounded-xl border border-gold/20">
             <p><strong>المدينة:</strong> {product.city || 'غير محدد'}</p>
-            <p><strong>الحالة:</strong> {product.condition === 'new' ? 'جديد' : product.condition === 'used' ? 'مستعمل' : 'مجدد'}</p>
+            <p><strong>الحالة:</strong> {
+              product.condition === 'new' ? 'جديد' :
+              product.condition === 'used' ? 'مستعمل' : 'مجدد'
+            }</p>
             {isOwner && product.contact_number && (
               <p className="mt-2 text-gold font-semibold bg-gold/10 p-2 rounded border border-gold/20">
                 <strong>رقم التواصل الخاص بك:</strong> {product.contact_number}
