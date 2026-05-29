@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom' // تم التعديل هنا
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { addProduct, uploadProductImages, updateProduct } from '../services/productService'
 import { Button } from '../components/ui/Button'
@@ -10,7 +10,7 @@ const categories = ['electronics', 'fashion', 'beauty', 'vehicles', 'home', 'bab
 
 export default function AddProductPage() {
   const { user, profile } = useAuth()
-  const navigate = useNavigate() // تم التعديل هنا
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     title: '', description: '', price: '', discount_percentage: 0, category: categories[0],
@@ -34,7 +34,6 @@ export default function AddProductPage() {
     setImagePreviews(files.map(file => URL.createObjectURL(file)))
   }
 
-  // دالة مضافة لضغط الصور وتحويلها إلى أسماء عشوائية آمنة بالإنجليزية
   const compressAndRenameImage = (file, productId) => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -44,7 +43,7 @@ export default function AddProductPage() {
         img.src = event.target.result;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1200; // تحديد أقصى عرض للصورة لتقليل الحجم
+          const MAX_WIDTH = 1200;
           let width = img.width;
           let height = img.height;
 
@@ -58,7 +57,6 @@ export default function AddProductPage() {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
 
-          // ضغط الصورة بجودة 75% وتحويلها لصيغة jpeg خفيفة
           canvas.toBlob((blob) => {
             const fileExtension = 'jpg';
             const randomString = Math.random().toString(36).substring(2, 7);
@@ -96,18 +94,14 @@ export default function AddProductPage() {
       }
       const newProduct = await addProduct(productData)
       if (imageFiles.length > 0) {
-        // معالجة كافة الصور وضغطها وتغيير أسمائها بالتوازي قبل إرسالها لخدمة الرفع
         const processedFiles = await Promise.all(
           imageFiles.map(file => compressAndRenameImage(file, newProduct.id))
         )
         
         const imageUrls = await uploadProductImages(processedFiles, newProduct.id)
-        // تم تصحيح هذا السطر بدقة ليرسل أول عنصر مصفوفة [0] كما كان في كودك الأصلي
         await updateProduct(newProduct.id, { images: imageUrls, cover_image: imageUrls[0] || '' })
       }
       toast.success('تم نشر المنتج بنجاح')
-      
-      // تم التعديل هنا لاستخدام navigate بدلاً من window.location
       navigate(`/product/${newProduct.id}`) 
       
     } catch (err) {
@@ -123,7 +117,7 @@ export default function AddProductPage() {
         <Input label="اسم المنتج" name="title" value={formData.title} onChange={handleChange} required />
         <div className="mb-4">
           <label className="block mb-1 text-text-secondary">الوصف</label>
-          <textarea name="description" value={formData.description} onChange={handleChange} rows="4" className="w-full px-4 py-2 rounded-lg bg-primary-card border border-gold/30 text-white" required />
+          <textarea name="description" value={formData.description} onChange={handleChange} rows="4" className="w-full px-4 py-2 rounded-lg bg-white border border-gold/30 text-gray-900 placeholder-gray-500 focus:outline-none focus:border-gold" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input label="السعر (ريال)" name="price" type="number" step="0.01" value={formData.price} onChange={handleChange} required />
@@ -132,7 +126,7 @@ export default function AddProductPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="mb-4">
             <label className="block mb-1 text-text-secondary">القسم</label>
-            <select name="category" value={formData.category} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-primary-card border border-gold/30 text-white">
+            <select name="category" value={formData.category} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-white border border-gold/30 text-gray-900 focus:outline-none focus:border-gold">
               {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
           </div>
@@ -144,7 +138,7 @@ export default function AddProductPage() {
         </div>
         <div className="mb-4">
           <label className="block mb-1 text-text-secondary">حالة المنتج</label>
-          <select name="condition" value={formData.condition} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-primary-card border border-gold/30 text-white">
+          <select name="condition" value={formData.condition} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-white border border-gold/30 text-gray-900 focus:outline-none focus:border-gold">
             <option value="new">جديد</option>
             <option value="used">مستعمل</option>
             <option value="refurbished">مجدد</option>
@@ -166,5 +160,4 @@ export default function AddProductPage() {
     </div>
   )
 }
-
 

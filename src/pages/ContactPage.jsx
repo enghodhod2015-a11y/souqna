@@ -52,8 +52,7 @@ export default function ContactPage() {
               value={formData.message}
               onChange={handleChange}
               rows="5"
-              className="w-full px-4 py-3 rounded-lg bg-primary-card border border-gold/30 text-white focus:border-gold focus:outline-none"
-              required
+              className="w-full px-4 py-3 rounded-lg bg-white border border-gold/30 text-gray-900 placeholder-gray-500 focus:outline-none focus:border-gold"
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
@@ -64,5 +63,4 @@ export default function ContactPage() {
     </div>
   )
 }
-
 
