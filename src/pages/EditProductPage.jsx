@@ -15,37 +15,59 @@ export default function EditProductPage() {
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [formData, setFormData] = useState({
-    title: '', description: '', price: '', discount_percentage: 0, category: categories[0],
-    quantity: '', city: '', contact_number: '', condition: 'new', featured: false
+    title: '',
+    description: '',
+    price: '',
+    discount_percentage: 0,
+    category: categories[0],
+    stock_quantity: '',
+    city: '',
+    contact_number: '',
+    condition: 'new',
+    is_featured: false
   })
   const [existingImages, setExistingImages] = useState([])
   const [newImageFiles, setNewImageFiles] = useState([])
   const [newImagePreviews, setNewImagePreviews] = useState([])
 
-  useEffect(() => { loadProduct() }, [id])
+  const productId = id ? parseInt(id, 10) : null
+
+  useEffect(() => {
+    if (productId && !isNaN(productId)) {
+      loadProduct()
+    } else {
+      toast.error('رابط المنتج غير صالح')
+      navigate('/my-products')
+    }
+  }, [productId])
 
   const loadProduct = async () => {
     try {
-      const product = await getProductById(id)
-      if (product.seller_id !== user.id && profile?.account_type !== 'admin') {
+      setInitialLoading(true)
+      const product = await getProductById(productId)
+      if (!product) throw new Error('المنتج غير موجود')
+
+      if (product.seller_id !== user?.id && profile?.account_type !== 'admin') {
         toast.error('لا تملك صلاحية تعديل هذا المنتج')
         navigate('/')
         return
       }
+
       setFormData({
-        title: product.title,
+        title: product.name || '',
         description: product.description || '',
-        price: product.price,
-        discount_percentage: product.discount_percentage,
-        category: product.category,
-        quantity: product.quantity,
+        price: product.price || '',
+        discount_percentage: product.discount_percentage || 0,
+        category: product.category || categories[0],
+        stock_quantity: product.stock_quantity ?? '',
         city: product.city || '',
         contact_number: product.contact_number || '',
-        condition: product.condition,
-        featured: product.featured
+        condition: product.condition || 'new',
+        is_featured: product.is_featured ?? false
       })
       setExistingImages(product.images || [])
     } catch (err) {
+      console.error(err)
       toast.error(err.message)
       navigate('/my-products')
     } finally {
@@ -74,25 +96,43 @@ export default function EditProductPage() {
     try {
       let allImages = [...existingImages]
       if (newImageFiles.length > 0) {
-        const newUrls = await uploadProductImages(newImageFiles, id)
+        const newUrls = await uploadProductImages(newImageFiles, productId)
         allImages = [...allImages, ...newUrls]
       }
-      await updateProduct(id, {
-        ...formData,
+
+      let compare_at_price = null
+      if (formData.discount_percentage > 0 && formData.price) {
+        const originalPrice = parseFloat(formData.price) / (1 - formData.discount_percentage / 100)
+        compare_at_price = parseFloat(originalPrice.toFixed(2))
+      }
+
+      const updates = {
+        name: formData.title,
+        description: formData.description,
         price: parseFloat(formData.price),
-        discount_percentage: parseInt(formData.discount_percentage),
-        quantity: parseInt(formData.quantity),
+        compare_at_price: compare_at_price,
+        category: formData.category,
+        stock_quantity: parseInt(formData.stock_quantity) || 0,
+        city: formData.city,
+        condition: formData.condition,
+        is_featured: formData.is_featured,
         images: allImages,
         cover_image: allImages[0] || ''
-      })
+      }
+
+      await updateProduct(productId, updates)
       toast.success('تم تحديث المنتج بنجاح')
-      navigate(`/product/${id}`)
+      navigate(`/product/${productId}`)
     } catch (err) {
       toast.error(err.message)
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    return () => newImagePreviews.forEach(url => URL.revokeObjectURL(url))
+  }, [newImagePreviews])
 
   if (initialLoading) return <div className="text-center py-20">جاري التحميل...</div>
 
@@ -116,7 +156,7 @@ export default function EditProductPage() {
               {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
           </div>
-          <Input label="الكمية" name="quantity" type="number" value={formData.quantity} onChange={handleChange} required />
+          <Input label="الكمية" name="stock_quantity" type="number" value={formData.stock_quantity} onChange={handleChange} required />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input label="المدينة" name="city" value={formData.city} onChange={handleChange} />
@@ -131,7 +171,7 @@ export default function EditProductPage() {
           </select>
         </div>
         <div className="mb-4 flex items-center gap-2">
-          <input type="checkbox" name="featured" checked={formData.featured} onChange={handleChange} className="w-5 h-5" />
+          <input type="checkbox" name="is_featured" checked={formData.is_featured} onChange={handleChange} className="w-5 h-5" />
           <label>منتج مميز</label>
         </div>
         <div className="mb-4">
@@ -152,7 +192,9 @@ export default function EditProductPage() {
             {newImagePreviews.map((src, idx) => <img key={idx} src={src} className="w-20 h-20 object-cover rounded" />)}
           </div>
         </div>
-        <Button type="submit" disabled={loading} className="w-full">{loading ? 'جاري التحديث...' : 'تحديث المنتج'}</Button>
+        <Button type="submit" disabled={loading} className="w-full">
+          {loading ? 'جاري التحديث...' : 'حفظ التغييرات'}
+        </Button>
       </form>
     </div>
   )
