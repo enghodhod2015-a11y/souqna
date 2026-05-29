@@ -31,31 +31,53 @@ export default function EditProductPage() {
   const [newImagePreviews, setNewImagePreviews] = useState([])
 
   useEffect(() => {
-    loadProduct()
+    console.log("=== EditProductPage mounted ===")
+    console.log("id from params:", id)
+    if (id && id !== 'undefined') {
+      loadProduct()
+    } else {
+      console.error("لا يوجد معرف صالح للمنتج")
+      toast.error("رابط غير صالح")
+      navigate('/')
+    }
   }, [id])
 
   const loadProduct = async () => {
     try {
+      setInitialLoading(true)
+      console.log("جاري جلب المنتج بالمعرف:", id)
+      
       const product = await getProductById(id)
-      if (product.seller_id !== user.id && profile?.account_type !== 'admin') {
+      console.log("المنتج المستلم:", product)
+      
+      if (!product) {
+        throw new Error('المنتج غير موجود')
+      }
+      
+      if (product.seller_id !== user?.id && profile?.account_type !== 'admin') {
         toast.error('لا تملك صلاحية تعديل هذا المنتج')
         navigate('/')
         return
       }
+      
+      // تعيين البيانات مع مراعاة الاختلافات في الأسماء
       setFormData({
-        name: product.name || product.title,
+        name: product.name || product.title || '',
         description: product.description || '',
-        price: product.price,
+        price: product.price || '',
         discount_percentage: product.discount_percentage || 0,
-        category: product.category,
+        category: product.category || categories[0],
         stock_quantity: product.stock_quantity ?? product.quantity ?? '',
         city: product.city || '',
         contact_number: product.contact_number || '',
-        condition: product.condition,
+        condition: product.condition || 'new',
         is_featured: product.is_featured ?? product.featured ?? false
       })
       setExistingImages(product.images || [])
+      
+      console.log("تم تعيين formData:", formData) // ستظهر القيم القديمة مؤقتاً
     } catch (err) {
+      console.error("خطأ في loadProduct:", err)
       toast.error(err.message)
       navigate('/my-products')
     } finally {
@@ -102,8 +124,6 @@ export default function EditProductPage() {
         cover_image: allImages[0] || ''
       })
       toast.success('تم تحديث المنتج بنجاح')
-
-      // ✅ التوجيه إلى صفحة تفاصيل المنتج بعد التعديل
       navigate(`/product/${id}`)
     } catch (err) {
       toast.error(err.message)
@@ -112,14 +132,13 @@ export default function EditProductPage() {
     }
   }
 
-  // تحرير عناوين URL المؤقتة
   useEffect(() => {
     return () => {
       newImagePreviews.forEach(url => URL.revokeObjectURL(url))
     }
   }, [newImagePreviews])
 
-  if (initialLoading) return <div className="text-center py-20">جاري التحميل...</div>
+  if (initialLoading) return <div className="text-center py-20 text-gold">جاري تحميل بيانات المنتج...</div>
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
