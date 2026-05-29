@@ -15,7 +15,7 @@ export default function EditProductPage() {
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [formData, setFormData] = useState({
-    name: '',
+    title: '',
     description: '',
     price: '',
     discount_percentage: 0,
@@ -31,53 +31,38 @@ export default function EditProductPage() {
   const [newImagePreviews, setNewImagePreviews] = useState([])
 
   useEffect(() => {
-    console.log("=== EditProductPage mounted ===")
-    console.log("id from params:", id)
-    if (id && id !== 'undefined') {
-      loadProduct()
-    } else {
-      console.error("لا يوجد معرف صالح للمنتج")
-      toast.error("رابط غير صالح")
-      navigate('/')
-    }
+    loadProduct()
   }, [id])
 
   const loadProduct = async () => {
     try {
       setInitialLoading(true)
-      console.log("جاري جلب المنتج بالمعرف:", id)
-      
       const product = await getProductById(id)
-      console.log("المنتج المستلم:", product)
-      
-      if (!product) {
-        throw new Error('المنتج غير موجود')
-      }
-      
+
+      if (!product) throw new Error('المنتج غير موجود')
+
       if (product.seller_id !== user?.id && profile?.account_type !== 'admin') {
         toast.error('لا تملك صلاحية تعديل هذا المنتج')
         navigate('/')
         return
       }
-      
-      // تعيين البيانات مع مراعاة الاختلافات في الأسماء
+
+      // ✅ التصحيح الوحيد: استخدم product.name بدلاً من product.title
       setFormData({
-        name: product.name || product.title || '',
+        title: product.name || '',
         description: product.description || '',
         price: product.price || '',
         discount_percentage: product.discount_percentage || 0,
         category: product.category || categories[0],
-        stock_quantity: product.stock_quantity ?? product.quantity ?? '',
+        stock_quantity: product.stock_quantity ?? '',
         city: product.city || '',
         contact_number: product.contact_number || '',
         condition: product.condition || 'new',
-        is_featured: product.is_featured ?? product.featured ?? false
+        is_featured: product.is_featured ?? false
       })
       setExistingImages(product.images || [])
-      
-      console.log("تم تعيين formData:", formData) // ستظهر القيم القديمة مؤقتاً
     } catch (err) {
-      console.error("خطأ في loadProduct:", err)
+      console.error(err)
       toast.error(err.message)
       navigate('/my-products')
     } finally {
@@ -109,20 +94,28 @@ export default function EditProductPage() {
         const newUrls = await uploadProductImages(newImageFiles, id)
         allImages = [...allImages, ...newUrls]
       }
-      await updateProduct(id, {
-        name: formData.name,
+
+      let compare_at_price = null
+      if (formData.discount_percentage > 0 && formData.price) {
+        const originalPrice = parseFloat(formData.price) / (1 - formData.discount_percentage / 100)
+        compare_at_price = parseFloat(originalPrice.toFixed(2))
+      }
+
+      const updates = {
+        name: formData.title,
         description: formData.description,
         price: parseFloat(formData.price),
-        discount_percentage: parseInt(formData.discount_percentage) || 0,
+        compare_at_price: compare_at_price,
         category: formData.category,
         stock_quantity: parseInt(formData.stock_quantity) || 0,
         city: formData.city,
-        contact_number: formData.contact_number,
         condition: formData.condition,
         is_featured: formData.is_featured,
         images: allImages,
         cover_image: allImages[0] || ''
-      })
+      }
+
+      await updateProduct(id, updates)
       toast.success('تم تحديث المنتج بنجاح')
       navigate(`/product/${id}`)
     } catch (err) {
@@ -133,18 +126,16 @@ export default function EditProductPage() {
   }
 
   useEffect(() => {
-    return () => {
-      newImagePreviews.forEach(url => URL.revokeObjectURL(url))
-    }
+    return () => newImagePreviews.forEach(url => URL.revokeObjectURL(url))
   }, [newImagePreviews])
 
-  if (initialLoading) return <div className="text-center py-20 text-gold">جاري تحميل بيانات المنتج...</div>
+  if (initialLoading) return <div className="text-center py-20">جاري التحميل...</div>
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <h1 className="text-2xl font-bold text-gold mb-6">تعديل المنتج</h1>
       <form onSubmit={handleSubmit} className="bg-primary-card p-6 rounded-2xl border border-gold/30">
-        <Input label="اسم المنتج" name="name" value={formData.name} onChange={handleChange} required />
+        <Input label="اسم المنتج" name="title" value={formData.title} onChange={handleChange} required />
         <div className="mb-4">
           <label className="block mb-1 text-text-secondary">الوصف</label>
           <textarea name="description" value={formData.description} onChange={handleChange} rows="4" className="w-full px-4 py-2 rounded-lg bg-primary-card border border-gold/30 text-white" required />
