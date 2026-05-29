@@ -7,9 +7,10 @@ import { supabase } from './supabase'
 */
 export const getProducts = async (filters = {}) => {
   try {
+    // جلب المنتجات فقط (بدون JOIN مع profiles لتجنب infinite recursion)
     let query = supabase
       .from('products')
-      .select('*, seller:profiles!products_seller_id_fkey(full_name, avatar_url)')
+      .select('*')
       .eq('is_hidden', false)
       .eq('is_approved', true)
       .order('created_at', { ascending: false })
@@ -30,14 +31,37 @@ export const getProducts = async (filters = {}) => {
       query = query.ilike('title', '%' + filters.search + '%')
     }
 
-    const { data, error } = await query
+    const { data: products, error } = await query
 
     if (error) {
       console.error('❌ خطأ أثناء جلب المنتجات:', error)
       throw error
     }
 
-    return data || []
+    // جلب بيانات البائعين بشكل منفصل
+    if (products && products.length > 0) {
+      const sellerIds = [...new Set(products.map(p => p.seller_id))].filter(Boolean)
+      
+      if (sellerIds.length > 0) {
+        const { data: sellers, error: sellersError } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', sellerIds)
+
+        if (!sellersError && sellers) {
+          const sellersMap = {}
+          sellers.forEach(s => {
+            sellersMap[s.id] = s
+          })
+
+          products.forEach(product => {
+            product.seller = sellersMap[product.seller_id] || null
+          })
+        }
+      }
+    }
+
+    return products || []
 
   } catch (error) {
     console.error('⚠️ فشل جلب المنتجات:', error)
@@ -89,9 +113,10 @@ export const getProductById = async (id) => {
       throw new Error('معرف المنتج غير صالح')
     }
 
-    const { data, error } = await supabase
+    // جلب المنتج فقط (بدون JOIN مع profiles)
+    const { data: product, error } = await supabase
       .from('products')
-      .select('*, seller:profiles!products_seller_id_fkey(full_name, avatar_url, phone, city)')
+      .select('*')
       .eq('id', id)
       .single()
 
@@ -100,7 +125,20 @@ export const getProductById = async (id) => {
       throw error
     }
 
-    return data
+    // جلب بيانات البائع بشكل منفصل
+    if (product && product.seller_id) {
+      const { data: seller, error: sellerError } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, phone, city')
+        .eq('id', product.seller_id)
+        .maybeSingle()
+
+      if (!sellerError && seller) {
+        product.seller = seller
+      }
+    }
+
+    return product
 
   } catch (error) {
     console.error('❌ فشل جلب المنتج:', error)
@@ -236,5 +274,3 @@ export const uploadProductImages = async (files, productId) => {
     throw error
   }
 }
-
-

@@ -11,16 +11,14 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [accountType, setAccountType] = useState('buyer')
   const [loading, setLoading] = useState(false)
-  const [isBlocked, setIsBlocked] = useState(false) // حظر الضغط المتكرر
   const navigate = useNavigate()
-  const hasSubmitted = useRef(false)
+  const isSubmitting = useRef(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    // منع الضغط المتكرر
-    if (hasSubmitted.current || isBlocked) {
-      toast.error('يرجى الانتظار دقيقة قبل المحاولة مرة أخرى')
+    // منع الإرسال المتكرر
+    if (isSubmitting.current) {
       return
     }
     
@@ -42,7 +40,7 @@ export default function RegisterPage() {
       return
     }
     
-    hasSubmitted.current = true
+    isSubmitting.current = true
     setLoading(true)
     
     try {
@@ -51,19 +49,9 @@ export default function RegisterPage() {
       navigate('/')
     } catch (err) { 
       toast.error(err.message || 'حدث خطأ أثناء التسجيل')
-      
-      // حظر الضغط لمدة 60 ثانية
-      if (err.message.includes('rate limit') || err.message.includes('429')) {
-        setIsBlocked(true)
-        setTimeout(() => {
-          setIsBlocked(false)
-          hasSubmitted.current = false
-        }, 60000) // 60 ثانية
-      } else {
-        hasSubmitted.current = false
-      }
     } finally { 
       setLoading(false)
+      isSubmitting.current = false
     }
   }
 
@@ -106,9 +94,9 @@ export default function RegisterPage() {
           <Button 
             type="submit" 
             className="w-full" 
-            disabled={loading || isBlocked}
+            disabled={loading}
           >
-            {loading ? 'جاري التسجيل...' : isBlocked ? 'انتظر دقيقة...' : 'تسجيل'}
+            {loading ? 'جاري التسجيل...' : 'تسجيل'}
           </Button>
         </form>
         <p className="mt-4 text-center">
@@ -118,3 +106,5 @@ export default function RegisterPage() {
     </div>
   )
 }
+
+
