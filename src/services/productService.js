@@ -1,4 +1,4 @@
-```javascript
+```javascript id="zv6tvf"
 import { supabase } from './supabase'
 
 /*
@@ -8,15 +8,10 @@ import { supabase } from './supabase'
 */
 export const getProducts = async (filters = {}) => {
   try {
+
     let query = supabase
       .from('products')
-      .select(`
-        *,
-        seller:profiles!products_seller_id_fkey (
-          full_name,
-          avatar_url
-        )
-      `)
+      .select('*, seller:profiles!products_seller_id_fkey(full_name, avatar_url)')
       .eq('is_hidden', false)
       .eq('is_approved', true)
       .eq('is_active', true)
@@ -30,12 +25,12 @@ export const getProducts = async (filters = {}) => {
 
     // فلترة القسم
     if (filters.category) {
-      query = query.eq('category', filters.category)
+      query = query.eq('category_id', filters.category)
     }
 
     // البحث بالاسم
     if (filters.search) {
-      query = query.ilike('name', `%${filters.search}%`)
+      query = query.ilike('name', '%' + filters.search + '%')
     }
 
     const { data, error } = await query
@@ -60,19 +55,24 @@ export const getProducts = async (filters = {}) => {
 |--------------------------------------------------------------------------
 */
 export const getSellerProducts = async (sellerId) => {
+
   try {
+
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .eq('seller_id', sellerId)
       .order('created_at', { ascending: false })
 
-    if (error) throw error
+    if (error) {
+      console.error('❌ خطأ أثناء جلب منتجات البائع:', error)
+      throw error
+    }
 
     return data || []
 
   } catch (error) {
-    console.error('❌ خطأ أثناء جلب منتجات البائع:', error)
+    console.error('❌ فشل جلب منتجات البائع:', error)
     return []
   }
 }
@@ -84,6 +84,7 @@ export const getSellerProducts = async (sellerId) => {
 |--------------------------------------------------------------------------
 */
 export const getProductById = async (id) => {
+
   try {
 
     // حماية ضد undefined أو null
@@ -93,15 +94,7 @@ export const getProductById = async (id) => {
 
     const { data, error } = await supabase
       .from('products')
-      .select(`
-        *,
-        seller:profiles!products_seller_id_fkey (
-          full_name,
-          avatar_url,
-          phone,
-          city
-        )
-      `)
+      .select('*, seller:profiles!products_seller_id_fkey(full_name, avatar_url, phone, city)')
       .eq('id', id)
       .single()
 
@@ -125,6 +118,7 @@ export const getProductById = async (id) => {
 |--------------------------------------------------------------------------
 */
 export const addProduct = async (productData) => {
+
   try {
 
     const { data, error } = await supabase
@@ -153,6 +147,7 @@ export const addProduct = async (productData) => {
 |--------------------------------------------------------------------------
 */
 export const updateProduct = async (id, updates) => {
+
   try {
 
     const { data, error } = await supabase
@@ -182,6 +177,7 @@ export const updateProduct = async (id, updates) => {
 |--------------------------------------------------------------------------
 */
 export const deleteProduct = async (id) => {
+
   try {
 
     const { error } = await supabase
@@ -216,7 +212,7 @@ export const uploadProductImages = async (files, productId) => {
 
     for (const file of files) {
 
-      const fileName = `${productId}/${Date.now()}_${file.name}`
+      const fileName = productId + '/' + Date.now() + '_' + file.name
 
       const { error } = await supabase
         .storage
@@ -228,14 +224,12 @@ export const uploadProductImages = async (files, productId) => {
         throw error
       }
 
-      const {
-        data: { publicUrl }
-      } = supabase
+      const { data } = supabase
         .storage
         .from('product-images')
         .getPublicUrl(fileName)
 
-      urls.push(publicUrl)
+      urls.push(data.publicUrl)
     }
 
     return urls
