@@ -10,7 +10,7 @@ export default function ProductDetailsPage() {
   const { id, productId } = useParams()
   const rawId = id || productId
   const targetId = rawId && rawId !== 'undefined' ? rawId : null
-  
+
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   const [product, setProduct] = useState(null)
@@ -128,29 +128,31 @@ export default function ProductDetailsPage() {
             </p>
           )}
 
-          {/* الأزرار حسب الصلاحية */}
+          {/* الأزرار حسب دور المستخدم */}
           <div className="flex gap-4 mt-6 flex-wrap">
-            {isOwner || isAdmin ? (
-              // أزرار المالك / الأدمن
+            {/* مشاركة - تظهر للجميع */}
+            <Button onClick={handleShare} variant="secondary">
+              <Share2 className="inline ml-2" size={18} /> مشاركة
+            </Button>
+
+            {/* شراء - تظهر للجميع (مع تحذير للمالك) */}
+            <Button onClick={handleBuy}>
+              <ShoppingCart className="inline ml-2" size={18} /> شراء
+            </Button>
+
+            {/* استعلام - تظهر للجميع (مع تحذير للمالك) */}
+            <Button onClick={handleInquiry} variant="secondary">
+              <MessageCircle className="inline ml-2" size={18} /> استعلام
+            </Button>
+
+            {/* تعديل وحذف - تظهر فقط للمالك أو الأدمن */}
+            {(isOwner || isAdmin) && (
               <>
                 <Button onClick={handleEdit} variant="secondary">
                   <Edit className="inline ml-2" size={18} /> تعديل
                 </Button>
                 <Button onClick={handleDelete} variant="danger">
                   <Trash2 className="inline ml-2" size={18} /> حذف
-                </Button>
-                <Button onClick={handleShare} variant="secondary">
-                  <Share2 className="inline ml-2" size={18} /> مشاركة
-                </Button>
-              </>
-            ) : (
-              // أزرار المشتري أو الزائر
-              <>
-                <Button onClick={handleBuy}>
-                  <ShoppingCart className="inline ml-2" size={18} /> شراء
-                </Button>
-                <Button onClick={handleInquiry} variant="secondary">
-                  <MessageCircle className="inline ml-2" size={18} /> استعلام
                 </Button>
               </>
             )}
