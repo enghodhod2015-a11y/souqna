@@ -30,14 +30,25 @@ export default function EditProductPage() {
   const [newImageFiles, setNewImageFiles] = useState([])
   const [newImagePreviews, setNewImagePreviews] = useState([])
 
+  // ✅ تحويل id إلى رقم صحيح
+  const productId = id ? parseInt(id, 10) : null
+
   useEffect(() => {
-    loadProduct()
-  }, [id])
+    if (productId && !isNaN(productId)) {
+      loadProduct()
+    } else {
+      console.error('معرف المنتج غير صالح:', id)
+      toast.error('رابط المنتج غير صالح')
+      navigate('/my-products')
+    }
+  }, [productId])
 
   const loadProduct = async () => {
     try {
       setInitialLoading(true)
-      const product = await getProductById(id)
+      console.log('جلب المنتج بالرقم:', productId)
+      const product = await getProductById(productId)
+      console.log('المنتج:', product)
 
       if (!product) throw new Error('المنتج غير موجود')
 
@@ -47,7 +58,7 @@ export default function EditProductPage() {
         return
       }
 
-      // ✅ التصحيح الوحيد: استخدم product.name بدلاً من product.title
+      // ✅ تعيين البيانات مع التأكد من وجود قيم
       setFormData({
         title: product.name || '',
         description: product.description || '',
@@ -61,8 +72,9 @@ export default function EditProductPage() {
         is_featured: product.is_featured ?? false
       })
       setExistingImages(product.images || [])
+      console.log('تم تعيين formData بنجاح')
     } catch (err) {
-      console.error(err)
+      console.error('خطأ في loadProduct:', err)
       toast.error(err.message)
       navigate('/my-products')
     } finally {
@@ -91,7 +103,7 @@ export default function EditProductPage() {
     try {
       let allImages = [...existingImages]
       if (newImageFiles.length > 0) {
-        const newUrls = await uploadProductImages(newImageFiles, id)
+        const newUrls = await uploadProductImages(newImageFiles, productId)
         allImages = [...allImages, ...newUrls]
       }
 
@@ -115,9 +127,9 @@ export default function EditProductPage() {
         cover_image: allImages[0] || ''
       }
 
-      await updateProduct(id, updates)
+      await updateProduct(productId, updates)
       toast.success('تم تحديث المنتج بنجاح')
-      navigate(`/product/${id}`)
+      navigate(`/product/${productId}`)
     } catch (err) {
       toast.error(err.message)
     } finally {
