@@ -77,9 +77,10 @@ export default function AddProductPage() {
     e.preventDefault()
     setLoading(true)
     try {
+      // تغيير 'title' إلى 'name' ليتناسب مع جدول products
       const productData = {
         seller_id: user.id,
-        title: formData.title,
+        name: formData.title,           // <-- تغيير من title إلى name
         description: formData.description,
         price: parseFloat(formData.price),
         discount_percentage: parseInt(formData.discount_percentage),

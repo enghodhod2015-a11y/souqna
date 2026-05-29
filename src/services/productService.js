@@ -7,7 +7,6 @@ import { supabase } from './supabase'
 */
 export const getProducts = async (filters = {}) => {
   try {
-    // جلب المنتجات فقط (بدون JOIN مع profiles لتجنب infinite recursion)
     let query = supabase
       .from('products')
       .select('*')
@@ -15,20 +14,14 @@ export const getProducts = async (filters = {}) => {
       .eq('is_approved', true)
       .order('created_at', { ascending: false })
 
-    /*
-    |--------------------------------------------------------------------------
-    | الفلاتر
-    |--------------------------------------------------------------------------
-    */
-
     // فلترة القسم
     if (filters.category) {
       query = query.eq('category', filters.category)
     }
 
-    // البحث بالاسم
+    // البحث بالاسم - استخدام 'name' بدلاً من 'title'
     if (filters.search) {
-      query = query.ilike('title', '%' + filters.search + '%')
+      query = query.ilike('name', '%' + filters.search + '%')
     }
 
     const { data: products, error } = await query
@@ -76,9 +69,7 @@ export const getProducts = async (filters = {}) => {
 |--------------------------------------------------------------------------
 */
 export const getSellerProducts = async (sellerId) => {
-
   try {
-
     const { data, error } = await supabase
       .from('products')
       .select('*')
@@ -105,9 +96,7 @@ export const getSellerProducts = async (sellerId) => {
 |--------------------------------------------------------------------------
 */
 export const getProductById = async (id) => {
-
   try {
-
     // حماية ضد undefined أو null
     if (!id || id === 'undefined') {
       throw new Error('معرف المنتج غير صالح')
@@ -153,9 +142,7 @@ export const getProductById = async (id) => {
 |--------------------------------------------------------------------------
 */
 export const addProduct = async (productData) => {
-
   try {
-
     const { data, error } = await supabase
       .from('products')
       .insert([productData])
@@ -182,9 +169,7 @@ export const addProduct = async (productData) => {
 |--------------------------------------------------------------------------
 */
 export const updateProduct = async (id, updates) => {
-
   try {
-
     const { data, error } = await supabase
       .from('products')
       .update(updates)
@@ -212,9 +197,7 @@ export const updateProduct = async (id, updates) => {
 |--------------------------------------------------------------------------
 */
 export const deleteProduct = async (id) => {
-
   try {
-
     const { error } = await supabase
       .from('products')
       .delete()
@@ -240,13 +223,10 @@ export const deleteProduct = async (id) => {
 |--------------------------------------------------------------------------
 */
 export const uploadProductImages = async (files, productId) => {
-
   try {
-
     const urls = []
 
     for (const file of files) {
-
       const fileName = productId + '/' + Date.now() + '_' + file.name
 
       const { error } = await supabase
@@ -274,3 +254,4 @@ export const uploadProductImages = async (files, productId) => {
     throw error
   }
 }
+
