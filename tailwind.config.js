@@ -1,18 +1,25 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
   theme: {
     extend: {
       colors: {
-        'header-blue': '#02152d',
-        'primary-card': '#06264D',
-        'secondary-blue': '#0b2f5c',
+        primary: '#041C3A',
+        header: '#02152d',
         gold: '#D4AF37',
-        danger: '#dc2626',
-        'text-secondary': '#ddd',
+        card: '#06264D',
+        secondary: '#0b2f5c',
       },
-      fontFamily: { tajawal: ['Tajawal', 'sans-serif'] },
+      fontFamily: {
+        tajawal: ['Tajawal', 'sans-serif'],
+      },
     },
   },
-  plugins: [require('tailwindcss-rtl')],
+  plugins: [],
+  corePlugins: {
+    textAlign: true,
+  },
 }

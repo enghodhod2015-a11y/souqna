@@ -1,4 +1,3 @@
-```javascript id="zv6tvf"
 import { supabase } from './supabase'
 
 /*
@@ -8,13 +7,11 @@ import { supabase } from './supabase'
 */
 export const getProducts = async (filters = {}) => {
   try {
-
     let query = supabase
       .from('products')
       .select('*, seller:profiles!products_seller_id_fkey(full_name, avatar_url)')
       .eq('is_hidden', false)
       .eq('is_approved', true)
-      .eq('is_active', true)
       .order('created_at', { ascending: false })
 
     /*
@@ -25,12 +22,12 @@ export const getProducts = async (filters = {}) => {
 
     // فلترة القسم
     if (filters.category) {
-      query = query.eq('category_id', filters.category)
+      query = query.eq('category', filters.category)
     }
 
     // البحث بالاسم
     if (filters.search) {
-      query = query.ilike('name', '%' + filters.search + '%')
+      query = query.ilike('title', '%' + filters.search + '%')
     }
 
     const { data, error } = await query
@@ -239,4 +236,5 @@ export const uploadProductImages = async (files, productId) => {
     throw error
   }
 }
-```
+
+
