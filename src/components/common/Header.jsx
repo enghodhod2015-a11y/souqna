@@ -15,9 +15,16 @@ export const Header = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [isSellerReady, setIsSellerReady] = useState(false)
+  const [isAdminReady, setIsAdminReady] = useState(false)
 
-  const isSeller = profile?.account_type === 'seller' || profile?.account_type === 'admin'
-  const isAdmin = profile?.account_type === 'admin'
+  // تحديث الصلاحيات بعد جلب البيانات
+  useEffect(() => {
+    if (!loading && profile) {
+      setIsSellerReady(profile?.account_type === 'seller' || profile?.account_type === 'admin')
+      setIsAdminReady(profile?.account_type === 'admin')
+    }
+  }, [loading, profile])
 
   // جلب عدد المحادثات غير المقروءة
   useEffect(() => {
@@ -88,7 +95,7 @@ export const Header = () => {
               </Link>
 
               {/* ─── أزرار البائع ─── */}
-              {isSeller && (
+              {!loading && isSellerReady && (
                 <>
                   <Link 
                     to="/my-products" 
@@ -112,7 +119,7 @@ export const Header = () => {
               )}
 
               {/* ─── زر الأدمن ─── */}
-              {isAdmin && (
+              {!loading && isAdminReady && (
                 <Link 
                   to="/admin/dashboard" 
                   className="px-4 py-2 rounded-full border border-red-400 text-red-400 hover:bg-red-400/10 transition text-sm"
@@ -180,4 +187,3 @@ export const Header = () => {
     </header>
   )
 }
-
