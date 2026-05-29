@@ -53,12 +53,23 @@ export const getSellerProducts = async (sellerId) => {
 export const getProductById = async (id) => {
   try {
     if (!id || id === 'undefined') throw new Error('معرف المنتج غير صالح')
+    
+    // ✅ التعديل الأساسي: تحويل id إلى رقم صحيح لأن جدول products يستخدم integer
+    const numericId = parseInt(id, 10)
+    if (isNaN(numericId)) throw new Error('معرف المنتج يجب أن يكون رقماً')
+
+    console.log("🔍 جلب المنتج بالرقم:", numericId)
+    
     const { data: product, error } = await supabase
       .from('products')
       .select('*')
-      .eq('id', id)
+      .eq('id', numericId)
       .single()
+      
     if (error) throw error
+    
+    console.log("✅ المنتج المستلم:", product)
+    
     if (product?.seller_id) {
       const { data: seller } = await supabase
         .from('profiles')
@@ -67,6 +78,7 @@ export const getProductById = async (id) => {
         .maybeSingle()
       if (seller) product.seller = seller
     }
+    
     // حساب نسبة الخصم للعرض (إذا كان compare_at_price موجوداً)
     if (product.compare_at_price && product.compare_at_price > product.price) {
       product.discount_percentage = Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)
@@ -74,6 +86,7 @@ export const getProductById = async (id) => {
       product.discount_percentage = 0
     }
     product.final_price = product.price
+    
     return product
   } catch (error) {
     console.error('❌ فشل جلب المنتج:', error)
@@ -143,5 +156,3 @@ export const uploadProductImages = async (files, productId) => {
     throw error
   }
 }
-
-
