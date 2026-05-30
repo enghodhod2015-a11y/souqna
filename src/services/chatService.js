@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { addNotification } from './notificationService'
 
 export const getOrCreateConversation = async (productId, buyerId, sellerId) => {
   let { data, error } = await supabase
@@ -33,6 +34,27 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
     .update({ last_message: message, last_message_at: new Date() })
     .eq('id', conversationId)
 
+  // ✅ إضافة إشعار للمستقبل
+  try {
+    // جلب اسم المرسل من profiles
+    const { data: senderProfile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', senderId)
+      .single()
+    const senderName = senderProfile?.full_name || 'مستخدم'
+
+    await addNotification(
+      receiverId,
+      'message',
+      'رسالة جديدة',
+      `${senderName} أرسل لك: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
+      conversationId
+    )
+  } catch (err) {
+    console.error('خطأ في إضافة الإشعار:', err)
+  }
+
   return data
 }
 
@@ -47,7 +69,6 @@ export const getMessages = async (conversationId) => {
 }
 
 export const getUserConversations = async (userId) => {
-  // ✅ التصحيح النهائي: استخدام name بدلاً من title، وإزالة product.* من select المباشر
   const { data: conversations, error } = await supabase
     .from('conversations')
     .select(`
@@ -59,11 +80,9 @@ export const getUserConversations = async (userId) => {
     .order('last_message_at', { ascending: false })
   if (error) throw error
 
-  // جلب المنتجات بشكل منفصل لتجنب مشاكل العلاقات
   const conversationsWithProduct = await Promise.all(
     (conversations || []).map(async (conv) => {
       if (!conv.product_id) return { ...conv, product: null }
-      // ✅ تأكد من استخدام name فقط
       const { data: product, error: prodError } = await supabase
         .from('products')
         .select('id, name, cover_image, seller_id')
@@ -73,7 +92,6 @@ export const getUserConversations = async (userId) => {
         console.error('خطأ في جلب المنتج:', prodError)
         return { ...conv, product: null }
       }
-      // إضافة حقل title مؤقتًا للواجهة
       const productWithTitle = product ? { ...product, title: product.name } : null
       return { ...conv, product: productWithTitle }
     })
@@ -91,3 +109,4 @@ export const markMessagesAsRead = async (conversationId, userId) => {
     .eq('is_read', false)
   if (error) throw error
 }
+

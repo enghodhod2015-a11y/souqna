@@ -36,10 +36,7 @@ export default function ChatPage() {
           .select('*, product:products(*)')
           .eq('id', conversationId)
           .single()
-
-        // ✅ تم التصحيح هنا: رمي المتغير المعرّف الصحيح convErr لمنع خطأ Rollup
         if (convErr) throw convErr 
-        
         currentConv = convData
         currentProduct = convData?.product
       } 
@@ -87,7 +84,11 @@ export default function ChatPage() {
         filter: `conversation_id=eq.${conversation.id}`
       }, (payload) => {
         if (payload?.new) {
-          setMessages(prev => [...prev, payload.new])
+          // ✅ تجنب إضافة الرسالة إذا كانت موجودة بالفعل (لحالة الإضافة المحلية)
+          setMessages(prev => {
+            if (prev.some(m => m.id === payload.new.id)) return prev
+            return [...prev, payload.new]
+          })
           if (payload.new.receiver_id === user.id) {
             markMessagesAsRead(conversation.id, user.id)
           }
@@ -107,11 +108,27 @@ export default function ChatPage() {
   const handleSend = async () => {
     if (!newMessage.trim() || !conversation) return
     setSending(true)
+    const messageText = newMessage.trim()
+    // ✅ إضافة الرسالة محلياً فوراً
+    const tempId = Date.now()
+    const optimisticMessage = {
+      id: tempId,
+      conversation_id: conversation.id,
+      sender_id: user.id,
+      receiver_id: conversation.buyer_id === user.id ? conversation.seller_id : conversation.buyer_id,
+      message: messageText,
+      created_at: new Date().toISOString(),
+      is_read: false
+    }
+    setMessages(prev => [...prev, optimisticMessage])
+    setNewMessage('')
     try {
-      const receiverId = conversation.buyer_id === user.id ? conversation.seller_id : conversation.buyer_id
-      await sendMessage(conversation.id, user.id, receiverId, newMessage)
-      setNewMessage('')
+      const sent = await sendMessage(conversation.id, user.id, optimisticMessage.receiver_id, messageText)
+      // استبدال الرسالة المؤقتة بالرسالة الحقيقية (للتأكد من id الصحيح)
+      setMessages(prev => prev.map(m => m.id === tempId ? sent : m))
     } catch (err) {
+      // في حالة الخطأ، قم بإزالة الرسالة المؤقتة
+      setMessages(prev => prev.filter(m => m.id !== tempId))
       toast.error(err.message)
     } finally {
       setSending(false)
@@ -160,3 +177,4 @@ export default function ChatPage() {
     </div>
   )
 }
+
