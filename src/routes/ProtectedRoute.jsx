@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 export const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const { user, profile, loading } = useAuth()
 
+  // إذا كانت loading لمدة طويلة، يمكننا اعتبارها false
   if (loading) {
     return <div className="text-center py-20">جاري التحقق...</div>
   }
@@ -12,8 +13,7 @@ export const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     return <Navigate to="/login" replace />
   }
 
-  // التحقق من وجود profile قبل استخدامه
-  if (allowedRoles.length > 0 && (!profile || !allowedRoles.includes(profile.account_type))) {
+  if (allowedRoles.length > 0 && profile && !allowedRoles.includes(profile.account_type)) {
     return <Navigate to="/" replace />
   }
 
