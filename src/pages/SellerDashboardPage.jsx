@@ -24,8 +24,8 @@ export default function SellerDashboardPage() {
   const loadDashboard = async () => {
     try {
       const [statsData, salesData, productsData, conversationsData] = await Promise.all([
-        getSellerStats(user.id),
-        getMonthlySales(user.id),
+        getSellerStats(user.id).catch(err => { console.error('Stats error:', err); return null }),
+        getMonthlySales(user.id).catch(err => { console.error('MonthlySales error:', err); return null }),
         getSellerProducts(user.id),
         getUserConversations(user.id)
       ])
