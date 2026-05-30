@@ -1,5 +1,17 @@
 import { supabase } from './supabase'
 
+// دالة مساعدة لإصلاح روابط الصور
+const fixImageUrl = (url) => {
+  if (!url) return null
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  // إذا كان الرابط نسبياً، أضف عنوان Supabase الكامل
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://utmhjbeyrwohrvfobibl.supabase.co'
+  if (url.startsWith('/')) {
+    return `${supabaseUrl}/storage/v1/object/public/product-images${url}`
+  }
+  return `${supabaseUrl}/storage/v1/object/public/product-images/${url}`
+}
+
 export const getProducts = async (filters = {}) => {
   try {
     let query = supabase
@@ -27,6 +39,13 @@ export const getProducts = async (filters = {}) => {
           products.forEach(p => { p.seller = sellersMap[p.seller_id] || null })
         }
       }
+      // إصلاح روابط الصور لكل منتج
+      products.forEach(p => {
+        if (p.cover_image) p.cover_image = fixImageUrl(p.cover_image)
+        if (p.images && Array.isArray(p.images)) {
+          p.images = p.images.map(img => fixImageUrl(img)).filter(Boolean)
+        }
+      })
     }
     return products || []
   } catch (error) {
@@ -47,7 +66,9 @@ export const getSellerProducts = async (sellerId) => {
       ...p,
       title: p.name,
       final_price: p.price,
-      discount_percentage: 0
+      discount_percentage: 0,
+      cover_image: fixImageUrl(p.cover_image),
+      images: p.images ? p.images.map(img => fixImageUrl(img)).filter(Boolean) : []
     }))
     return dataWithTitle
   } catch (error) {
@@ -83,6 +104,8 @@ export const getProductById = async (id) => {
         product.discount_percentage = 0
       }
       product.final_price = product.price
+      product.cover_image = fixImageUrl(product.cover_image)
+      if (product.images) product.images = product.images.map(img => fixImageUrl(img)).filter(Boolean)
     }
     return product
   } catch (error) {
@@ -154,3 +177,5 @@ export const uploadProductImages = async (files, productId) => {
     throw error
   }
 }
+
+

@@ -94,7 +94,7 @@ export default function SellerDashboardPage() {
         </div>
       )}
 
-      {/* آخر المنتجات */}
+      {/* آخر المنتجات - مع إضافة الصورة المصغرة وإزالة views_count */}
       <div className="bg-primary-card p-4 rounded-2xl border border-gold/30 mb-8">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">آخر المنتجات</h2>
@@ -106,12 +106,21 @@ export default function SellerDashboardPage() {
           <div className="space-y-3">
             {recentProducts.map(product => {
               if (!product?.id) return null;
+              // صورة احتياطية إذا كانت cover_image غير موجودة
+              const imgSrc = product.cover_image || 'https://placehold.co/60x60/06264D/D4AF37?text=صورة';
               return (
                 <div key={product.id} className="flex justify-between items-center p-3 bg-secondary-blue/30 rounded-xl">
-                  <div>
-                    <p className="font-bold">{product.title}</p>
-                    <p className="text-gold">{product.final_price} ريال</p>
-                    <p className="text-text-secondary text-sm">المشاهدات: {product.views_count || 0}</p>
+                  <div className="flex items-center gap-3">
+                    <img 
+                      src={imgSrc}
+                      alt={product.title}
+                      className="w-12 h-12 object-cover rounded-lg border border-gold/30"
+                      onError={(e) => { e.target.src = 'https://placehold.co/60x60/06264D/D4AF37?text=صورة' }}
+                    />
+                    <div>
+                      <p className="font-bold">{product.title}</p>
+                      <p className="text-gold">{product.final_price} ريال</p>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <Link to={`/product/${product.id}`}><Eye size={18} className="text-gold" /></Link>
@@ -124,7 +133,7 @@ export default function SellerDashboardPage() {
         )}
       </div>
 
-      {/* آخر الاستفسارات */}
+      {/* آخر الاستفسارات (بدون تعديل) */}
       <div className="bg-primary-card p-4 rounded-2xl border border-gold/30">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">آخر الاستفسارات</h2>
@@ -140,10 +149,8 @@ export default function SellerDashboardPage() {
               const isBuyer = conv.buyer_id === user?.id
               const unreadCount = isBuyer ? conv.buyer_unread_count : conv.seller_unread_count
               
-              // 🔒 حظر الهويات: استبدال الأسماء الصريحة بألقاب مجهولة
               const anonymousLabel = isBuyer ? "البائع" : "مشتري محتمل";
 
-              // 🔒 حظر الهويات: التوجيه الآمن باستخدام معرف المحادثة بدلاً من الـ user.id
               return (
                 <Link to={`/chat/c/${conv.id}`} key={conv.id}>
                   <div className="flex justify-between items-center p-3 bg-secondary-blue/30 rounded-xl hover:bg-secondary-blue transition">
@@ -167,3 +174,4 @@ export default function SellerDashboardPage() {
     </div>
   )
 }
+

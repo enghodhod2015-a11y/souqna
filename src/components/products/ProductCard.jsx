@@ -3,16 +3,18 @@ import { ShoppingCart, MessageCircle, Star } from 'lucide-react'
 import { Button } from '../ui/Button'
 
 export const ProductCard = ({ product }) => {
-  // فحص أمني لضمان عدم تمرير حقول فارغة
   if (!product || !product.id) return null;
+
+  const imageUrl = product.cover_image || (product.images && product.images[0]) || 'https://placehold.co/400x200/06264D/D4AF37?text=صورة';
 
   return (
     <div className="bg-primary-card rounded-2xl overflow-hidden border border-gold/30 hover:border-gold transition-all duration-300">
       <Link to={`/product/${product.id}`}>
         <img 
-          src={product.cover_image || (product.images && product.images[0]) || 'https://placehold.co'} 
+          src={imageUrl}
           alt={product.title} 
           className="w-full h-48 object-cover hover:scale-105 transition duration-300"
+          onError={(e) => { e.target.src = 'https://placehold.co/400x200/06264D/D4AF37?text=صورة' }}
         />
       </Link>
       <div className="p-4">
@@ -37,7 +39,6 @@ export const ProductCard = ({ product }) => {
               <ShoppingCart size={16} className="inline ml-1" /> شراء
             </Button>
           </Link>
-          {/* 🔒 تم التعديل الأمني الحاسم هنا: التوجيه لحساب مسار المنتج المباشر المجهول حظراً لكشف الهويات */}
           <Link to={`/chat/product/${product.id}`} className="flex-1">
             <Button variant="secondary" className="w-full text-sm py-1.5">
               <MessageCircle size={16} className="inline ml-1" /> استعلام
@@ -48,3 +49,4 @@ export const ProductCard = ({ product }) => {
     </div>
   )
 }
+
