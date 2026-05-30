@@ -1,9 +1,5 @@
 import { supabase } from './supabase'
 
-// ==========================================
-// خدمات المحادثات (chatService)
-// ==========================================
-
 export const getOrCreateConversation = async (productId, buyerId, sellerId) => {
   let { data, error } = await supabase
     .from('conversations')
@@ -52,13 +48,36 @@ export const getMessages = async (conversationId) => {
 }
 
 export const getUserConversations = async (userId) => {
-  const { data, error } = await supabase
+  // ✅ التصحيح: إزالة العلاقة المباشرة product:products() واستخدام select منفصل لمنع تضارب العلاقات المكررة
+  const { data: conversations, error } = await supabase
     .from('conversations')
-    .select('*, product:products(title, cover_image), buyer:profiles!conversations_buyer_id_fkey(full_name), seller:profiles!conversations_seller_id_fkey(full_name)')
+    .select(`
+      *,
+      buyer:profiles!conversations_buyer_id_fkey(full_name),
+      seller:profiles!conversations_seller_id_fkey(full_name)
+    `)
     .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
     .order('last_message_at', { ascending: false })
   if (error) throw error
-  return data
+
+  // جلب بيانات المنتج بشكل منفصل لكل محادثة لتجنب تضارب العلاقات
+  const conversationsWithProduct = await Promise.all(
+    (conversations || []).map(async (conv) => {
+      if (!conv.product_id) return { ...conv, product: null }
+      const { data: product, error: prodError } = await supabase
+        .from('products')
+        .select('id, title, cover_image, seller_id')
+        .eq('id', conv.product_id)
+        .maybeSingle()
+      if (prodError) {
+        console.error('خطأ في جلب المنتج:', prodError)
+        return { ...conv, product: null }
+      }
+      return { ...conv, product }
+    })
+  )
+
+  return conversationsWithProduct
 }
 
 export const markMessagesAsRead = async (conversationId, userId) => {
@@ -70,4 +89,3 @@ export const markMessagesAsRead = async (conversationId, userId) => {
     .eq('is_read', false)
   if (error) throw error
 }
-
