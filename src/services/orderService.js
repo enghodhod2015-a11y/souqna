@@ -63,6 +63,7 @@ export const getBuyerOrders = async (buyerId) => {
 }
 
 export const getSellerOrders = async (sellerId) => {
+  // جلب منتجات البائع
   const { data: products, error: prodError } = await supabase
     .from('products')
     .select('id')
@@ -71,29 +72,63 @@ export const getSellerOrders = async (sellerId) => {
   if (!products || products.length === 0) return []
 
   const productIds = products.map(p => p.id)
-  // ✅ إزالة order.created_at.desc والاكتفاء بترتيب العميل
+  
+  // جلب order_items لهذه المنتجات
   const { data: items, error: itemsError } = await supabase
     .from('order_items')
-    .select('*, product:products(name, cover_image), order:orders(*, buyer:profiles!orders_user_id_fkey(full_name, email, phone))')
+    .select('*, product:products(name, cover_image), order:orders(*)')
     .in('product_id', productIds)
   if (itemsError) throw itemsError
-  
-  // ترتيب النتائج يدويًا حسب created_at تنازليًا
-  const sortedItems = (items || []).sort((a, b) => 
-    new Date(b.order?.created_at) - new Date(a.order?.created_at)
-  )
+  if (!items || items.length === 0) return []
 
-  return sortedItems.map(item => ({
-    id: item.order.id,
-    order_status: item.order.status,
-    payment_status: item.order.payment_status,
-    total_price: item.total_price,
-    shipping_address: item.order.shipping_address,
-    receipt_image: item.order.receipt_image,
-    product: item.product ? { ...item.product, title: item.product.name } : null,
-    buyer: item.order.buyer,
-    quantity: item.quantity
-  }))
+  // جلب بيانات المشترين بشكل منفصل (لأن العلاقة المباشرة تسبب خطأ)
+  const orderIds = [...new Set(items.map(i => i.order_id))]
+  const buyerIds = [...new Set(items.map(i => i.order?.user_id).filter(Boolean))]
+  
+  let buyersMap = new Map()
+  if (buyerIds.length) {
+    const { data: buyers, error: buyersError } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, phone')
+      .in('id', buyerIds)
+    if (!buyersError && buyers) {
+      buyers.forEach(b => buyersMap.set(b.id, b))
+    }
+  }
+
+  // تجميع النتائج
+  const ordersMap = new Map()
+  items.forEach(item => {
+    if (!item.order) return
+    const orderId = item.order.id
+    if (!ordersMap.has(orderId)) {
+      ordersMap.set(orderId, {
+        id: orderId,
+        order_status: item.order.status,
+        payment_status: item.order.payment_status,
+        total_price: item.total_price,
+        shipping_address: item.order.shipping_address,
+        receipt_image: item.order.receipt_image,
+        buyer: buyersMap.get(item.order.user_id) || null,
+        items: []
+      })
+    }
+    const orderObj = ordersMap.get(orderId)
+    orderObj.items.push({
+      product: item.product ? { ...item.product, title: item.product.name } : null,
+      quantity: item.quantity,
+      total_price: item.total_price
+    })
+    // إضافة المنتج الأول كـ product رئيسي للتوافق مع الـ UI القديم
+    if (!orderObj.product) {
+      orderObj.product = item.product ? { ...item.product, title: item.product.name } : null
+    }
+  })
+
+  // تحويل الماب إلى مصفوفة وترتيبها حسب created_at
+  let result = Array.from(ordersMap.values())
+  result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  return result
 }
 
 export const updateOrderStatus = async (orderId, status) => {
@@ -204,7 +239,6 @@ export const getMonthlySales = async (sellerId) => {
   if (!products || products.length === 0) return []
 
   const productIds = products.map(p => p.id)
-  // ✅ لا نستخدم created_at من order_items لأنه غير موجود، نستخدم orders.created_at
   const { data: items, error: itemsError } = await supabase
     .from('order_items')
     .select('total_price, order_id')
