@@ -78,7 +78,6 @@ export const getSellerOrders = async (sellerId) => {
   if (itemsError) throw itemsError
   if (!items || items.length === 0) return []
 
-  // ✅ التصحيح: تم إضافة const orderIds = قبل تعيين المصفوفة
   const orderIds = [...new Set(items.map(i => i.order_id))]
   const buyerIds = [...new Set(items.map(i => i.order?.user_id).filter(Boolean))]
   
