@@ -21,6 +21,7 @@ export const getOrCreateConversation = async (productId, buyerId, sellerId) => {
 }
 
 export const sendMessage = async (conversationId, senderId, receiverId, message) => {
+  // 1. إدراج الرسالة
   const { data, error } = await supabase
     .from('messages')
     .insert({ conversation_id: conversationId, sender_id: senderId, receiver_id: receiverId, message })
@@ -28,13 +29,15 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
     .single()
   if (error) throw error
 
+  // 2. تحديث آخر رسالة في المحادثة
   await supabase
     .from('conversations')
     .update({ last_message: message, last_message_at: new Date() })
     .eq('id', conversationId)
 
-  // ✅ حل مختلف: إشعار متصفح مباشر بدون تخزين في قاعدة البيانات
+  // 3. إدراج إشعار في جدول notifications (ليظهر في الجرس)
   try {
+    // جلب اسم المرسل
     const { data: senderProfile } = await supabase
       .from('profiles')
       .select('full_name')
@@ -42,7 +45,35 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
       .single()
     const senderName = senderProfile?.full_name || 'مستخدم'
 
+    // إدراج الإشعار باستخدام الأعمدة الموجودة في الجدول
+    const { error: notifError } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: receiverId,
+        type: 'message',
+        title: 'رسالة جديدة',
+        message: `${senderName} أرسل لك: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
+        related_id: conversationId,
+        is_read: false
+        // created_at ستُضاف تلقائياً (DEFAULT NOW())
+      })
+
+    if (notifError) {
+      console.error('خطأ في إدراج الإشعار في قاعدة البيانات:', notifError)
+    }
+  } catch (err) {
+    console.error('خطأ في إضافة الإشعار:', err)
+  }
+
+  // 4. إشعار المتصفح المنبثق (اختياري - يظهر حتى بدون إذن)
+  try {
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', senderId)
+        .single()
+      const senderName = senderProfile?.full_name || 'مستخدم'
       new Notification('رسالة جديدة', {
         body: `${senderName}: ${message.substring(0, 100)}`,
         icon: '/logo192.png'
