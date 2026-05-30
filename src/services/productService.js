@@ -1,164 +1,200 @@
 import { supabase } from './supabase'
 
-export const getProducts = async (filters = {}) => {
-  try {
-    let query = supabase
-      .from('products')
-      .select('*')
-      .eq('is_hidden', false)
-      .eq('is_approved', true)
-      .order('created_at', { ascending: false })
+export const createOrder = async (orderData) => {
+  const { buyer_id, total_amount, shipping_address, shipping_city, payment_method, notes, items } = orderData
+  
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .insert([{
+      user_id: buyer_id,
+      order_number: `ORD-${Date.now()}`,
+      status: 'pending_payment_review',
+      total_amount: total_amount,
+      shipping_address,
+      shipping_city,
+      payment_method,
+      payment_status: 'pending',
+      notes
+    }])
+    .select()
+    .single()
+  if (orderError) throw orderError
 
-    if (filters.category) query = query.eq('category', filters.category)
-    if (filters.search) query = query.ilike('name', '%' + filters.search + '%')
+  const orderItems = items.map(item => ({
+    order_id: order.id,
+    product_id: item.product_id,
+    quantity: item.quantity,
+    total_price: item.unit_price * item.quantity
+  }))
+  const { error: itemsError } = await supabase
+    .from('order_items')
+    .insert(orderItems)
+  if (itemsError) throw itemsError
 
-    const { data: products, error } = await query
-    if (error) throw error
+  return order
+}
 
-    if (products?.length) {
-      const sellerIds = [...new Set(products.map(p => p.seller_id))].filter(Boolean)
-      if (sellerIds.length) {
-        const { data: sellers } = await supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url')
-          .in('id', sellerIds)
-        if (sellers) {
-          const sellersMap = Object.fromEntries(sellers.map(s => [s.id, s]))
-          products.forEach(p => { p.seller = sellersMap[p.seller_id] || null })
+export const getBuyerOrders = async (buyerId) => {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      order_items!inner (
+        product_id,
+        quantity,
+        total_price,
+        product:products (name, cover_image, seller_id)
+      )
+    `)
+    .eq('user_id', buyerId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data.map(order => ({
+    ...order,
+    product: order.order_items?.[0]?.product ? { ...order.order_items[0].product, title: order.order_items[0].product.name } : null,
+    total_price: order.total_amount
+  }))
+}
+
+export const getSellerOrders = async (sellerId) => {
+  const { data, error } = await supabase
+    .from('order_items')
+    .select(`
+      *,
+      order:orders (*, buyer:profiles!orders_user_id_fkey (full_name, email, phone)),
+      product:products (name, cover_image)
+    `)
+    .eq('product.seller_id', sellerId)
+    .order('order.created_at', { ascending: false })
+  if (error) throw error
+  return data.map(item => ({
+    id: item.order.id,
+    order_status: item.order.status,
+    payment_status: item.order.payment_status,
+    total_price: item.total_price,
+    shipping_address: item.order.shipping_address,
+    receipt_image: item.order.receipt_image,
+    product: item.product ? { ...item.product, title: item.product.name } : null,
+    buyer: item.order.buyer,
+    quantity: item.quantity
+  }))
+}
+
+export const updateOrderStatus = async (orderId, status) => {
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ status: status })
+    .eq('id', orderId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export const uploadReceipt = async (orderId, file) => {
+  const fileName = `receipts/${orderId}/${Date.now()}_${file.name}`
+  const { error: uploadError } = await supabase.storage
+    .from('receipts')
+    .upload(fileName, file)
+  if (uploadError) throw uploadError
+  const { data: { publicUrl } } = supabase.storage
+    .from('receipts')
+    .getPublicUrl(fileName)
+  const { error: updateError } = await supabase
+    .from('orders')
+    .update({ receipt_image: publicUrl, payment_status: 'pending' })
+    .eq('id', orderId)
+  if (updateError) throw updateError
+  return publicUrl
+}
+
+export const getSellerStats = async (sellerId) => {
+  // ✅ إصلاح جذري: استخدام استعلامين منفصلين بسيطين بدلاً من orders!inner
+  let totalSales = 0
+  let statusCount = { pending_payment_review: 0, processing: 0, completed: 0 }
+  
+  // 1. جلب جميع الطلبات التي تحتوي على منتجات هذا البائع
+  const { data: orderItems, error: itemsError } = await supabase
+    .from('order_items')
+    .select('total_price, order_id')
+    .eq('product.seller_id', sellerId)
+  if (!itemsError && orderItems) {
+    // 2. جلب حالات الطلبات بشكل منفصل
+    const orderIds = [...new Set(orderItems.map(item => item.order_id))]
+    if (orderIds.length) {
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('id, status, total_amount')
+        .in('id', orderIds)
+      if (!ordersError && orders) {
+        const ordersMap = new Map(orders.map(o => [o.id, o]))
+        orderItems.forEach(item => {
+          const order = ordersMap.get(item.order_id)
+          if (order) {
+            if (order.status === 'completed') {
+              totalSales += (item.total_price || 0)
+            }
+            if (order.status === 'pending_payment_review') statusCount.pending_payment_review++
+            else if (order.status === 'processing') statusCount.processing++
+            else if (order.status === 'completed') statusCount.completed++
+          }
+        })
+      }
+    }
+  }
+
+  // عدد المنتجات
+  const { count: productsCount, error: prodError } = await supabase
+    .from('products')
+    .select('*', { count: 'exact', head: true })
+    .eq('seller_id', sellerId)
+  if (prodError) throw prodError
+
+  // عدد المحادثات
+  const { count: conversationsCount, error: convError } = await supabase
+    .from('conversations')
+    .select('*', { count: 'exact', head: true })
+    .eq('seller_id', sellerId)
+  if (convError) throw convError
+
+  return {
+    totalSales,
+    productsCount,
+    conversationsCount,
+    pendingOrders: statusCount.pending_payment_review,
+    processingOrders: statusCount.processing,
+    completedOrders: statusCount.completed
+  }
+}
+
+export const getMonthlySales = async (sellerId) => {
+  const startDate = new Date()
+  startDate.setMonth(startDate.getMonth() - 5)
+  const months = {}
+  
+  // جلب order_items للمنتجات ثم الطلبات المرتبطة
+  const { data: orderItems, error: itemsError } = await supabase
+    .from('order_items')
+    .select('total_price, order_id')
+    .eq('product.seller_id', sellerId)
+    .gte('created_at', startDate.toISOString())
+  if (!itemsError && orderItems && orderItems.length) {
+    const orderIds = [...new Set(orderItems.map(item => item.order_id))]
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select('id, status, created_at')
+      .in('id', orderIds)
+      .eq('status', 'completed')
+    if (!ordersError && orders) {
+      const ordersMap = new Map(orders.map(o => [o.id, o]))
+      orderItems.forEach(item => {
+        const order = ordersMap.get(item.order_id)
+        if (order && order.status === 'completed') {
+          const month = new Date(order.created_at).toLocaleString('ar', { month: 'short' })
+          months[month] = (months[month] || 0) + (item.total_price || 0)
         }
-      }
+      })
     }
-    return products || []
-  } catch (error) {
-    console.error('⚠️ فشل جلب المنتجات:', error)
-    return []
   }
-}
-
-export const getSellerProducts = async (sellerId) => {
-  try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('seller_id', sellerId)
-      .order('created_at', { ascending: false })
-    if (error) {
-      console.error('❌ خطأ في استعلام getSellerProducts:', error)
-      return []
-    }
-    // ✅ إضافة اسم مستعار title و final_price و views_count (افتراضي 0)
-    const dataWithMeta = (data || []).map(p => ({
-      ...p,
-      title: p.name,
-      final_price: p.price,
-      views_count: p.views_count || 0,
-      discount_percentage: (p.compare_at_price && p.compare_at_price > p.price) ? Math.round(((p.compare_at_price - p.price) / p.compare_at_price) * 100) : 0
-    }))
-    console.log(`✅ تم جلب ${dataWithMeta.length} منتج للبائع ${sellerId}`)
-    return dataWithMeta
-  } catch (error) {
-    console.error('❌ فشل جلب منتجات البائع:', error)
-    return []
-  }
-}
-
-export const getProductById = async (id) => {
-  try {
-    if (!id || id === 'undefined') throw new Error('معرف المنتج غير صالح')
-    const numericId = parseInt(id, 10)
-    if (isNaN(numericId)) throw new Error('معرف المنتج يجب أن يكون رقماً')
-    console.log("🔍 جلب المنتج بالرقم:", numericId)
-    const { data: product, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('id', numericId)
-      .single()
-    if (error) throw error
-    console.log("✅ المنتج المستلم:", product)
-    if (product?.seller_id) {
-      const { data: seller } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url, phone, city')
-        .eq('id', product.seller_id)
-        .maybeSingle()
-      if (seller) product.seller = seller
-    }
-    if (product) {
-      product.title = product.name
-      if (product.compare_at_price && product.compare_at_price > product.price) {
-        product.discount_percentage = Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)
-      } else {
-        product.discount_percentage = 0
-      }
-      product.final_price = product.price
-    }
-    return product
-  } catch (error) {
-    console.error('❌ فشل جلب المنتج:', error)
-    throw error
-  }
-}
-
-export const addProduct = async (productData) => {
-  try {
-    const { title, discount_percentage, final_price, contact_number, ...rest } = productData
-    const cleanData = { ...rest, name: title || rest.name }
-    const { data, error } = await supabase
-      .from('products')
-      .insert([cleanData])
-      .select()
-      .single()
-    if (error) throw error
-    return data
-  } catch (error) {
-    console.error('❌ فشل إضافة المنتج:', error)
-    throw error
-  }
-}
-
-export const updateProduct = async (id, updates) => {
-  try {
-    const { title, discount_percentage, final_price, contact_number, ...rest } = updates
-    const cleanUpdates = { ...rest }
-    if (title) cleanUpdates.name = title
-    const { data, error } = await supabase
-      .from('products')
-      .update(cleanUpdates)
-      .eq('id', id)
-      .select()
-      .single()
-    if (error) throw error
-    return data
-  } catch (error) {
-    console.error('❌ فشل تحديث المنتج:', error)
-    throw error
-  }
-}
-
-export const deleteProduct = async (id) => {
-  try {
-    const { error } = await supabase.from('products').delete().eq('id', id)
-    if (error) throw error
-    return true
-  } catch (error) {
-    console.error('❌ فشل حذف المنتج:', error)
-    throw error
-  }
-}
-
-export const uploadProductImages = async (files, productId) => {
-  try {
-    const urls = []
-    for (const file of files) {
-      const fileName = `${productId}/${Date.now()}_${file.name}`
-      const { error } = await supabase.storage.from('product-images').upload(fileName, file)
-      if (error) throw error
-      const { data } = supabase.storage.from('product-images').getPublicUrl(fileName)
-      urls.push(data.publicUrl)
-    }
-    return urls
-  } catch (error) {
-    console.error('❌ فشل رفع الصور:', error)
-    throw error
-  }
+  return Object.entries(months).map(([name, sales]) => ({ name, sales }))
 }
