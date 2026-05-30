@@ -1,13 +1,17 @@
-import { Suspense } from 'react'
-// ✅ استيراد مرن يتكيف مع الـ Default أو الـ Named export لمنع انهيار الـ Rollup فوراً
+import { Suspense, useEffect } from 'react'
 import AppRoutesComponent from './routes/AppRoutes'
 import { Header } from './components/common/Header'
 import { Footer } from './components/common/Footer'
+import { requestNotificationPermission } from './services/notificationService'
 
-// فحص أمني لتحديد الكائن الصحيح برمجياً قبل الاستخدام
 const AppRoutes = AppRoutesComponent.AppRoutes || AppRoutesComponent;
 
 function App() {
+  // ✅ طلب إذن الإشعارات عند تحميل التطبيق
+  useEffect(() => {
+    requestNotificationPermission()
+  }, [])
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -22,3 +26,4 @@ function App() {
 }
 
 export default App
+

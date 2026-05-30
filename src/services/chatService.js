@@ -1,5 +1,4 @@
 import { supabase } from './supabase'
-import { addNotification } from './notificationService'
 
 export const getOrCreateConversation = async (productId, buyerId, sellerId) => {
   let { data, error } = await supabase
@@ -34,9 +33,8 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
     .update({ last_message: message, last_message_at: new Date() })
     .eq('id', conversationId)
 
-  // ✅ إضافة إشعار للمستقبل
+  // إدراج إشعار مباشر للمستقبل
   try {
-    // جلب اسم المرسل من profiles
     const { data: senderProfile } = await supabase
       .from('profiles')
       .select('full_name')
@@ -44,13 +42,17 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
       .single()
     const senderName = senderProfile?.full_name || 'مستخدم'
 
-    await addNotification(
-      receiverId,
-      'message',
-      'رسالة جديدة',
-      `${senderName} أرسل لك: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
-      conversationId
-    )
+    await supabase
+      .from('notifications')
+      .insert({
+        user_id: receiverId,
+        type: 'message',
+        title: 'رسالة جديدة',
+        message: `${senderName} أرسل لك: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
+        related_id: conversationId,
+        is_read: false,
+        created_at: new Date().toISOString()
+      })
   } catch (err) {
     console.error('خطأ في إضافة الإشعار:', err)
   }
@@ -109,4 +111,5 @@ export const markMessagesAsRead = async (conversationId, userId) => {
     .eq('is_read', false)
   if (error) throw error
 }
+
 

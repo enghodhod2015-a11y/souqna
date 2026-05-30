@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
+import { NotificationBell } from './NotificationBell'  // ✅ إضافة الإشعارات
 
 export const Header = () => {
   const { user, profile, logout } = useAuth()
@@ -16,11 +17,9 @@ export const Header = () => {
   const dropdownRef = useRef(null)
   const [unreadCount, setUnreadCount] = useState(0)
 
-  // تحديد الصلاحيات مباشرة من profile
   const isSeller = profile?.account_type === 'seller' || profile?.account_type === 'admin'
   const isAdmin = profile?.account_type === 'admin'
 
-  // جلب عدد المحادثات غير المقروءة
   useEffect(() => {
     if (!user) return
 
@@ -65,14 +64,11 @@ export const Header = () => {
   return (
     <header className="bg-header-blue border-b-2 border-gold py-4 px-6 md:px-12">
       <div className="container mx-auto flex justify-between items-center">
-        {/* الشعار */}
         <Link to="/" className="text-2xl font-bold text-gold">سوقنا</Link>
 
-        {/* الأزرار والمستخدم */}
         <div className="flex items-center gap-3">
           {user ? (
             <>
-              {/* ─── أزرار المشتري ─── */}
               <Link 
                 to="/orders" 
                 className="bg-gold text-primary-blue px-4 py-2 rounded-lg font-bold hover:bg-gold/90 transition text-sm"
@@ -80,7 +76,6 @@ export const Header = () => {
                 طلباتي
               </Link>
 
-              {/* ─── أزرار البائع ─── */}
               {isSeller && (
                 <>
                   <Link 
@@ -104,7 +99,6 @@ export const Header = () => {
                 </>
               )}
 
-              {/* ─── زر الأدمن ─── */}
               {isAdmin && (
                 <Link 
                   to="/admin/dashboard" 
@@ -114,7 +108,6 @@ export const Header = () => {
                 </Link>
               )}
 
-              {/* ─── الرسائل ─── */}
               <Link 
                 to="/inbox" 
                 className="p-2 rounded-full hover:bg-primary-card transition-colors relative"
@@ -128,7 +121,9 @@ export const Header = () => {
                 )}
               </Link>
 
-              {/* ─── اسم المستخدم + منسدلة صغيرة ─── */}
+              {/* ✅ إضافة زر الإشعارات */}
+              <NotificationBell />
+
               <div className="relative" ref={dropdownRef}>
                 <button 
                   onClick={() => setDropdownOpen(!dropdownOpen)} 
