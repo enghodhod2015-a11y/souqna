@@ -33,7 +33,7 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
     .update({ last_message: message, last_message_at: new Date() })
     .eq('id', conversationId)
 
-  // إدراج إشعار مباشر للمستقبل
+  // ✅ حل مختلف: إشعار متصفح مباشر بدون تخزين في قاعدة البيانات
   try {
     const { data: senderProfile } = await supabase
       .from('profiles')
@@ -42,19 +42,14 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
       .single()
     const senderName = senderProfile?.full_name || 'مستخدم'
 
-    await supabase
-      .from('notifications')
-      .insert({
-        user_id: receiverId,
-        type: 'message',
-        title: 'رسالة جديدة',
-        message: `${senderName} أرسل لك: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
-        related_id: conversationId,
-        is_read: false,
-        created_at: new Date().toISOString()
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification('رسالة جديدة', {
+        body: `${senderName}: ${message.substring(0, 100)}`,
+        icon: '/logo192.png'
       })
+    }
   } catch (err) {
-    console.error('خطأ في إضافة الإشعار:', err)
+    console.error('خطأ في إشعار المتصفح:', err)
   }
 
   return data
@@ -111,5 +106,4 @@ export const markMessagesAsRead = async (conversationId, userId) => {
     .eq('is_read', false)
   if (error) throw error
 }
-
 
