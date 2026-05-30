@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getProducts } from '../services/productService'
 import { ProductCard } from '../components/products/ProductCard'
-import { ChevronLeft } from 'lucide-react'
 
 const categories = [
   { id: 'electronics', name: 'الإلكترونيات', icon: '📱' },
@@ -52,33 +51,41 @@ export default function HomePage() {
       <h1 className="text-3xl font-bold text-gold mb-8 text-center">مرحباً بكم في سوقنا</h1>
       
       <div className="flex flex-col lg:flex-row gap-8">
-        <aside className="lg:w-1/4">
-          <div className="bg-primary-card rounded-2xl p-4 border border-gold/30 sticky top-20">
-            <h2 className="text-xl font-bold text-gold mb-4">الأقسام</h2>
-            <ul className="space-y-2">
-              <li>
-                <button 
-                  onClick={() => setSelectedCategory('')}
-                  className={`w-full text-right px-3 py-2 rounded-lg transition ${!selectedCategory ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}
-                >
-                  الكل
-                </button>
-              </li>
+        {/* القائمة اليسرى (الأقسام) - مربعات احترافية */}
+        <aside className="lg:w-1/3">
+          <div className="bg-primary-card/90 backdrop-blur-sm rounded-2xl p-5 border border-gold/30 shadow-xl sticky top-20">
+            <h2 className="text-xl font-bold text-gold mb-4 border-b border-gold/30 pb-2">📂 الأقسام</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button 
+                onClick={() => setSelectedCategory('')}
+                className={`w-full text-right px-4 py-3 rounded-xl transition-all duration-300 shadow-md flex items-center gap-2 ${
+                  !selectedCategory 
+                    ? 'bg-gold text-primary-blue font-bold' 
+                    : 'bg-secondary-blue/40 text-white hover:bg-gold/20 hover:text-gold hover:shadow-lg'
+                }`}
+              >
+                <span>📋</span> الكل
+              </button>
               {categories.map(cat => (
-                <li key={cat.id}>
-                  <button 
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`w-full text-right px-3 py-2 rounded-lg transition flex items-center gap-2 ${selectedCategory === cat.id ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}
-                  >
-                    <span>{cat.icon}</span> {cat.name}
-                  </button>
-                </li>
+                <button 
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`w-full text-right px-4 py-3 rounded-xl transition-all duration-300 shadow-md flex items-center gap-2 ${
+                    selectedCategory === cat.id 
+                      ? 'bg-gold text-primary-blue font-bold' 
+                      : 'bg-secondary-blue/40 text-white hover:bg-gold/20 hover:text-gold hover:shadow-lg'
+                  }`}
+                >
+                  <span className="text-xl">{cat.icon}</span>
+                  <span>{cat.name}</span>
+                </button>
               ))}
-            </ul>
+            </div>
           </div>
         </aside>
 
-        <main className="lg:w-2/4">
+        {/* منطقة المنتجات الرئيسية */}
+        <main className="lg:w-1/2">
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {[...Array(6)].map((_, i) => (
@@ -92,7 +99,6 @@ export default function HomePage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {products.map(product => {
-                // 🔒 حماية ذكية: استثناء المنتجات التي لا تحتوي على id سليم لمنع انهيار الموقع
                 if (!product?.id) return null;
                 return <ProductCard key={product.id} product={product} />
               })}
@@ -100,24 +106,26 @@ export default function HomePage() {
           )}
         </main>
 
+        {/* القائمة اليمنى (اكتشف) - مربعات احترافية */}
         <aside className="lg:w-1/4">
-          <div className="bg-primary-card rounded-2xl p-4 border border-gold/30 sticky top-20">
-            <h2 className="text-xl font-bold text-gold mb-4">اكتشف</h2>
-            <ul className="space-y-2">
+          <div className="bg-primary-card/90 backdrop-blur-sm rounded-2xl p-5 border border-gold/30 shadow-xl sticky top-20">
+            <h2 className="text-xl font-bold text-gold mb-4 border-b border-gold/30 pb-2">✨ اكتشف</h2>
+            <div className="flex flex-col gap-3">
               {sideLinks.map(link => (
-                <li key={link.slug}>
-                  <Link 
-                    to={`/${link.slug}`}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-secondary-blue transition"
-                  >
-                    <span>{link.icon}</span> {link.name}
-                  </Link>
-                </li>
+                <Link 
+                  key={link.slug}
+                  to={`/${link.slug}`}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-secondary-blue/40 text-white hover:bg-gold/20 hover:text-gold hover:shadow-lg transition-all duration-300 shadow-md"
+                >
+                  <span className="text-xl">{link.icon}</span>
+                  <span>{link.name}</span>
+                </Link>
               ))}
-            </ul>
+            </div>
           </div>
         </aside>
       </div>
     </div>
   )
 }
+

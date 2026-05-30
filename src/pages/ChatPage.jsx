@@ -134,25 +134,25 @@ export default function ChatPage() {
     }
   }
 
-  if (loading) return <div className="text-center py-20 text-text-secondary">جاري التحميل...</div>
-  if (!product) return <div className="text-center py-20 text-text-secondary">المنتج غير موجود</div>
+  if (loading) return <div className="text-center py-20 text-gray-500">جاري التحميل...</div>
+  if (!product) return <div className="text-center py-20 text-gray-500">المنتج غير موجود</div>
 
   const isBuyer = conversation?.buyer_id === user?.id
   const chatPartnerRole = isBuyer ? 'البائع' : 'المشتري المحتمل'
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="bg-primary-card/90 backdrop-blur-sm rounded-2xl border border-gold/30 shadow-2xl overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gold/40 shadow-xl overflow-hidden">
         {/* رأس المحادثة */}
-        <div className="p-5 border-b border-gold/30 bg-gradient-to-r from-secondary-blue to-primary-card">
+        <div className="p-5 border-b border-gold/30 bg-gradient-to-r from-gray-50 to-white">
           <h2 className="text-2xl font-bold text-gold flex items-center gap-2">
             💬 محادثة مع: {chatPartnerRole}
           </h2>
-          <p className="text-sm text-text-secondary mt-1">بخصوص منتج: <span className="text-gold font-medium">{product?.title}</span></p>
+          <p className="text-sm text-gray-600 mt-1">بخصوص منتج: <span className="text-gold font-medium">{product?.title}</span></p>
         </div>
 
         {/* منطقة الرسائل */}
-        <div className="h-[500px] overflow-y-auto p-5 space-y-4 bg-gradient-to-b from-primary-card/50 to-secondary-blue/10">
+        <div className="h-[500px] overflow-y-auto p-5 space-y-4 bg-gray-50">
           {messages.map((msg) => {
             const isOwn = msg.sender_id === user.id
             return (
@@ -161,14 +161,14 @@ export default function ChatPage() {
                 className={`flex ${isOwn ? 'justify-end' : 'justify-start'} animate-fadeIn`}
               >
                 <div
-                  className={`max-w-[70%] rounded-2xl px-5 py-3 shadow-md transition-all ${
+                  className={`max-w-[70%] rounded-2xl px-5 py-3 shadow-sm transition-all ${
                     isOwn
-                      ? 'bg-gold text-primary-blue rounded-br-none'
-                      : 'bg-secondary-blue text-white rounded-bl-none border border-gold/20'
+                      ? 'bg-gold text-gray-900 rounded-br-none'
+                      : 'bg-white text-gray-800 rounded-bl-none border border-gray-200'
                   }`}
                 >
                   <p className="text-base break-words leading-relaxed">{msg.message}</p>
-                  <div className={`text-xs mt-1 ${isOwn ? 'text-primary-blue/70' : 'text-text-secondary/70'} text-left`}>
+                  <div className={`text-xs mt-1 ${isOwn ? 'text-gray-700/70' : 'text-gray-500'} text-left`}>
                     {new Date(msg.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
@@ -179,20 +179,20 @@ export default function ChatPage() {
         </div>
 
         {/* شريط إرسال الرسالة */}
-        <div className="p-4 border-t border-gold/30 bg-primary-card/80">
+        <div className="p-4 border-t border-gold/30 bg-white">
           <div className="flex gap-3 items-center">
             <input
               type="text"
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="اكتب رسالتك بخصوص المنتج..."
-              className="flex-1 px-5 py-3 rounded-full bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-text-secondary/60"
+              className="flex-1 px-5 py-3 rounded-full bg-gray-100 text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
               onKeyPress={(e) => e.key === 'Enter' && !sending && handleSend()}
             />
             <Button
               onClick={handleSend}
               disabled={sending}
-              className="!rounded-full !px-5 !py-3 bg-gold text-primary-blue hover:bg-amber-500 transition-all duration-200 shadow-md flex items-center gap-2"
+              className="!rounded-full !px-5 !py-3 bg-gold text-gray-900 hover:bg-amber-500 transition-all duration-200 shadow-md flex items-center gap-2"
             >
               <Send size={18} />
               <span>إرسال</span>

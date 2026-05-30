@@ -151,7 +151,7 @@ export default function EditProductPage() {
             value={formData.title}
             onChange={handleChange}
             required
-            className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+            className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
             placeholder="اسم المنتج"
           />
         </div>
@@ -165,7 +165,7 @@ export default function EditProductPage() {
             onChange={handleChange}
             rows="5"
             required
-            className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 resize-y"
+            className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 resize-y placeholder:text-gray-400"
             placeholder="وصف المنتج ..."
           />
         </div>
@@ -181,7 +181,7 @@ export default function EditProductPage() {
               value={formData.price}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+              className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
               placeholder="0.00"
             />
           </div>
@@ -194,7 +194,7 @@ export default function EditProductPage() {
               name="discount_percentage"
               value={formData.discount_percentage}
               onChange={handleChange}
-              className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+              className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
               placeholder="0"
             />
           </div>
@@ -208,10 +208,10 @@ export default function EditProductPage() {
               name="category"
               value={formData.category}
               onChange={handleChange}
-              className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+              className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
             >
               {categories.map(cat => (
-                <option key={cat} value={cat} className="bg-primary-card">{cat}</option>
+                <option key={cat} value={cat} className="bg-white">{cat}</option>
               ))}
             </select>
           </div>
@@ -223,7 +223,7 @@ export default function EditProductPage() {
               value={formData.stock_quantity}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+              className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
               placeholder="0"
             />
           </div>
@@ -238,7 +238,7 @@ export default function EditProductPage() {
               name="city"
               value={formData.city}
               onChange={handleChange}
-              className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+              className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
               placeholder="مثال: الرياض"
             />
           </div>
@@ -249,7 +249,7 @@ export default function EditProductPage() {
               name="contact_number"
               value={formData.contact_number}
               onChange={handleChange}
-              className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+              className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
               placeholder="05xxxxxxxx"
             />
           </div>
@@ -262,7 +262,7 @@ export default function EditProductPage() {
             name="condition"
             value={formData.condition}
             onChange={handleChange}
-            className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+            className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
           >
             <option value="new">جديد</option>
             <option value="used">مستعمل</option>
@@ -279,7 +279,7 @@ export default function EditProductPage() {
             name="is_featured"
             checked={formData.is_featured}
             onChange={handleChange}
-            className="w-5 h-5 text-gold bg-secondary-blue border-gold/30 rounded focus:ring-gold focus:ring-1"
+            className="w-5 h-5 text-gold bg-white border-gold/30 rounded focus:ring-gold focus:ring-1"
           />
         </div>
 
@@ -287,7 +287,7 @@ export default function EditProductPage() {
         <div className="mb-6">
           <label className="block text-gold font-medium mb-3 text-right">الصور الحالية</label>
           {existingImages.length === 0 ? (
-            <p className="text-text-secondary text-center py-4 bg-secondary-blue/20 rounded-xl">لا توجد صور حالية</p>
+            <p className="text-gray-600 text-center py-4 bg-gray-100 rounded-xl">لا توجد صور حالية</p>
           ) : (
             <div className="flex gap-3 flex-wrap">
               {existingImages.map((img, idx) => (
@@ -310,13 +310,13 @@ export default function EditProductPage() {
         <div className="mb-8">
           <label className="block text-gold font-medium mb-3 text-right">إضافة صور جديدة</label>
           <div className="flex flex-col items-center justify-center w-full">
-            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gold/40 rounded-xl cursor-pointer bg-secondary-blue/30 hover:bg-secondary-blue/50 transition-all duration-200">
+            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gold/40 rounded-xl cursor-pointer bg-white/30 hover:bg-white/50 transition-all duration-200">
               <div className="flex flex-col items-center justify-center pt-5 pb-6">
                 <svg className="w-8 h-8 mb-2 text-gold" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
                   <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
                 </svg>
-                <p className="mb-1 text-sm text-text-secondary">انقر لرفع الصور أو اسحبها</p>
-                <p className="text-xs text-text-secondary/70">PNG, JPG, JPEG (الحد الأقصى 5 صور)</p>
+                <p className="mb-1 text-sm text-gray-700">انقر لرفع الصور أو اسحبها</p>
+                <p className="text-xs text-gray-500">PNG, JPG, JPEG (الحد الأقصى 5 صور)</p>
               </div>
               <input type="file" multiple accept="image/*" onChange={handleNewImages} className="hidden" />
             </label>
