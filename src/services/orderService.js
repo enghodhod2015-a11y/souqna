@@ -63,7 +63,6 @@ export const getBuyerOrders = async (buyerId) => {
 }
 
 export const getSellerOrders = async (sellerId) => {
-  // جلب منتجات البائع
   const { data: products, error: prodError } = await supabase
     .from('products')
     .select('id')
@@ -72,8 +71,6 @@ export const getSellerOrders = async (sellerId) => {
   if (!products || products.length === 0) return []
 
   const productIds = products.map(p => p.id)
-  
-  // جلب order_items لهذه المنتجات
   const { data: items, error: itemsError } = await supabase
     .from('order_items')
     .select('*, product:products(name, cover_image), order:orders(*)')
@@ -81,9 +78,9 @@ export const getSellerOrders = async (sellerId) => {
   if (itemsError) throw itemsError
   if (!items || items.length === 0) return []
 
-  // جلب بيانات المشترين بشكل منفصل (لأن العلاقة المباشرة تسبب خطأ)
-  const orderIds = [...new Set(items.map(i => i.order_id))]
-  const buyerIds = [...new Set(items.map(i => i.order?.user_id).filter(Boolean))]
+  // ✅ التصحيح: إضافة const قبل كل تعيين
+  const orderIds = [...new Set(items.map(i => i.order_id))];
+  const buyerIds = [...new Set(items.map(i => i.order?.user_id).filter(Boolean))];
   
   let buyersMap = new Map()
   if (buyerIds.length) {
@@ -96,7 +93,6 @@ export const getSellerOrders = async (sellerId) => {
     }
   }
 
-  // تجميع النتائج
   const ordersMap = new Map()
   items.forEach(item => {
     if (!item.order) return
@@ -110,6 +106,7 @@ export const getSellerOrders = async (sellerId) => {
         shipping_address: item.order.shipping_address,
         receipt_image: item.order.receipt_image,
         buyer: buyersMap.get(item.order.user_id) || null,
+        created_at: item.order.created_at,
         items: []
       })
     }
@@ -119,13 +116,11 @@ export const getSellerOrders = async (sellerId) => {
       quantity: item.quantity,
       total_price: item.total_price
     })
-    // إضافة المنتج الأول كـ product رئيسي للتوافق مع الـ UI القديم
     if (!orderObj.product) {
       orderObj.product = item.product ? { ...item.product, title: item.product.name } : null
     }
   })
 
-  // تحويل الماب إلى مصفوفة وترتيبها حسب created_at
   let result = Array.from(ordersMap.values())
   result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   return result
