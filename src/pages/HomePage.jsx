@@ -51,9 +51,9 @@ export default function HomePage() {
       <h1 className="text-3xl font-bold text-gold mb-8 text-center">مرحباً بكم في سوقنا</h1>
       
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* القائمة اليسرى (الأقسام) - مربعات احترافية */}
+        {/* القائمة اليسرى (الأقسام) - مربعات احترافية مع hover */}
         <aside className="lg:w-1/4">
-          <div className="bg-primary-card rounded-2xl p-4 border border-gold/30 sticky top-20">
+          <div className="bg-primary-card rounded-2xl p-4 border border-gold/30 sticky top-20 transition-all duration-300 hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:-translate-y-1">
             <h2 className="text-xl font-bold text-gold mb-4">الأقسام</h2>
             <ul className="space-y-3">
               <li>
@@ -109,9 +109,9 @@ export default function HomePage() {
           )}
         </main>
 
-        {/* القائمة اليمنى (اكتشف) - مربعات احترافية */}
+        {/* القائمة اليمنى (اكتشف) - مربعات احترافية مع hover */}
         <aside className="lg:w-1/4">
-          <div className="bg-primary-card rounded-2xl p-4 border border-gold/30 sticky top-20">
+          <div className="bg-primary-card rounded-2xl p-4 border border-gold/30 sticky top-20 transition-all duration-300 hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:-translate-y-1">
             <h2 className="text-xl font-bold text-gold mb-4">اكتشف</h2>
             <ul className="space-y-3">
               {sideLinks.map(link => (
