@@ -10,7 +10,7 @@ export const getProducts = async (filters = {}) => {
       .order('created_at', { ascending: false })
 
     if (filters.category) query = query.eq('category', filters.category)
-    if (filters.search) query = query.ilike('name', '%' + filters.search + '%')
+    if (filters.search) query = query.ilike('name', '%' + filters.search + '%')  // ✅ name بدلاً من title
 
     const { data: products, error } = await query
     if (error) throw error
@@ -43,7 +43,9 @@ export const getSellerProducts = async (sellerId) => {
       .eq('seller_id', sellerId)
       .order('created_at', { ascending: false })
     if (error) throw error
-    return data || []
+    // ✅ إضافة اسم مستعار title ليتوافق مع الـ UI الذي يتوقع title
+    const dataWithTitle = (data || []).map(p => ({ ...p, title: p.name }))
+    return dataWithTitle
   } catch (error) {
     console.error('❌ فشل جلب منتجات البائع:', error)
     return []
@@ -53,23 +55,16 @@ export const getSellerProducts = async (sellerId) => {
 export const getProductById = async (id) => {
   try {
     if (!id || id === 'undefined') throw new Error('معرف المنتج غير صالح')
-    
-    // ✅ التعديل الأساسي: تحويل id إلى رقم صحيح لأن جدول products يستخدم integer
     const numericId = parseInt(id, 10)
     if (isNaN(numericId)) throw new Error('معرف المنتج يجب أن يكون رقماً')
-
     console.log("🔍 جلب المنتج بالرقم:", numericId)
-    
     const { data: product, error } = await supabase
       .from('products')
       .select('*')
       .eq('id', numericId)
       .single()
-      
     if (error) throw error
-    
     console.log("✅ المنتج المستلم:", product)
-    
     if (product?.seller_id) {
       const { data: seller } = await supabase
         .from('profiles')
@@ -78,15 +73,16 @@ export const getProductById = async (id) => {
         .maybeSingle()
       if (seller) product.seller = seller
     }
-    
-    // حساب نسبة الخصم للعرض (إذا كان compare_at_price موجوداً)
-    if (product.compare_at_price && product.compare_at_price > product.price) {
-      product.discount_percentage = Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)
-    } else {
-      product.discount_percentage = 0
+    // ✅ إضافة اسم مستعار title و final_price
+    if (product) {
+      product.title = product.name
+      if (product.compare_at_price && product.compare_at_price > product.price) {
+        product.discount_percentage = Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)
+      } else {
+        product.discount_percentage = 0
+      }
+      product.final_price = product.price
     }
-    product.final_price = product.price
-    
     return product
   } catch (error) {
     console.error('❌ فشل جلب المنتج:', error)
@@ -96,8 +92,9 @@ export const getProductById = async (id) => {
 
 export const addProduct = async (productData) => {
   try {
-    // إزالة الحقول غير الموجودة في الجدول
-    const { discount_percentage, final_price, contact_number, ...cleanData } = productData
+    // تحويل title إلى name
+    const { title, discount_percentage, final_price, contact_number, ...rest } = productData
+    const cleanData = { ...rest, name: title || rest.name }
     const { data, error } = await supabase
       .from('products')
       .insert([cleanData])
@@ -113,8 +110,10 @@ export const addProduct = async (productData) => {
 
 export const updateProduct = async (id, updates) => {
   try {
-    // إزالة الحقول غير الموجودة في الجدول
-    const { discount_percentage, final_price, contact_number, ...cleanUpdates } = updates
+    // تحويل title إلى name إذا وجد
+    const { title, discount_percentage, final_price, contact_number, ...rest } = updates
+    const cleanUpdates = { ...rest }
+    if (title) cleanUpdates.name = title
     const { data, error } = await supabase
       .from('products')
       .update(cleanUpdates)
