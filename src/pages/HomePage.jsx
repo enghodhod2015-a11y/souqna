@@ -23,6 +23,40 @@ const sideLinks = [
   { name: 'مميز / مختار لك', slug: 'featured', icon: '⭐' }
 ]
 
+// ✅ مكون مساعد لتجنب تكرار الكود
+const SidebarItem = ({ children, isActive, onClick, className = '' }) => {
+  return (
+    <button
+      onClick={onClick}
+      className={`
+        w-full text-right px-4 py-3 rounded-lg border transition-all duration-200
+        ${isActive 
+          ? 'bg-blue-50 text-gray-900 border-blue-300 shadow-sm' 
+          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100 hover:text-gray-900 hover:border-gray-300'
+        }
+        ${className}
+      `}
+    >
+      {children}
+    </button>
+  )
+}
+
+const SidebarLink = ({ children, to, className = '' }) => {
+  return (
+    <Link
+      to={to}
+      className={`
+        w-full text-right px-4 py-3 rounded-lg border transition-all duration-200
+        bg-white text-gray-700 border-gray-200 hover:bg-gray-100 hover:text-gray-900 hover:border-gray-300
+        ${className}
+      `}
+    >
+      {children}
+    </Link>
+  )
+}
+
 export default function HomePage() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -51,42 +85,40 @@ export default function HomePage() {
       <h1 className="text-3xl font-bold text-gold mb-8 text-center">مرحباً بكم في سوقنا</h1>
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* القائمة اليسرى (الأقسام) - كل قسم داخل مربع مع شبكة 2x5 */}
-        <aside className="lg:w-1/4">
+        {/* ========== القائمة اليسرى (الأقسام) ========== */}
+        {/* تم التعديل هنا */}
+        <aside className="lg:w-1/5">
           <div className="sticky top-20">
             <h2 className="text-xl font-bold text-gold mb-4">الأقسام</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <button
+            {/* Container كبير مع rounded-xl و shadow-md */}
+            <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-3">
+              <SidebarItem
+                isActive={!selectedCategory}
                 onClick={() => setSelectedCategory('')}
-                className={`flex items-center justify-center gap-2 text-center px-3 py-3 rounded-xl transition-all duration-300 shadow-sm ${
-                  !selectedCategory
-                    ? 'bg-gold text-primary-blue font-bold shadow-md'
-                    : 'bg-primary-card text-white border border-gold/40 hover:bg-gold hover:text-primary-blue hover:shadow-md'
-                }`}
               >
-                <span>📋</span>
-                <span>الكل</span>
-              </button>
+                <div className="flex items-center gap-2">
+                  <span>📋</span>
+                  <span>الكل</span>
+                </div>
+              </SidebarItem>
               {categories.map((cat) => (
-                <button
+                <SidebarItem
                   key={cat.id}
+                  isActive={selectedCategory === cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl transition-all duration-300 shadow-sm ${
-                    selectedCategory === cat.id
-                      ? 'bg-gold text-primary-blue font-bold shadow-md'
-                      : 'bg-primary-card text-white border border-gold/40 hover:bg-gold hover:text-primary-blue hover:shadow-md'
-                  }`}
                 >
-                  <span className="text-xl">{cat.icon}</span>
-                  <span className="text-sm whitespace-nowrap">{cat.name}</span>
-                </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{cat.icon}</span>
+                    <span>{cat.name}</span>
+                  </div>
+                </SidebarItem>
               ))}
             </div>
           </div>
         </aside>
 
-        {/* منطقة المنتجات الرئيسية */}
-        <main className="lg:w-2/4">
+        {/* منطقة المنتجات الرئيسية - عرض 3/5 (بدون تعديل) */}
+        <main className="lg:w-3/5">
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {[...Array(6)].map((_, i) => (
@@ -107,20 +139,20 @@ export default function HomePage() {
           )}
         </main>
 
-        {/* القائمة اليمنى (اكتشف) - كل رابط داخل مربع */}
-        <aside className="lg:w-1/4">
+        {/* ========== القائمة اليمنى (اكتشف) ========== */}
+        {/* تم التعديل هنا */}
+        <aside className="lg:w-1/5">
           <div className="sticky top-20">
             <h2 className="text-xl font-bold text-gold mb-4">اكتشف</h2>
-            <div className="flex flex-col gap-3">
+            {/* Container كبير مع rounded-xl و shadow-md */}
+            <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-3">
               {sideLinks.map((link) => (
-                <Link
-                  key={link.slug}
-                  to={`/${link.slug}`}
-                  className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary-card text-white border border-gold/40 hover:bg-gold hover:text-primary-blue transition-all duration-300 shadow-sm hover:shadow-md"
-                >
-                  <span className="text-xl">{link.icon}</span>
-                  <span>{link.name}</span>
-                </Link>
+                <SidebarLink key={link.slug} to={`/${link.slug}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{link.icon}</span>
+                    <span>{link.name}</span>
+                  </div>
+                </SidebarLink>
               ))}
             </div>
           </div>
@@ -129,4 +161,5 @@ export default function HomePage() {
     </div>
   )
 }
+
 
