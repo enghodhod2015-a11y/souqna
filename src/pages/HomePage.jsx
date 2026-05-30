@@ -23,7 +23,7 @@ const sideLinks = [
   { name: 'مميز / مختار لك', slug: 'featured', icon: '⭐' }
 ]
 
-// ✅ مكون مساعد لتجنب تكرار الكود
+// مكون مساعد للأزرار (الأقسام)
 const SidebarItem = ({ children, isActive, onClick, className = '' }) => {
   return (
     <button
@@ -31,8 +31,8 @@ const SidebarItem = ({ children, isActive, onClick, className = '' }) => {
       className={`
         w-full text-right px-4 py-3 rounded-lg border transition-all duration-200
         ${isActive 
-          ? 'bg-blue-50 text-gray-900 border-blue-300 shadow-sm' 
-          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100 hover:text-gray-900 hover:border-gray-300'
+          ? 'bg-gold text-primary-blue font-bold shadow-md border-gold' 
+          : 'bg-primary-card text-white border border-gold/40 hover:bg-gold hover:text-primary-blue hover:shadow-md'
         }
         ${className}
       `}
@@ -42,13 +42,14 @@ const SidebarItem = ({ children, isActive, onClick, className = '' }) => {
   )
 }
 
+// مكون مساعد للروابط (اكتشف)
 const SidebarLink = ({ children, to, className = '' }) => {
   return (
     <Link
       to={to}
       className={`
         w-full text-right px-4 py-3 rounded-lg border transition-all duration-200
-        bg-white text-gray-700 border-gray-200 hover:bg-gray-100 hover:text-gray-900 hover:border-gray-300
+        bg-primary-card text-white border border-gold/40 hover:bg-gold hover:text-primary-blue hover:shadow-md
         ${className}
       `}
     >
@@ -86,12 +87,11 @@ export default function HomePage() {
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* ========== القائمة اليسرى (الأقسام) ========== */}
-        {/* تم التعديل هنا */}
         <aside className="lg:w-1/5">
           <div className="sticky top-20">
             <h2 className="text-xl font-bold text-gold mb-4">الأقسام</h2>
-            {/* Container كبير مع rounded-xl و shadow-md */}
-            <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-3">
+            {/* Container كبير مع خلفية أصلية وحواف ذهبية وظل */}
+            <div className="bg-primary-card rounded-xl shadow-md p-4 border border-gold/30 flex flex-col gap-3">
               <SidebarItem
                 isActive={!selectedCategory}
                 onClick={() => setSelectedCategory('')}
@@ -117,7 +117,7 @@ export default function HomePage() {
           </div>
         </aside>
 
-        {/* منطقة المنتجات الرئيسية - عرض 3/5 (بدون تعديل) */}
+        {/* منطقة المنتجات الرئيسية - بدون تعديل */}
         <main className="lg:w-3/5">
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -140,12 +140,11 @@ export default function HomePage() {
         </main>
 
         {/* ========== القائمة اليمنى (اكتشف) ========== */}
-        {/* تم التعديل هنا */}
         <aside className="lg:w-1/5">
           <div className="sticky top-20">
             <h2 className="text-xl font-bold text-gold mb-4">اكتشف</h2>
-            {/* Container كبير مع rounded-xl و shadow-md */}
-            <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-3">
+            {/* Container كبير مع خلفية أصلية وحواف ذهبية وظل */}
+            <div className="bg-primary-card rounded-xl shadow-md p-4 border border-gold/30 flex flex-col gap-3">
               {sideLinks.map((link) => (
                 <SidebarLink key={link.slug} to={`/${link.slug}`}>
                   <div className="flex items-center gap-2">
