@@ -31,14 +31,18 @@ export default function ChatPage() {
       let currentProduct = null
 
       if (conversationId) {
+        // ✅ تجنب تضمين products مباشرة
         const { data: convData, error: convErr } = await supabase
           .from('conversations')
-          .select('*, product:products(*)')
+          .select('*')
           .eq('id', conversationId)
           .single()
-        if (convErr) throw convErr 
+        if (convErr) throw convErr
+
         currentConv = convData
-        currentProduct = convData?.product
+        if (currentConv.product_id) {
+          currentProduct = await getProductById(currentConv.product_id)
+        }
       } 
       else if (productId) {
         currentProduct = await getProductById(productId)
@@ -84,7 +88,6 @@ export default function ChatPage() {
         filter: `conversation_id=eq.${conversation.id}`
       }, (payload) => {
         if (payload?.new) {
-          // ✅ تجنب إضافة الرسالة إذا كانت موجودة بالفعل (لحالة الإضافة المحلية)
           setMessages(prev => {
             if (prev.some(m => m.id === payload.new.id)) return prev
             return [...prev, payload.new]
@@ -109,7 +112,7 @@ export default function ChatPage() {
     if (!newMessage.trim() || !conversation) return
     setSending(true)
     const messageText = newMessage.trim()
-    // ✅ إضافة الرسالة محلياً فوراً
+    // إضافة مؤقتة محلية
     const tempId = Date.now()
     const optimisticMessage = {
       id: tempId,
@@ -124,10 +127,8 @@ export default function ChatPage() {
     setNewMessage('')
     try {
       const sent = await sendMessage(conversation.id, user.id, optimisticMessage.receiver_id, messageText)
-      // استبدال الرسالة المؤقتة بالرسالة الحقيقية (للتأكد من id الصحيح)
       setMessages(prev => prev.map(m => m.id === tempId ? sent : m))
     } catch (err) {
-      // في حالة الخطأ، قم بإزالة الرسالة المؤقتة
       setMessages(prev => prev.filter(m => m.id !== tempId))
       toast.error(err.message)
     } finally {
@@ -177,4 +178,5 @@ export default function ChatPage() {
     </div>
   )
 }
+
 
