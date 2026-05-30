@@ -10,7 +10,7 @@ export const getProducts = async (filters = {}) => {
       .order('created_at', { ascending: false })
 
     if (filters.category) query = query.eq('category', filters.category)
-    if (filters.search) query = query.ilike('name', '%' + filters.search + '%')  // ✅ name بدلاً من title
+    if (filters.search) query = query.ilike('name', '%' + filters.search + '%')
 
     const { data: products, error } = await query
     if (error) throw error
@@ -42,10 +42,20 @@ export const getSellerProducts = async (sellerId) => {
       .select('*')
       .eq('seller_id', sellerId)
       .order('created_at', { ascending: false })
-    if (error) throw error
-    // ✅ إضافة اسم مستعار title ليتوافق مع الـ UI الذي يتوقع title
-    const dataWithTitle = (data || []).map(p => ({ ...p, title: p.name }))
-    return dataWithTitle
+    if (error) {
+      console.error('❌ خطأ في استعلام getSellerProducts:', error)
+      return []
+    }
+    // ✅ إضافة اسم مستعار title و final_price و views_count (افتراضي 0)
+    const dataWithMeta = (data || []).map(p => ({
+      ...p,
+      title: p.name,
+      final_price: p.price,
+      views_count: p.views_count || 0,
+      discount_percentage: (p.compare_at_price && p.compare_at_price > p.price) ? Math.round(((p.compare_at_price - p.price) / p.compare_at_price) * 100) : 0
+    }))
+    console.log(`✅ تم جلب ${dataWithMeta.length} منتج للبائع ${sellerId}`)
+    return dataWithMeta
   } catch (error) {
     console.error('❌ فشل جلب منتجات البائع:', error)
     return []
@@ -73,7 +83,6 @@ export const getProductById = async (id) => {
         .maybeSingle()
       if (seller) product.seller = seller
     }
-    // ✅ إضافة اسم مستعار title و final_price
     if (product) {
       product.title = product.name
       if (product.compare_at_price && product.compare_at_price > product.price) {
@@ -92,7 +101,6 @@ export const getProductById = async (id) => {
 
 export const addProduct = async (productData) => {
   try {
-    // تحويل title إلى name
     const { title, discount_percentage, final_price, contact_number, ...rest } = productData
     const cleanData = { ...rest, name: title || rest.name }
     const { data, error } = await supabase
@@ -110,7 +118,6 @@ export const addProduct = async (productData) => {
 
 export const updateProduct = async (id, updates) => {
   try {
-    // تحويل title إلى name إذا وجد
     const { title, discount_percentage, final_price, contact_number, ...rest } = updates
     const cleanUpdates = { ...rest }
     if (title) cleanUpdates.name = title
