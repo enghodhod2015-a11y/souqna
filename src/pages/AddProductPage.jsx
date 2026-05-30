@@ -104,7 +104,7 @@ export default function AddProductPage() {
             value={formData.title}
             onChange={handleChange}
             required
-            className="w-full px-4 py-3 rounded-xl bg-secondary-blue/50 border border-gold/30 text-white placeholder:text-text-secondary/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+            className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
             placeholder="مثال: هاتف ذكي - شاشة 6.7 بوصة"
           />
         </div>
@@ -118,7 +118,7 @@ export default function AddProductPage() {
             onChange={handleChange}
             rows="5"
             required
-            className="w-full px-4 py-3 rounded-xl bg-secondary-blue/50 border border-gold/30 text-white placeholder:text-text-secondary/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 resize-y"
+            className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 resize-y"
             placeholder="صف المنتج بالتفصيل ..."
           />
         </div>
@@ -134,7 +134,7 @@ export default function AddProductPage() {
               value={formData.price}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3 rounded-xl bg-secondary-blue/50 border border-gold/30 text-white placeholder:text-text-secondary/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+              className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
               placeholder="0.00"
             />
           </div>
@@ -147,7 +147,7 @@ export default function AddProductPage() {
               name="discount_percentage"
               value={formData.discount_percentage}
               onChange={handleChange}
-              className="w-full px-4 py-3 rounded-xl bg-secondary-blue/50 border border-gold/30 text-white placeholder:text-text-secondary/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+              className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
               placeholder="0"
             />
           </div>
@@ -161,7 +161,7 @@ export default function AddProductPage() {
               name="category"
               value={formData.category}
               onChange={handleChange}
-              className="w-full px-4 py-3 rounded-xl bg-secondary-blue/50 border border-gold/30 text-white focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+              className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
             >
               {categories.map(cat => (
                 <option key={cat} value={cat} className="bg-primary-card">{cat}</option>
@@ -176,7 +176,7 @@ export default function AddProductPage() {
               value={formData.stock_quantity}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3 rounded-xl bg-secondary-blue/50 border border-gold/30 text-white placeholder:text-text-secondary/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+              className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
               placeholder="0"
             />
           </div>
@@ -191,7 +191,7 @@ export default function AddProductPage() {
               name="city"
               value={formData.city}
               onChange={handleChange}
-              className="w-full px-4 py-3 rounded-xl bg-secondary-blue/50 border border-gold/30 text-white placeholder:text-text-secondary/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+              className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
               placeholder="مثال: الرياض"
             />
           </div>
@@ -202,7 +202,7 @@ export default function AddProductPage() {
               name="contact_number"
               value={formData.contact_number}
               onChange={handleChange}
-              className="w-full px-4 py-3 rounded-xl bg-secondary-blue/50 border border-gold/30 text-white placeholder:text-text-secondary/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+              className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
               placeholder="05xxxxxxxx"
             />
           </div>
@@ -215,7 +215,7 @@ export default function AddProductPage() {
             name="condition"
             value={formData.condition}
             onChange={handleChange}
-            className="w-full px-4 py-3 rounded-xl bg-secondary-blue/50 border border-gold/30 text-white focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
+            className="w-full px-4 py-3 rounded-xl bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
           >
             <option value="new">جديد</option>
             <option value="used">مستعمل</option>
