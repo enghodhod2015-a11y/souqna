@@ -52,40 +52,43 @@ export default function HomePage() {
       
       <div className="flex flex-col lg:flex-row gap-8">
         {/* القائمة اليسرى (الأقسام) - مربعات احترافية */}
-        <aside className="lg:w-1/3">
-          <div className="bg-primary-card/90 backdrop-blur-sm rounded-2xl p-5 border border-gold/30 shadow-xl sticky top-20">
-            <h2 className="text-xl font-bold text-gold mb-4 border-b border-gold/30 pb-2">📂 الأقسام</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button 
-                onClick={() => setSelectedCategory('')}
-                className={`w-full text-right px-4 py-3 rounded-xl transition-all duration-300 shadow-md flex items-center gap-2 ${
-                  !selectedCategory 
-                    ? 'bg-gold text-primary-blue font-bold' 
-                    : 'bg-secondary-blue/40 text-white hover:bg-gold/20 hover:text-gold hover:shadow-lg'
-                }`}
-              >
-                <span>📋</span> الكل
-              </button>
-              {categories.map(cat => (
+        <aside className="lg:w-1/4">
+          <div className="bg-primary-card rounded-2xl p-4 border border-gold/30 sticky top-20">
+            <h2 className="text-xl font-bold text-gold mb-4">الأقسام</h2>
+            <ul className="space-y-3">
+              <li>
                 <button 
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`w-full text-right px-4 py-3 rounded-xl transition-all duration-300 shadow-md flex items-center gap-2 ${
-                    selectedCategory === cat.id 
-                      ? 'bg-gold text-primary-blue font-bold' 
-                      : 'bg-secondary-blue/40 text-white hover:bg-gold/20 hover:text-gold hover:shadow-lg'
+                  onClick={() => setSelectedCategory('')}
+                  className={`w-full text-right px-4 py-3 rounded-xl transition-all duration-300 flex items-center gap-2 ${
+                    !selectedCategory 
+                      ? 'bg-gold text-primary-blue font-bold shadow-md' 
+                      : 'bg-secondary-blue/40 text-white hover:bg-gold hover:text-primary-blue hover:shadow-md'
                   }`}
                 >
-                  <span className="text-xl">{cat.icon}</span>
-                  <span>{cat.name}</span>
+                  <span>📋</span> الكل
                 </button>
+              </li>
+              {categories.map(cat => (
+                <li key={cat.id}>
+                  <button 
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`w-full text-right px-4 py-3 rounded-xl transition-all duration-300 flex items-center gap-2 ${
+                      selectedCategory === cat.id 
+                        ? 'bg-gold text-primary-blue font-bold shadow-md' 
+                        : 'bg-secondary-blue/40 text-white hover:bg-gold hover:text-primary-blue hover:shadow-md'
+                    }`}
+                  >
+                    <span className="text-xl">{cat.icon}</span>
+                    <span>{cat.name}</span>
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
         </aside>
 
         {/* منطقة المنتجات الرئيسية */}
-        <main className="lg:w-1/2">
+        <main className="lg:w-2/4">
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {[...Array(6)].map((_, i) => (
@@ -108,20 +111,21 @@ export default function HomePage() {
 
         {/* القائمة اليمنى (اكتشف) - مربعات احترافية */}
         <aside className="lg:w-1/4">
-          <div className="bg-primary-card/90 backdrop-blur-sm rounded-2xl p-5 border border-gold/30 shadow-xl sticky top-20">
-            <h2 className="text-xl font-bold text-gold mb-4 border-b border-gold/30 pb-2">✨ اكتشف</h2>
-            <div className="flex flex-col gap-3">
+          <div className="bg-primary-card rounded-2xl p-4 border border-gold/30 sticky top-20">
+            <h2 className="text-xl font-bold text-gold mb-4">اكتشف</h2>
+            <ul className="space-y-3">
               {sideLinks.map(link => (
-                <Link 
-                  key={link.slug}
-                  to={`/${link.slug}`}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-secondary-blue/40 text-white hover:bg-gold/20 hover:text-gold hover:shadow-lg transition-all duration-300 shadow-md"
-                >
-                  <span className="text-xl">{link.icon}</span>
-                  <span>{link.name}</span>
-                </Link>
+                <li key={link.slug}>
+                  <Link 
+                    to={`/${link.slug}`}
+                    className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary-blue/40 text-white hover:bg-gold hover:text-primary-blue transition-all duration-300"
+                  >
+                    <span className="text-xl">{link.icon}</span>
+                    <span>{link.name}</span>
+                  </Link>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
         </aside>
       </div>
