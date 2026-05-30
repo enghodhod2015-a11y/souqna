@@ -35,39 +35,55 @@ export const createOrder = async (orderData) => {
 }
 
 export const getBuyerOrders = async (buyerId) => {
-  const { data, error } = await supabase
+  // جلب الطلبات أولاً
+  const { data: orders, error: ordersError } = await supabase
     .from('orders')
-    .select(`
-      *,
-      order_items!inner (
-        product_id,
-        quantity,
-        total_price,
-        product:products (name, cover_image, seller_id)
-      )
-    `)
+    .select('*')
     .eq('user_id', buyerId)
     .order('created_at', { ascending: false })
-  if (error) throw error
-  return data.map(order => ({
-    ...order,
-    product: order.order_items?.[0]?.product ? { ...order.order_items[0].product, title: order.order_items[0].product.name } : null,
-    total_price: order.total_amount
-  }))
+  if (ordersError) throw ordersError
+  if (!orders || orders.length === 0) return []
+
+  // جلب order_items لكل طلب
+  const orderIds = orders.map(o => o.id)
+  const { data: items, error: itemsError } = await supabase
+    .from('order_items')
+    .select('*, product:products(name, cover_image, seller_id)')
+    .in('order_id', orderIds)
+  if (itemsError) throw itemsError
+
+  // تجميع النتائج
+  return orders.map(order => {
+    const orderItems = items.filter(i => i.order_id === order.id)
+    const firstItem = orderItems[0]
+    return {
+      ...order,
+      product: firstItem?.product ? { ...firstItem.product, title: firstItem.product.name } : null,
+      total_price: order.total_amount,
+      order_status: order.status
+    }
+  })
 }
 
 export const getSellerOrders = async (sellerId) => {
-  const { data, error } = await supabase
+  // جلب جميع products الخاصة بالبائع
+  const { data: products, error: prodError } = await supabase
+    .from('products')
+    .select('id')
+    .eq('seller_id', sellerId)
+  if (prodError) throw prodError
+  if (!products || products.length === 0) return []
+
+  const productIds = products.map(p => p.id)
+  // جلب order_items لهذه المنتجات
+  const { data: items, error: itemsError } = await supabase
     .from('order_items')
-    .select(`
-      *,
-      order:orders (*, buyer:profiles!orders_user_id_fkey (full_name, email, phone)),
-      product:products (name, cover_image)
-    `)
-    .eq('product.seller_id', sellerId)
+    .select('*, product:products(name, cover_image), order:orders(*, buyer:profiles!orders_user_id_fkey(full_name, email, phone))')
+    .in('product_id', productIds)
     .order('order.created_at', { ascending: false })
-  if (error) throw error
-  return data.map(item => ({
+  if (itemsError) throw itemsError
+
+  return items.map(item => ({
     id: item.order.id,
     order_status: item.order.status,
     payment_status: item.order.payment_status,
@@ -109,68 +125,111 @@ export const uploadReceipt = async (orderId, file) => {
 }
 
 export const getSellerStats = async (sellerId) => {
-  // ✅ التصحيح: استخدم `orders!inner(*)` بدلاً من `order!inner(status)`
-  const { data: salesData, error: salesError } = await supabase
-    .from('order_items')
-    .select('total_price, orders!inner(*)')
-    .eq('product.seller_id', sellerId)
-    .eq('orders.status', 'completed')
-  if (salesError) throw salesError
-  const totalSales = salesData.reduce((sum, item) => sum + (item.total_price || 0), 0)
+  let totalSales = 0
+  let statusCount = { pending_payment_review: 0, processing: 0, completed: 0 }
+  
+  // جلب منتجات البائع
+  const { data: products, error: prodError } = await supabase
+    .from('products')
+    .select('id')
+    .eq('seller_id', sellerId)
+  if (prodError) throw prodError
+  if (!products || products.length === 0) {
+    return { totalSales: 0, productsCount: 0, conversationsCount: 0, pendingOrders: 0, processingOrders: 0, completedOrders: 0 }
+  }
+  const productIds = products.map(p => p.id)
 
-  const { data: statusCountData, error: countError } = await supabase
+  // جلب order_items لهذه المنتجات
+  const { data: items, error: itemsError } = await supabase
     .from('order_items')
-    .select('orders!inner(*)')
-    .eq('product.seller_id', sellerId)
-  if (countError) throw countError
-  const statusCount = {}
-  // نحتاج الآن لجلب حالة كل طلب من البيانات المعادة
-  // لكن data تحتوي على orders objects، استخراج status يدوياً:
-  for (const item of statusCountData) {
-    if (item.orders && item.orders.status) {
-      const st = item.orders.status
-      statusCount[st] = (statusCount[st] || 0) + 1
-    }
+    .select('total_price, order_id')
+    .in('product_id', productIds)
+  if (itemsError) throw itemsError
+  if (!items || items.length === 0) {
+    // لا توجد طلبات
+    const { count: productsCount } = await supabase.from('products').select('*', { count: 'exact', head: true }).eq('seller_id', sellerId)
+    const { count: conversationsCount } = await supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('seller_id', sellerId)
+    return { totalSales: 0, productsCount: productsCount || 0, conversationsCount: conversationsCount || 0, pendingOrders: 0, processingOrders: 0, completedOrders: 0 }
   }
 
-  const { count: productsCount, error: prodError } = await supabase
+  const orderIds = [...new Set(items.map(i => i.order_id))]
+  const { data: orders, error: ordersError } = await supabase
+    .from('orders')
+    .select('id, status, total_amount')
+    .in('id', orderIds)
+  if (ordersError) throw ordersError
+
+  const ordersMap = new Map(orders.map(o => [o.id, o]))
+  items.forEach(item => {
+    const order = ordersMap.get(item.order_id)
+    if (order) {
+      if (order.status === 'completed') totalSales += (item.total_price || 0)
+      if (order.status === 'pending_payment_review') statusCount.pending_payment_review++
+      else if (order.status === 'processing') statusCount.processing++
+      else if (order.status === 'completed') statusCount.completed++
+    }
+  })
+
+  const { count: productsCount, error: prodCountErr } = await supabase
     .from('products')
     .select('*', { count: 'exact', head: true })
     .eq('seller_id', sellerId)
-  if (prodError) throw prodError
+  if (prodCountErr) throw prodCountErr
 
-  const { count: conversationsCount, error: convError } = await supabase
+  const { count: conversationsCount, error: convCountErr } = await supabase
     .from('conversations')
     .select('*', { count: 'exact', head: true })
     .eq('seller_id', sellerId)
-  if (convError) throw convError
+  if (convCountErr) throw convCountErr
 
   return {
     totalSales,
-    productsCount,
-    conversationsCount,
-    pendingOrders: statusCount['pending_payment_review'] || 0,
-    processingOrders: statusCount['processing'] || 0,
-    completedOrders: statusCount['completed'] || 0
+    productsCount: productsCount || 0,
+    conversationsCount: conversationsCount || 0,
+    pendingOrders: statusCount.pending_payment_review,
+    processingOrders: statusCount.processing,
+    completedOrders: statusCount.completed
   }
 }
 
 export const getMonthlySales = async (sellerId) => {
   const startDate = new Date()
   startDate.setMonth(startDate.getMonth() - 5)
-  const { data, error } = await supabase
-    .from('order_items')
-    .select('total_price, orders!inner(created_at, status)')
-    .eq('product.seller_id', sellerId)
-    .eq('orders.status', 'completed')
-    .gte('orders.created_at', startDate.toISOString())
-  if (error) throw error
   const months = {}
-  data.forEach(item => {
-    if (item.orders && item.orders.created_at) {
-      const month = new Date(item.orders.created_at).toLocaleString('ar', { month: 'short' })
+
+  // جلب منتجات البائع
+  const { data: products, error: prodError } = await supabase
+    .from('products')
+    .select('id')
+    .eq('seller_id', sellerId)
+  if (prodError) throw prodError
+  if (!products || products.length === 0) return []
+
+  const productIds = products.map(p => p.id)
+  const { data: items, error: itemsError } = await supabase
+    .from('order_items')
+    .select('total_price, order_id, created_at')
+    .in('product_id', productIds)
+    .gte('created_at', startDate.toISOString())
+  if (itemsError) throw itemsError
+  if (!items || items.length === 0) return []
+
+  const orderIds = [...new Set(items.map(i => i.order_id))]
+  const { data: orders, error: ordersError } = await supabase
+    .from('orders')
+    .select('id, status, created_at')
+    .in('id', orderIds)
+    .eq('status', 'completed')
+  if (ordersError) throw ordersError
+
+  const ordersMap = new Map(orders.map(o => [o.id, o]))
+  items.forEach(item => {
+    const order = ordersMap.get(item.order_id)
+    if (order && order.status === 'completed') {
+      const month = new Date(order.created_at).toLocaleString('ar', { month: 'short' })
       months[month] = (months[month] || 0) + (item.total_price || 0)
     }
   })
+
   return Object.entries(months).map(([name, sales]) => ({ name, sales }))
 }
