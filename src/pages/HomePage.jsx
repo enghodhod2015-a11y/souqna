@@ -49,41 +49,39 @@ export default function HomePage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold text-gold mb-8 text-center">مرحباً بكم في سوقنا</h1>
-      
+
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* القائمة اليسرى (الأقسام) - مربعات احترافية مع hover */}
+        {/* القائمة اليسرى (الأقسام) - كل قسم داخل مربع مع شبكة 2x5 */}
         <aside className="lg:w-1/4">
-          <div className="bg-primary-card rounded-2xl p-4 border border-gold/30 sticky top-20 transition-all duration-300 hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:-translate-y-1">
+          <div className="sticky top-20">
             <h2 className="text-xl font-bold text-gold mb-4">الأقسام</h2>
-            <ul className="space-y-3">
-              <li>
-                <button 
-                  onClick={() => setSelectedCategory('')}
-                  className={`w-full text-right px-4 py-3 rounded-xl transition-all duration-300 flex items-center gap-2 ${
-                    !selectedCategory 
-                      ? 'bg-gold text-primary-blue font-bold shadow-md' 
-                      : 'bg-secondary-blue/40 text-white hover:bg-gold hover:text-primary-blue hover:shadow-md'
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setSelectedCategory('')}
+                className={`flex items-center justify-center gap-2 text-center px-3 py-3 rounded-xl transition-all duration-300 shadow-sm ${
+                  !selectedCategory
+                    ? 'bg-gold text-primary-blue font-bold shadow-md'
+                    : 'bg-primary-card text-white border border-gold/40 hover:bg-gold hover:text-primary-blue hover:shadow-md'
+                }`}
+              >
+                <span>📋</span>
+                <span>الكل</span>
+              </button>
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl transition-all duration-300 shadow-sm ${
+                    selectedCategory === cat.id
+                      ? 'bg-gold text-primary-blue font-bold shadow-md'
+                      : 'bg-primary-card text-white border border-gold/40 hover:bg-gold hover:text-primary-blue hover:shadow-md'
                   }`}
                 >
-                  <span>📋</span> الكل
+                  <span className="text-xl">{cat.icon}</span>
+                  <span className="text-sm whitespace-nowrap">{cat.name}</span>
                 </button>
-              </li>
-              {categories.map(cat => (
-                <li key={cat.id}>
-                  <button 
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`w-full text-right px-4 py-3 rounded-xl transition-all duration-300 flex items-center gap-2 ${
-                      selectedCategory === cat.id 
-                        ? 'bg-gold text-primary-blue font-bold shadow-md' 
-                        : 'bg-secondary-blue/40 text-white hover:bg-gold hover:text-primary-blue hover:shadow-md'
-                    }`}
-                  >
-                    <span className="text-xl">{cat.icon}</span>
-                    <span>{cat.name}</span>
-                  </button>
-                </li>
               ))}
-            </ul>
+            </div>
           </div>
         </aside>
 
@@ -101,31 +99,30 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {products.map(product => {
-                if (!product?.id) return null;
+              {products.map((product) => {
+                if (!product?.id) return null
                 return <ProductCard key={product.id} product={product} />
               })}
             </div>
           )}
         </main>
 
-        {/* القائمة اليمنى (اكتشف) - مربعات احترافية مع hover */}
+        {/* القائمة اليمنى (اكتشف) - كل رابط داخل مربع */}
         <aside className="lg:w-1/4">
-          <div className="bg-primary-card rounded-2xl p-4 border border-gold/30 sticky top-20 transition-all duration-300 hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:-translate-y-1">
+          <div className="sticky top-20">
             <h2 className="text-xl font-bold text-gold mb-4">اكتشف</h2>
-            <ul className="space-y-3">
-              {sideLinks.map(link => (
-                <li key={link.slug}>
-                  <Link 
-                    to={`/${link.slug}`}
-                    className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary-blue/40 text-white hover:bg-gold hover:text-primary-blue transition-all duration-300"
-                  >
-                    <span className="text-xl">{link.icon}</span>
-                    <span>{link.name}</span>
-                  </Link>
-                </li>
+            <div className="flex flex-col gap-3">
+              {sideLinks.map((link) => (
+                <Link
+                  key={link.slug}
+                  to={`/${link.slug}`}
+                  className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary-card text-white border border-gold/40 hover:bg-gold hover:text-primary-blue transition-all duration-300 shadow-sm hover:shadow-md"
+                >
+                  <span className="text-xl">{link.icon}</span>
+                  <span>{link.name}</span>
+                </Link>
               ))}
-            </ul>
+            </div>
           </div>
         </aside>
       </div>
