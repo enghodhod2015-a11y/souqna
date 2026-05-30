@@ -35,7 +35,6 @@ export const createOrder = async (orderData) => {
 }
 
 export const getBuyerOrders = async (buyerId) => {
-  // جلب الطلبات أولاً
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
     .select('*')
@@ -44,7 +43,6 @@ export const getBuyerOrders = async (buyerId) => {
   if (ordersError) throw ordersError
   if (!orders || orders.length === 0) return []
 
-  // جلب order_items لكل طلب
   const orderIds = orders.map(o => o.id)
   const { data: items, error: itemsError } = await supabase
     .from('order_items')
@@ -52,7 +50,6 @@ export const getBuyerOrders = async (buyerId) => {
     .in('order_id', orderIds)
   if (itemsError) throw itemsError
 
-  // تجميع النتائج
   return orders.map(order => {
     const orderItems = items.filter(i => i.order_id === order.id)
     const firstItem = orderItems[0]
@@ -66,7 +63,6 @@ export const getBuyerOrders = async (buyerId) => {
 }
 
 export const getSellerOrders = async (sellerId) => {
-  // جلب جميع products الخاصة بالبائع
   const { data: products, error: prodError } = await supabase
     .from('products')
     .select('id')
@@ -75,15 +71,19 @@ export const getSellerOrders = async (sellerId) => {
   if (!products || products.length === 0) return []
 
   const productIds = products.map(p => p.id)
-  // جلب order_items لهذه المنتجات
+  // ✅ إزالة order.created_at.desc والاكتفاء بترتيب العميل
   const { data: items, error: itemsError } = await supabase
     .from('order_items')
     .select('*, product:products(name, cover_image), order:orders(*, buyer:profiles!orders_user_id_fkey(full_name, email, phone))')
     .in('product_id', productIds)
-    .order('order.created_at', { ascending: false })
   if (itemsError) throw itemsError
+  
+  // ترتيب النتائج يدويًا حسب created_at تنازليًا
+  const sortedItems = (items || []).sort((a, b) => 
+    new Date(b.order?.created_at) - new Date(a.order?.created_at)
+  )
 
-  return items.map(item => ({
+  return sortedItems.map(item => ({
     id: item.order.id,
     order_status: item.order.status,
     payment_status: item.order.payment_status,
@@ -128,25 +128,24 @@ export const getSellerStats = async (sellerId) => {
   let totalSales = 0
   let statusCount = { pending_payment_review: 0, processing: 0, completed: 0 }
   
-  // جلب منتجات البائع
   const { data: products, error: prodError } = await supabase
     .from('products')
     .select('id')
     .eq('seller_id', sellerId)
   if (prodError) throw prodError
   if (!products || products.length === 0) {
-    return { totalSales: 0, productsCount: 0, conversationsCount: 0, pendingOrders: 0, processingOrders: 0, completedOrders: 0 }
+    const { count: productsCount } = await supabase.from('products').select('*', { count: 'exact', head: true }).eq('seller_id', sellerId)
+    const { count: conversationsCount } = await supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('seller_id', sellerId)
+    return { totalSales: 0, productsCount: productsCount || 0, conversationsCount: conversationsCount || 0, pendingOrders: 0, processingOrders: 0, completedOrders: 0 }
   }
-  const productIds = products.map(p => p.id)
 
-  // جلب order_items لهذه المنتجات
+  const productIds = products.map(p => p.id)
   const { data: items, error: itemsError } = await supabase
     .from('order_items')
     .select('total_price, order_id')
     .in('product_id', productIds)
   if (itemsError) throw itemsError
   if (!items || items.length === 0) {
-    // لا توجد طلبات
     const { count: productsCount } = await supabase.from('products').select('*', { count: 'exact', head: true }).eq('seller_id', sellerId)
     const { count: conversationsCount } = await supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('seller_id', sellerId)
     return { totalSales: 0, productsCount: productsCount || 0, conversationsCount: conversationsCount || 0, pendingOrders: 0, processingOrders: 0, completedOrders: 0 }
@@ -197,7 +196,6 @@ export const getMonthlySales = async (sellerId) => {
   startDate.setMonth(startDate.getMonth() - 5)
   const months = {}
 
-  // جلب منتجات البائع
   const { data: products, error: prodError } = await supabase
     .from('products')
     .select('id')
@@ -206,11 +204,11 @@ export const getMonthlySales = async (sellerId) => {
   if (!products || products.length === 0) return []
 
   const productIds = products.map(p => p.id)
+  // ✅ لا نستخدم created_at من order_items لأنه غير موجود، نستخدم orders.created_at
   const { data: items, error: itemsError } = await supabase
     .from('order_items')
-    .select('total_price, order_id, created_at')
+    .select('total_price, order_id')
     .in('product_id', productIds)
-    .gte('created_at', startDate.toISOString())
   if (itemsError) throw itemsError
   if (!items || items.length === 0) return []
 
@@ -220,6 +218,7 @@ export const getMonthlySales = async (sellerId) => {
     .select('id, status, created_at')
     .in('id', orderIds)
     .eq('status', 'completed')
+    .gte('created_at', startDate.toISOString())
   if (ordersError) throw ordersError
 
   const ordersMap = new Map(orders.map(o => [o.id, o]))

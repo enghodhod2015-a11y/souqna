@@ -8,7 +8,6 @@ export const getOrCreateConversation = async (productId, buyerId, sellerId) => {
     .eq('buyer_id', buyerId)
     .eq('seller_id', sellerId)
     .maybeSingle()
-
   if (error) throw error
   if (data) return data
 
@@ -48,7 +47,7 @@ export const getMessages = async (conversationId) => {
 }
 
 export const getUserConversations = async (userId) => {
-  // ✅ التصحيح: إزالة العلاقة المباشرة product:products() واستخدام select منفصل لمنع تضارب العلاقات المكررة
+  // ✅ التصحيح النهائي: استخدام name بدلاً من title، وإزالة product.* من select المباشر
   const { data: conversations, error } = await supabase
     .from('conversations')
     .select(`
@@ -60,20 +59,23 @@ export const getUserConversations = async (userId) => {
     .order('last_message_at', { ascending: false })
   if (error) throw error
 
-  // جلب بيانات المنتج بشكل منفصل لكل محادثة لتجنب تضارب العلاقات
+  // جلب المنتجات بشكل منفصل لتجنب مشاكل العلاقات
   const conversationsWithProduct = await Promise.all(
     (conversations || []).map(async (conv) => {
       if (!conv.product_id) return { ...conv, product: null }
+      // ✅ تأكد من استخدام name فقط
       const { data: product, error: prodError } = await supabase
         .from('products')
-        .select('id, title, cover_image, seller_id')
+        .select('id, name, cover_image, seller_id')
         .eq('id', conv.product_id)
         .maybeSingle()
       if (prodError) {
         console.error('خطأ في جلب المنتج:', prodError)
         return { ...conv, product: null }
       }
-      return { ...conv, product }
+      // إضافة حقل title مؤقتًا للواجهة
+      const productWithTitle = product ? { ...product, title: product.name } : null
+      return { ...conv, product: productWithTitle }
     })
   )
 
