@@ -31,7 +31,6 @@ export default function ChatPage() {
       let currentProduct = null
 
       if (conversationId) {
-        // ✅ تجنب تضمين products مباشرة
         const { data: convData, error: convErr } = await supabase
           .from('conversations')
           .select('*')
@@ -112,7 +111,6 @@ export default function ChatPage() {
     if (!newMessage.trim() || !conversation) return
     setSending(true)
     const messageText = newMessage.trim()
-    // إضافة مؤقتة محلية
     const tempId = Date.now()
     const optimisticMessage = {
       id: tempId,
@@ -143,36 +141,63 @@ export default function ChatPage() {
   const chatPartnerRole = isBuyer ? 'البائع' : 'المشتري المحتمل'
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-3xl">
-      <div className="bg-primary-card rounded-2xl border border-gold/30 overflow-hidden">
-        <div className="p-4 border-b border-gold/30 bg-secondary-blue/20 flex flex-col gap-1">
-          <h2 className="text-xl font-bold text-gold">محادثة مع: {chatPartnerRole}</h2>
-          <p className="text-sm text-text-secondary">بخصوص منتج: {product?.title}</p>
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="bg-primary-card/90 backdrop-blur-sm rounded-2xl border border-gold/30 shadow-2xl overflow-hidden">
+        {/* رأس المحادثة */}
+        <div className="p-5 border-b border-gold/30 bg-gradient-to-r from-secondary-blue to-primary-card">
+          <h2 className="text-2xl font-bold text-gold flex items-center gap-2">
+            💬 محادثة مع: {chatPartnerRole}
+          </h2>
+          <p className="text-sm text-text-secondary mt-1">بخصوص منتج: <span className="text-gold font-medium">{product?.title}</span></p>
         </div>
 
-        <div className="h-96 overflow-y-auto p-4 space-y-3">
-          {messages.map(msg => (
-            <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-xs rounded-lg px-4 py-2 ${msg.sender_id === user.id ? 'bg-gold text-primary-blue' : 'bg-secondary-blue text-white'}`}>
-                {msg.message}
+        {/* منطقة الرسائل */}
+        <div className="h-[500px] overflow-y-auto p-5 space-y-4 bg-gradient-to-b from-primary-card/50 to-secondary-blue/10">
+          {messages.map((msg) => {
+            const isOwn = msg.sender_id === user.id
+            return (
+              <div
+                key={msg.id}
+                className={`flex ${isOwn ? 'justify-end' : 'justify-start'} animate-fadeIn`}
+              >
+                <div
+                  className={`max-w-[70%] rounded-2xl px-5 py-3 shadow-md transition-all ${
+                    isOwn
+                      ? 'bg-gold text-primary-blue rounded-br-none'
+                      : 'bg-secondary-blue text-white rounded-bl-none border border-gold/20'
+                  }`}
+                >
+                  <p className="text-base break-words leading-relaxed">{msg.message}</p>
+                  <div className={`text-xs mt-1 ${isOwn ? 'text-primary-blue/70' : 'text-text-secondary/70'} text-left`}>
+                    {new Date(msg.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-4 border-t border-gold/30 flex gap-2">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="اكتب رسالتك بخصوص المنتج..."
-            className="flex-1 px-4 py-2 rounded-lg bg-primary-card border border-gold/30 text-white focus:outline-none focus:border-gold"
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-          />
-          <Button onClick={handleSend} disabled={sending}>
-            <Send size={18} /> إرسال
-          </Button>
+        {/* شريط إرسال الرسالة */}
+        <div className="p-4 border-t border-gold/30 bg-primary-card/80">
+          <div className="flex gap-3 items-center">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="اكتب رسالتك بخصوص المنتج..."
+              className="flex-1 px-5 py-3 rounded-full bg-secondary-blue text-white border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-text-secondary/60"
+              onKeyPress={(e) => e.key === 'Enter' && !sending && handleSend()}
+            />
+            <Button
+              onClick={handleSend}
+              disabled={sending}
+              className="!rounded-full !px-5 !py-3 bg-gold text-primary-blue hover:bg-amber-500 transition-all duration-200 shadow-md flex items-center gap-2"
+            >
+              <Send size={18} />
+              <span>إرسال</span>
+            </Button>
+          </div>
         </div>
       </div>
     </div>
