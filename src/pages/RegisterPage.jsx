@@ -9,6 +9,7 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [phone, setPhone] = useState('')  // ✅ إضافة رقم الهاتف
   const [accountType, setAccountType] = useState('buyer')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -17,12 +18,8 @@ export default function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    // منع الإرسال المتكرر
-    if (isSubmitting.current) {
-      return
-    }
+    if (isSubmitting.current) return
     
-    // التحقق من الحقول
     if (!fullName.trim()) {
       toast.error('الاسم الكامل مطلوب')
       return
@@ -39,12 +36,20 @@ export default function RegisterPage() {
       toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل')
       return
     }
+    if (!phone.trim()) {
+      toast.error('رقم الهاتف مطلوب للتواصل')
+      return
+    }
+    if (!/^7[0-9]{8}$/.test(phone.trim())) {
+      toast.error('رقم الهاتف يجب أن يكون يمنياً (يبدأ بـ 7 ويليها 8 أرقام)')
+      return
+    }
     
     isSubmitting.current = true
     setLoading(true)
     
     try {
-      await signUp(email, password, fullName, accountType)
+      await signUp(email, password, fullName, accountType, phone)  // ✅ تمرير رقم الهاتف
       toast.success('تم إنشاء الحساب بنجاح')
       navigate('/')
     } catch (err) { 
@@ -71,6 +76,14 @@ export default function RegisterPage() {
             type="email" 
             value={email} 
             onChange={e => setEmail(e.target.value)} 
+            required 
+          />
+          <Input 
+            label="رقم الهاتف (يمني – واتساب للتواصل)" 
+            type="tel" 
+            value={phone} 
+            onChange={e => setPhone(e.target.value)} 
+            placeholder="771234567"
             required 
           />
           <Input 

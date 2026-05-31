@@ -1,8 +1,8 @@
 import { supabase } from './supabase'
 
-// ─── التسجيل ───
-export const signUp = async (email, password, fullName, accountType) => {
-  if (!email || !password || !fullName) {
+// ─── التسجيل مع رقم الهاتف ───
+export const signUp = async (email, password, fullName, accountType, phone) => {
+  if (!email || !password || !fullName || !phone) {
     throw new Error('جميع الحقول مطلوبة')
   }
   
@@ -28,7 +28,7 @@ export const signUp = async (email, password, fullName, accountType) => {
     throw error
   }
   
-  // إنشاء profile
+  // إنشاء profile مع رقم الهاتف
   if (data.user) {
     const { error: profileError } = await supabase
       .from('profiles')
@@ -36,7 +36,8 @@ export const signUp = async (email, password, fullName, accountType) => {
         id: data.user.id,
         full_name: fullName,
         email: email,
-        account_type: accountType
+        account_type: accountType,
+        phone: phone   // ✅ إضافة رقم الهاتف
       })
     
     if (profileError) console.error('Profile creation error:', profileError)
@@ -45,7 +46,7 @@ export const signUp = async (email, password, fullName, accountType) => {
   return data
 }
 
-// ─── تسجيل الدخول ───
+// ─── تسجيل الدخول (بدون تغيير) ───
 export const signIn = async (email, password) => {
   if (!email || !password) {
     throw new Error('البريد وكلمة المرور مطلوبان')
