@@ -13,7 +13,7 @@ export const createOrder = async (orderData) => {
       shipping_address,
       shipping_city,
       payment_method,
-      payment_status: 'pending',
+      payment_status: 'unpaid',   // ✅ تم التصحيح: 'pending' → 'unpaid'
       notes
     }])
     .select()
@@ -62,7 +62,6 @@ export const getBuyerOrders = async (buyerId) => {
   })
 }
 
-// ✅ تبسيط جذري: إرجاع مصفوفة فارغة مؤقتاً لتجنب خطأ بناء Vercel
 export const getSellerOrders = async (sellerId) => {
   return []
 }
@@ -89,13 +88,12 @@ export const uploadReceipt = async (orderId, file) => {
     .getPublicUrl(fileName)
   const { error: updateError } = await supabase
     .from('orders')
-    .update({ receipt_image: publicUrl, payment_status: 'pending' })
+    .update({ receipt_image: publicUrl, payment_status: 'paid' })   // ✅ تم التصحيح: 'pending' → 'paid'
     .eq('id', orderId)
   if (updateError) throw updateError
   return publicUrl
 }
 
-// ✅ تبسيط جذري: إرجاع قيم افتراضية مؤقتاً
 export const getSellerStats = async (sellerId) => {
   const { count: productsCount, error: prodCountErr } = await supabase
     .from('products')
@@ -119,7 +117,7 @@ export const getSellerStats = async (sellerId) => {
   }
 }
 
-// ✅ تبسيط جذري: إرجاع مصفوفة فارغة مؤقتاً
 export const getMonthlySales = async (sellerId) => {
   return []
 }
+
