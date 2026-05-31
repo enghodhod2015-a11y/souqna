@@ -14,7 +14,6 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(false)
   const [fetchingOrder, setFetchingOrder] = useState(true)
   
-  // ✅ حالات جديدة للحقول الإضافية
   const [transferNumber, setTransferNumber] = useState('')
   const [transferName, setTransferName] = useState('')
   const [buyerPhone, setBuyerPhone] = useState('')
@@ -61,7 +60,6 @@ export default function PaymentPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    // ✅ التحقق من صحة الحقول الجديدة
     if (!file) {
       toast.error('يرجى رفع صورة الإيصال أولاً')
       return
@@ -78,8 +76,9 @@ export default function PaymentPage() {
       toast.error('يرجى إدخال رقم هاتف المشتري')
       return
     }
-    if (!/^05\d{8}$/.test(buyerPhone.trim()) && !/^(\+9665\d{8})$/.test(buyerPhone.trim())) {
-      toast.error('رقم الهاتف يجب أن يكون سعودياً (05xxxxxxxx أو +9665xxxxxxxx)')
+    // ✅ التحقق من صحة الرقم اليمني (يبدأ بـ 7 ويليها 8 أرقام)
+    if (!/^7[0-9]{8}$/.test(buyerPhone.trim())) {
+      toast.error('رقم الهاتف يجب أن يكون يمنياً (يبدأ بـ 7 ويليها 8 أرقام، مثال: 771234567)')
       return
     }
 
@@ -120,7 +119,6 @@ export default function PaymentPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="bg-primary-card p-6 rounded-2xl border border-gold/30 space-y-4">
-        {/* ✅ حقول جديدة */}
         <div>
           <label className="block mb-2 text-sm text-text-secondary">رقم الحوالة</label>
           <input 
@@ -146,12 +144,12 @@ export default function PaymentPage() {
         </div>
 
         <div>
-          <label className="block mb-2 text-sm text-text-secondary">رقم هاتف المشتري (واتساب للتواصل)</label>
+          <label className="block mb-2 text-sm text-text-secondary">رقم هاتف المشتري (يمني - واتساب للتواصل)</label>
           <input 
             type="tel" 
             value={buyerPhone}
             onChange={(e) => setBuyerPhone(e.target.value)}
-            placeholder="05xxxxxxxx"
+            placeholder="771234567"
             className="w-full px-4 py-2 rounded-lg bg-white text-gray-900 border border-gold/30 focus:outline-none focus:border-gold"
             required 
           />
