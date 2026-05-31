@@ -99,7 +99,8 @@ export default function SellerOrdersPage() {
                     <p className="text-text-secondary mt-1"><strong>المشتري:</strong> {order.buyer?.full_name || 'حساب غير متوفر'}</p>
                     <p className="text-text-secondary"><strong>رقم الهاتف:</strong> {order.buyer?.phone || 'غير متوفر'}</p>
                     <p className="text-text-secondary"><strong>العنوان:</strong> {order.shipping_address || 'لم يحدد'}</p>
-                    <p className="text-text-secondary"><strong>المبلغ:</strong> {order.total_price} ريال</p>
+                    {/* ✅ التعديل هنا: دعم total_amount و total_price معاً */}
+                    <p className="text-text-secondary"><strong>المبلغ:</strong> {order.total_amount || order.total_price} ريال</p>
                     <p className="text-text-secondary"><strong>الحالة الحالية:</strong> {order.status}</p>
                   </div>
                   <div className="flex gap-2 items-start">
