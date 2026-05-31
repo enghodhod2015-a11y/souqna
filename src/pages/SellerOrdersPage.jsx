@@ -103,19 +103,19 @@ export default function SellerOrdersPage() {
                     <p className="text-text-secondary"><strong>الحالة الحالية:</strong> {order.status}</p>
                   </div>
                   <div className="flex gap-2 items-start">
-                    {/* ✅ تحسين ستايل القائمة المنسدلة */}
+                    {/* ✅ تحسين ستايل القائمة المنسدلة - خلفية بيضاء ونص داكن */}
                     <select
                       value={order.status}
                       onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                      className="px-4 py-2 rounded-lg bg-secondary-blue text-white border border-gold/50 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold transition-all duration-200 cursor-pointer hover:bg-secondary-blue/80"
+                      className="px-4 py-2 rounded-lg bg-white text-gray-800 border border-gold/50 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold transition-all duration-200 cursor-pointer hover:bg-gray-100"
                     >
-                      <option value="pending_payment_review" className="bg-primary-card">⏳ انتظار الدفع</option>
-                      <option value="payment_approved" className="bg-primary-card">💰 تم تأكيد الدفع</option>
-                      <option value="processing" className="bg-primary-card">⚙️ قيد التجهيز</option>
-                      <option value="shipped" className="bg-primary-card">🚚 تم الشحن</option>
-                      <option value="delivered" className="bg-primary-card">📦 تم التسليم</option>
-                      <option value="completed" className="bg-primary-card">✅ مكتمل</option>
-                      <option value="cancelled" className="bg-primary-card">❌ ملغي</option>
+                      <option value="pending_payment_review">⏳ انتظار الدفع</option>
+                      <option value="payment_approved">💰 تم تأكيد الدفع</option>
+                      <option value="processing">⚙️ قيد التجهيز</option>
+                      <option value="shipped">🚚 تم الشحن</option>
+                      <option value="delivered">📦 تم التسليم</option>
+                      <option value="completed">✅ مكتمل</option>
+                      <option value="cancelled">❌ ملغي</option>
                     </select>
                   </div>
                 </div>
