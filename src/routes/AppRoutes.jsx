@@ -14,10 +14,11 @@ import OrdersPage from '../pages/OrdersPage'
 import InboxPage from '../pages/InboxPage'
 import ProfilePage from '../pages/ProfilePage'
 import CheckoutPage from '../pages/CheckoutPage'
+import PaymentPage from '../pages/PaymentPage'  // ✅ تمت الإضافة
 
 // ─── صفحات البائع ───
 import AddProductPage from '../pages/AddProductPage'
-import EditProductPage from '../pages/EditProductPage'   // ✅ أضف هذا السطر
+import EditProductPage from '../pages/EditProductPage'
 import MyProductsPage from '../pages/MyProductsPage'
 import SellerOrdersPage from '../pages/SellerOrdersPage'
 import SellerDashboardPage from '../pages/SellerDashboardPage'
@@ -60,6 +61,13 @@ export default function AppRoutes() {
           <CheckoutPage />
         </ProtectedRoute>
       } />
+      
+      {/* ✅ إضافة مسار الدفع */}
+      <Route path="/payment/:orderId" element={
+        <ProtectedRoute allowedRoles={['buyer', 'seller', 'admin']}>
+          <PaymentPage />
+        </ProtectedRoute>
+      } />
 
       {/* صفحات البائع */}
       <Route path="/add-product" element={
@@ -67,7 +75,6 @@ export default function AppRoutes() {
           <AddProductPage />
         </ProtectedRoute>
       } />
-      {/* ✅ أضف هذا المسار الجديد */}
       <Route path="/edit-product/:id" element={
         <ProtectedRoute allowedRoles={['seller', 'admin']}>
           <EditProductPage />
@@ -110,3 +117,5 @@ export default function AppRoutes() {
     </Routes>
   )
 }
+
+
