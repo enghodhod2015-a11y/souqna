@@ -29,14 +29,19 @@ export default function CheckoutPage() {
       if (!product?.id) return
       const { data, error } = await supabase
         .from('products')
-        .select('price, stock_quantity, name')
+        .select('price, compare_at_price, stock_quantity, name')
         .eq('id', product.id)
         .single()
       if (error) {
         console.error('Error fetching product data:', error)
         toast.error('تعذر التحقق من بيانات المنتج')
       } else {
-        setActualPrice(data.price)
+        // ✅ حساب السعر الفعلي بعد الخصم
+        let finalPrice = data.price
+        if (data.compare_at_price && data.compare_at_price > data.price) {
+          finalPrice = data.price // السعر بعد الخصم هو price (لأن compare_at_price هو السعر الأصلي)
+        }
+        setActualPrice(finalPrice)
         setStock(data.stock_quantity)
         if (initialQuantity > data.stock_quantity) {
           setQuantity(data.stock_quantity)
@@ -212,5 +217,4 @@ export default function CheckoutPage() {
     </div>
   )
 }
-
 
