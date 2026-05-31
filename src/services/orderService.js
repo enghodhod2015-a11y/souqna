@@ -21,21 +21,39 @@ export const createOrder = async (orderData) => {
     .single()
   if (orderError) throw orderError
 
-  // 2. تحضير عناصر الطلب (فقط الأعمدة غير المحسوبة)
+  // 2. معالجة عناصر الطلب
   const orderItems = await Promise.all(items.map(async (item) => {
-    // جلب اسم المنتج من جدول products
+    // جلب بيانات المنتج (السعر، الكمية المتاحة)
     const { data: product, error: productError } = await supabase
       .from('products')
-      .select('name')
+      .select('name, price, stock_quantity')
       .eq('id', item.product_id)
       .single()
     if (productError) throw productError
 
+    // التحقق من توفر الكمية
+    if (item.quantity > product.stock_quantity) {
+      throw new Error(`الكمية المطلوبة للمنتج ${product.name} (${item.quantity}) تتجاوز المتوفر في المخزون (${product.stock_quantity})`)
+    }
+
+    // تخفيض المخزون
+    const newStock = product.stock_quantity - item.quantity
+    const { error: updateError } = await supabase
+      .from('products')
+      .update({ stock_quantity: newStock })
+      .eq('id', item.product_id)
+    if (updateError) throw updateError
+
+    // استخدام السعر الفعلي من قاعدة البيانات (يمكن استخدام unit_price من الطلب أيضاً)
+    const unitPrice = product.price
+    const totalItemPrice = unitPrice * item.quantity
+
     return {
       order_id: order.id,
-      product_name: product.name,          // ✅ إضافة product_name (NOT NULL)
-      quantity: item.quantity
-      // ✅ تم إزالة product_price و total_price لأنهما إما محسوبان أو لهما قيم افتراضية
+      product_name: product.name,
+      quantity: item.quantity,
+      product_price: unitPrice,
+      total_price: totalItemPrice
     }
   }))
 
@@ -47,7 +65,7 @@ export const createOrder = async (orderData) => {
   return order
 }
 
-// باقي الدوال (getBuyerOrders, getSellerOrders, updateOrderStatus, uploadReceipt, getSellerStats, getMonthlySales) كما هي (محذوفة للاختصار ولكن يجب بقاؤها كما في الملف الأصلي)
+// باقي الدوال كما هي (لا تغيير)
 export const getBuyerOrders = async (buyerId) => {
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
@@ -134,3 +152,5 @@ export const getSellerStats = async (sellerId) => {
 export const getMonthlySales = async (sellerId) => {
   return []
 }
+
+
