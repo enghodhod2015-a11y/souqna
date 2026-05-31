@@ -54,9 +54,7 @@ export const getBuyerOrders = async (buyerId) => {
   })
 }
 
-// ✅ النسخة الآمنة لطلبات البائع
 export const getSellerOrders = async (sellerId) => {
-  // 1. جلب جميع product_ids الخاصة بالبائع
   const { data: sellerProducts, error: prodError } = await supabase
     .from('products')
     .select('id')
@@ -66,7 +64,6 @@ export const getSellerOrders = async (sellerId) => {
 
   const productIds = sellerProducts.map(p => p.id)
 
-  // 2. جلب order_items التي لها product_id في قائمة المنتجات
   const { data: orderItems, error: itemsError } = await supabase
     .from('order_items')
     .select('order_id, product_id, quantity, product_price, product_name')
@@ -76,7 +73,6 @@ export const getSellerOrders = async (sellerId) => {
 
   const orderIds = [...new Set(orderItems.map(item => item.order_id))]
 
-  // 3. جلب تفاصيل الطلبات مع المشتري
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
     .select(`
@@ -115,7 +111,7 @@ export const updateOrderStatus = async (orderId, status) => {
   return data
 }
 
-// ✅ دالة رفع الإيصال المعدلة (تحدّث status أيضاً)
+// ✅ تم تعديل status من 'payment_approved' إلى 'processing' لتجنب خطأ CHECK
 export const uploadReceipt = async (orderId, file, transferData) => {
   const { transfer_number, transfer_name, buyer_phone } = transferData
 
@@ -129,13 +125,12 @@ export const uploadReceipt = async (orderId, file, transferData) => {
     .from('receipts')
     .getPublicUrl(fileName)
   
-  // ✅ تحديث payment_status و status معاً
   const { error: updateError } = await supabase
     .from('orders')
     .update({ 
       receipt_image: publicUrl, 
       payment_status: 'paid',
-      status: 'payment_approved',   // <--- إضافة هذا السطر لنقل الطلب إلى مرحلة "تم الدفع"
+      status: 'processing',   // ← تغيير من 'payment_approved' إلى قيمة مسموحة
       transfer_number: transfer_number,
       transfer_name: transfer_name,
       buyer_phone: buyer_phone
