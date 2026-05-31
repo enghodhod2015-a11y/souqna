@@ -21,7 +21,7 @@ export default function PaymentPage() {
   const loadOrder = async () => {
     try {
       setFetchingOrder(true)
-      // 1. جلب بيانات الطلب الرئيسي
+      // 1. جلب الطلب من جدول orders
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select('*')
@@ -31,22 +31,20 @@ export default function PaymentPage() {
       if (orderError) throw orderError
       if (!orderData) throw new Error('الطلب غير موجود')
 
-      // 2. جلب عناصر الطلب (order_items) للحصول على اسم المنتج
+      // 2. جلب اسم المنتج من جدول order_items
       const { data: items, error: itemsError } = await supabase
         .from('order_items')
         .select('product_name')
         .eq('order_id', orderId)
-        .maybeSingle()  // استخدام maybeSingle لتجنب خطأ إذا لم يوجد items
+        .maybeSingle()
 
       if (itemsError) throw itemsError
 
-      // تعيين بيانات الطلب مع اسم المنتج
       setOrder(orderData)
       setProductTitle(items?.product_name || 'منتج غير متوفر')
-
     } catch (error) {
-      console.error("Error loading order context:", error)
-      toast.error(error.message || 'لم يتم العثور على الطلب أو حدث خطأ في الشبكة')
+      console.error('Error loading order:', error)
+      toast.error(error.message || 'لم يتم العثور على الطلب')
       navigate('/')
     } finally {
       setFetchingOrder(false)
@@ -54,9 +52,7 @@ export default function PaymentPage() {
   }
 
   const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0])
-    }
+    if (e.target.files?.[0]) setFile(e.target.files[0])
   }
 
   const handleSubmit = async (e) => {
@@ -65,7 +61,6 @@ export default function PaymentPage() {
       toast.error('يرجى رفع صورة الإيصال أولاً')
       return
     }
-    
     setLoading(true)
     try {
       await uploadReceipt(orderId, file)
@@ -84,8 +79,6 @@ export default function PaymentPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <h1 className="text-2xl font-bold text-gold mb-6">رفع إيصال الدفع</h1>
-      
-      {/* تفاصيل الحساب البنكي والطلب */}
       <div className="bg-primary-card p-6 rounded-2xl border border-gold/30 mb-6 space-y-2">
         <p><strong className="text-gold">المنتج:</strong> {productTitle}</p>
         <p><strong className="text-gold">المبلغ المطلوب:</strong> {order.total_amount} ريال</p>
@@ -99,7 +92,6 @@ export default function PaymentPage() {
         </p>
       </div>
 
-      {/* نموذج الرفع */}
       <form onSubmit={handleSubmit} className="bg-primary-card p-6 rounded-2xl border border-gold/30 space-y-4">
         <div>
           <label className="block mb-2 text-sm text-text-secondary">صورة إيصال التحويل</label>
@@ -111,7 +103,6 @@ export default function PaymentPage() {
             required 
           />
         </div>
-        
         <div className="pt-2">
           <Button type="submit" disabled={loading} className="w-full">
             {loading ? 'جاري رفع الملف...' : 'تأكيد ورفع الإيصال'}
