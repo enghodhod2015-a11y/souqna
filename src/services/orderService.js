@@ -6,13 +6,11 @@ import { supabase } from './supabase'
 export const createOrder = async (orderData) => {
   const { buyer_id, total_amount, shipping_address, shipping_city, payment_method, notes, items } = orderData
 
-  // تحويل العناصر إلى الصيغة المطلوبة للـ RPC
   const rpcItems = items.map(item => ({
     product_id: item.product_id,
     quantity: item.quantity
   }))
 
-  // استدعاء الدالة المخزنة في Supabase
   const { data, error } = await supabase.rpc('create_order_with_items', {
     p_user_id: buyer_id,
     p_total_amount: total_amount,
@@ -32,7 +30,7 @@ export const createOrder = async (orderData) => {
 }
 
 // ─────────────────────────────────────────────────────────────
-// باقي الدوال كما هي (لا تغيير)
+// جلب طلبات المشتري (جميع الطلبات)
 // ─────────────────────────────────────────────────────────────
 export const getBuyerOrders = async (buyerId) => {
   const { data: orders, error: ordersError } = await supabase
@@ -62,10 +60,49 @@ export const getBuyerOrders = async (buyerId) => {
   })
 }
 
+// ─────────────────────────────────────────────────────────────
+// جلب طلبات البائع (الطلبات التي تحتوي على منتجاته)
+// ─────────────────────────────────────────────────────────────
 export const getSellerOrders = async (sellerId) => {
-  return []
+  const { data: orderItems, error: itemsError } = await supabase
+    .from('order_items')
+    .select(`
+      order_id,
+      product_id,
+      products!inner (seller_id, name, cover_image)
+    `)
+    .eq('products.seller_id', sellerId)
+
+  if (itemsError) throw itemsError
+  if (!orderItems || orderItems.length === 0) return []
+
+  const orderIds = [...new Set(orderItems.map(item => item.order_id))]
+
+  const { data: orders, error: ordersError } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      buyer:profiles!orders_user_id_fkey (id, full_name, email, phone)
+    `)
+    .in('id', orderIds)
+    .order('created_at', { ascending: false })
+
+  if (ordersError) throw ordersError
+
+  return orders.map(order => {
+    const orderProduct = orderItems.find(item => item.order_id === order.id)
+    return {
+      ...order,
+      product: orderProduct?.products || null,
+      total_price: order.total_amount,
+      order_status: order.status
+    }
+  })
 }
 
+// ─────────────────────────────────────────────────────────────
+// تحديث حالة الطلب
+// ─────────────────────────────────────────────────────────────
 export const updateOrderStatus = async (orderId, status) => {
   const { data, error } = await supabase
     .from('orders')
@@ -77,7 +114,9 @@ export const updateOrderStatus = async (orderId, status) => {
   return data
 }
 
-// ✅ دالة رفع الإيصال مع حفظ بيانات الحوالة والمحول
+// ─────────────────────────────────────────────────────────────
+// رفع الإيصال مع بيانات الحوالة والمحول
+// ─────────────────────────────────────────────────────────────
 export const uploadReceipt = async (orderId, file, transferData) => {
   const { transfer_number, transfer_name, buyer_phone } = transferData
 
@@ -91,7 +130,6 @@ export const uploadReceipt = async (orderId, file, transferData) => {
     .from('receipts')
     .getPublicUrl(fileName)
   
-  // ✅ تحديث الطلب بإضافة بيانات الحوالة والإيصال
   const { error: updateError } = await supabase
     .from('orders')
     .update({ 
@@ -107,6 +145,9 @@ export const uploadReceipt = async (orderId, file, transferData) => {
   return publicUrl
 }
 
+// ─────────────────────────────────────────────────────────────
+// إحصائيات البائع (مؤقتة)
+// ─────────────────────────────────────────────────────────────
 export const getSellerStats = async (sellerId) => {
   const { count: productsCount, error: prodCountErr } = await supabase
     .from('products')
@@ -133,5 +174,4 @@ export const getSellerStats = async (sellerId) => {
 export const getMonthlySales = async (sellerId) => {
   return []
 }
-
 
