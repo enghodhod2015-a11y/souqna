@@ -37,10 +37,10 @@ export default function CheckoutPage() {
 
     setLoading(true)
     try {
-      // تجميع التفاصيل الإضافية (اللون، المقاس) في حقل notes
       const additionalDetails = `اللون: ${formData.color}, المقاس: ${formData.size}`
-      const existingNotes = ''
-      const combinedNotes = `${existingNotes} ${additionalDetails}`.trim()
+      const combinedNotes = additionalDetails
+
+      const totalPrice = product.final_price * quantity
 
       const orderData = {
         buyer_id: user?.id,
@@ -48,6 +48,7 @@ export default function CheckoutPage() {
         product_id: product.id,
         quantity: quantity,
         unit_price: product.final_price,
+        total_amount: totalPrice,               // ✅ إصلاح الخطأ: إضافة total_amount
         shipping_address: formData.shipping_address,
         shipping_city: formData.shipping_city,
         payment_method: formData.payment_method,
@@ -58,7 +59,6 @@ export default function CheckoutPage() {
       
       const order = await createOrder(orderData)
       toast.success('تم إنشاء الطلب بنجاح')
-      
       navigate(`/payment/${order.id}`)
     } catch (err) {
       toast.error(err.message)
@@ -67,9 +67,8 @@ export default function CheckoutPage() {
     }
   }
 
-  const totalPrice = product.final_price * quantity
+  const totalPrice = product.final_price * quantity   // لا تزال موجودة للعرض
 
-  // خيارات الألوان والمقاسات (يمكن تعديلها حسب احتياجات المنتج)
   const colorOptions = ['أحمر', 'أزرق', 'أخضر', 'أسود', 'أبيض']
   const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 
@@ -77,7 +76,6 @@ export default function CheckoutPage() {
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <h1 className="text-2xl font-bold text-gold mb-6">إنهاء الطلب</h1>
       
-      {/* مراجعة تفاصيل المنتج */}
       <div className="bg-primary-card p-6 rounded-2xl border border-gold/30 mb-6">
         <h2 className="text-xl font-bold mb-2">{product.title}</h2>
         <div className="flex justify-between text-text-secondary text-sm mb-2">
@@ -95,75 +93,36 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {/* نموذج بيانات الشحن والدفع */}
       <form onSubmit={handleSubmit} className="bg-primary-card p-6 rounded-2xl border border-gold/30 space-y-4">
         <h3 className="text-lg font-bold text-gold mb-2">معلومات الشحن والدفع</h3>
         
-        {/* المدينة */}
         <div>
           <label className="block text-sm mb-1 text-text-secondary">المدينة</label>
-          <Input 
-            type="text" 
-            name="shipping_city" 
-            value={formData.shipping_city} 
-            onChange={handleChange} 
-            placeholder="مثال: الرياض، جدة..." 
-            required 
-          />
+          <Input type="text" name="shipping_city" value={formData.shipping_city} onChange={handleChange} placeholder="مثال: الرياض، جدة..." required />
         </div>
 
-        {/* العنوان بالتفصيل */}
         <div>
           <label className="block text-sm mb-1 text-text-secondary">العنوان بالتفصيل</label>
-          <Input 
-            type="text" 
-            name="shipping_address" 
-            value={formData.shipping_address} 
-            onChange={handleChange} 
-            placeholder="اسم الحي، الشارع، رقم المنزل..." 
-            required 
-          />
+          <Input type="text" name="shipping_address" value={formData.shipping_address} onChange={handleChange} placeholder="اسم الحي، الشارع، رقم المنزل..." required />
         </div>
 
-        {/* اللون */}
         <div>
           <label className="block text-sm mb-1 text-text-secondary">اللون</label>
-          <select
-            name="color"
-            value={formData.color}
-            onChange={handleChange}
-            className="w-full px-4 py-2 rounded-lg bg-secondary-blue/50 border border-gold/30 text-white focus:outline-none focus:border-gold"
-          >
-            {colorOptions.map(color => (
-              <option key={color} value={color}>{color}</option>
-            ))}
+          <select name="color" value={formData.color} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-secondary-blue/50 border border-gold/30 text-white focus:outline-none focus:border-gold">
+            {colorOptions.map(color => <option key={color} value={color}>{color}</option>)}
           </select>
         </div>
 
-        {/* المقاس */}
         <div>
           <label className="block text-sm mb-1 text-text-secondary">المقاس</label>
-          <select
-            name="size"
-            value={formData.size}
-            onChange={handleChange}
-            className="w-full px-4 py-2 rounded-lg bg-secondary-blue/50 border border-gold/30 text-white focus:outline-none focus:border-gold"
-          >
-            {sizeOptions.map(size => (
-              <option key={size} value={size}>{size}</option>
-            ))}
+          <select name="size" value={formData.size} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-secondary-blue/50 border border-gold/30 text-white focus:outline-none focus:border-gold">
+            {sizeOptions.map(size => <option key={size} value={size}>{size}</option>)}
           </select>
         </div>
 
-        {/* طريقة الدفع (كريم أو حوالة موحدة) */}
         <div>
           <label className="block text-sm mb-1 text-text-secondary">طريقة الدفع</label>
-          <select
-            name="payment_method"
-            value={formData.payment_method}
-            onChange={handleChange}
-            className="w-full px-4 py-2 rounded-lg bg-secondary-blue/50 border border-gold/30 text-white focus:outline-none focus:border-gold"
-          >
+          <select name="payment_method" value={formData.payment_method} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-secondary-blue/50 border border-gold/30 text-white focus:outline-none focus:border-gold">
             <option value="كريم">حساب كريمي</option>
             <option value="حوالة موحدة">حوالة موحدة</option>
           </select>
