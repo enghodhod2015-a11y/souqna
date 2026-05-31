@@ -28,7 +28,11 @@ export default function OrdersPage() {
   const getFilteredOrders = () => {
     switch (activeTab) {
       case 'pending_payment':
-        return allOrders.filter(o => o.status === 'pending_payment_review' || o.status === 'pending')
+        // ✅ إصلاح: استبعاد الحالات التي تعني تم الدفع (processing, shipped, delivered, completed)
+        return allOrders.filter(o => 
+          (o.status === 'pending_payment_review' || o.status === 'pending') && 
+          o.status !== 'processing'
+        )
       case 'completed_paid':
         return allOrders.filter(o => ['payment_approved', 'processing', 'shipped', 'delivered', 'completed'].includes(o.status))
       case 'cancelled':
