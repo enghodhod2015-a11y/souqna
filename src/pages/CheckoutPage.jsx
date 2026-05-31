@@ -39,7 +39,6 @@ export default function CheckoutPage() {
     try {
       const additionalDetails = `اللون: ${formData.color}, المقاس: ${formData.size}`
       const combinedNotes = additionalDetails
-
       const totalPrice = product.final_price * quantity
 
       const orderData = {
@@ -52,9 +51,9 @@ export default function CheckoutPage() {
         shipping_address: formData.shipping_address,
         shipping_city: formData.shipping_city,
         payment_method: formData.payment_method,
-        order_status: 'pending_payment_review',
-        payment_status: 'unpaid',          // ✅ القيمة المسموحة حسب قاعدة البيانات
         notes: combinedNotes
+        // ✅ تم إزالة order_status و payment_status لاستخدام القيم الافتراضية في قاعدة البيانات
+        // تأكد من أن جدول orders له default مناسبة مثل status='pending_payment_review' و payment_status='unpaid'
       }
       
       const order = await createOrder(orderData)
@@ -153,5 +152,4 @@ export default function CheckoutPage() {
     </div>
   )
 }
-
 
