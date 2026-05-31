@@ -3,7 +3,6 @@ import { supabase } from './supabase'
 export const createOrder = async (orderData) => {
   const { buyer_id, total_amount, shipping_address, shipping_city, payment_method, notes, items } = orderData
   
-  // 1. إنشاء الطلب الرئيسي
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert([{
@@ -21,39 +20,20 @@ export const createOrder = async (orderData) => {
     .single()
   if (orderError) throw orderError
 
-  // 2. معالجة عناصر الطلب
   const orderItems = await Promise.all(items.map(async (item) => {
-    // جلب بيانات المنتج (السعر، الكمية المتاحة)
     const { data: product, error: productError } = await supabase
       .from('products')
-      .select('name, price, stock_quantity')
+      .select('name, price')
       .eq('id', item.product_id)
       .single()
     if (productError) throw productError
-
-    // التحقق من توفر الكمية
-    if (item.quantity > product.stock_quantity) {
-      throw new Error(`الكمية المطلوبة للمنتج ${product.name} (${item.quantity}) تتجاوز المتوفر في المخزون (${product.stock_quantity})`)
-    }
-
-    // تخفيض المخزون
-    const newStock = product.stock_quantity - item.quantity
-    const { error: updateError } = await supabase
-      .from('products')
-      .update({ stock_quantity: newStock })
-      .eq('id', item.product_id)
-    if (updateError) throw updateError
-
-    // استخدام السعر الفعلي من قاعدة البيانات (يمكن استخدام unit_price من الطلب أيضاً)
-    const unitPrice = product.price
-    const totalItemPrice = unitPrice * item.quantity
 
     return {
       order_id: order.id,
       product_name: product.name,
       quantity: item.quantity,
-      product_price: unitPrice,
-      total_price: totalItemPrice
+      product_price: product.price
+      // ✅ تم حذف total_price لأنه عمود GENERATED
     }
   }))
 
@@ -65,7 +45,7 @@ export const createOrder = async (orderData) => {
   return order
 }
 
-// باقي الدوال كما هي (لا تغيير)
+// باقي الدوال (getBuyerOrders, getSellerOrders, updateOrderStatus, uploadReceipt, getSellerStats, getMonthlySales) تبقى كما هي في النسخة السابقة
 export const getBuyerOrders = async (buyerId) => {
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
@@ -95,7 +75,7 @@ export const getBuyerOrders = async (buyerId) => {
 }
 
 export const getSellerOrders = async (sellerId) => {
-  return []
+  return []   // مبسط مؤقتاً
 }
 
 export const updateOrderStatus = async (orderId, status) => {
@@ -152,5 +132,4 @@ export const getSellerStats = async (sellerId) => {
 export const getMonthlySales = async (sellerId) => {
   return []
 }
-
 

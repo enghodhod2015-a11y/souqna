@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { createOrder } from '../services/orderService'
-import { supabase } from '../services/supabase'  // ✅ المسار الصحيح
+import { supabase } from '../services/supabase'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import toast from 'react-hot-toast'
@@ -212,6 +212,5 @@ export default function CheckoutPage() {
     </div>
   )
 }
-
 
 
