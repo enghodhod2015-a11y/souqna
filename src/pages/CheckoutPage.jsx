@@ -53,7 +53,7 @@ export default function CheckoutPage() {
         shipping_city: formData.shipping_city,
         payment_method: formData.payment_method,
         order_status: 'pending_payment_review',
-        payment_status: 'unpaid',          // ✅ تغيير القيمة لتتفق مع check constraint
+        payment_status: 'unpaid',          // ✅ القيمة المسموحة حسب قاعدة البيانات
         notes: combinedNotes
       }
       
@@ -153,4 +153,5 @@ export default function CheckoutPage() {
     </div>
   )
 }
+
 
