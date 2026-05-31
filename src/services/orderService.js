@@ -44,13 +44,9 @@ export const getBuyerOrders = async (buyerId) => {
   })
 }
 
-// ✅ استدعاء الدالة المخزنة لجلب طلبات البائع
 export const getSellerOrders = async (sellerId) => {
   const { data, error } = await supabase.rpc('get_seller_orders', { p_seller_id: sellerId })
-  if (error) {
-    console.error('RPC get_seller_orders error:', error)
-    throw error
-  }
+  if (error) throw error
   return data || []
 }
 
@@ -59,6 +55,18 @@ export const updateOrderStatus = async (orderId, status) => {
     .from('orders')
     .update({ status })
     .eq('id', orderId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export const confirmDelivery = async (orderId) => {
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ status: 'completed' })
+    .eq('id', orderId)
+    .eq('status', 'delivered')
     .select()
     .single()
   if (error) throw error
@@ -93,5 +101,4 @@ export const getSellerStats = async (sellerId) => {
 }
 
 export const getMonthlySales = async () => []
-
 

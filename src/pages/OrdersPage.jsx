@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { getBuyerOrders } from '../services/orderService'
+import { getBuyerOrders, confirmDelivery } from '../services/orderService'
 import { Link } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
+import toast from 'react-hot-toast'
 
 export default function OrdersPage() {
   const { user } = useAuth()
@@ -28,7 +29,6 @@ export default function OrdersPage() {
   const getFilteredOrders = () => {
     switch (activeTab) {
       case 'pending_payment':
-        // ✅ إصلاح: استبعاد الحالات التي تعني تم الدفع (processing, shipped, delivered, completed)
         return allOrders.filter(o => 
           (o.status === 'pending_payment_review' || o.status === 'pending') && 
           o.status !== 'processing'
@@ -84,11 +84,28 @@ export default function OrdersPage() {
                   <p className="text-text-secondary">الحالة: {order.status}</p>
                   <p className="text-text-secondary">طريقة الدفع: {order.payment_method}</p>
                 </div>
-                {order.status === 'pending_payment_review' && (
-                  <Link to={`/payment/${order.id}`}>
-                    <Button>رفع إيصال</Button>
-                  </Link>
-                )}
+                <div className="flex gap-2">
+                  {order.status === 'pending_payment_review' && (
+                    <Link to={`/payment/${order.id}`}>
+                      <Button>رفع إيصال</Button>
+                    </Link>
+                  )}
+                  {order.status === 'delivered' && (
+                    <Button 
+                      onClick={async () => {
+                        try {
+                          await confirmDelivery(order.id)
+                          toast.success('تم تأكيد الاستلام، شكراً لك')
+                          loadOrders()
+                        } catch (err) {
+                          toast.error(err.message)
+                        }
+                      }}
+                    >
+                      ✅ تأكيد الاستلام
+                    </Button>
+                  )}
+                </div>
               </div>
               {order.receipt_image && (
                 <div className="mt-3 pt-2 border-t border-gold/20">
@@ -104,5 +121,3 @@ export default function OrdersPage() {
     </div>
   )
 }
-
-
