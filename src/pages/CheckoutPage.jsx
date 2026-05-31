@@ -48,12 +48,12 @@ export default function CheckoutPage() {
         product_id: product.id,
         quantity: quantity,
         unit_price: product.final_price,
-        total_amount: totalPrice,               // ✅ إصلاح الخطأ: إضافة total_amount
+        total_amount: totalPrice,
         shipping_address: formData.shipping_address,
         shipping_city: formData.shipping_city,
         payment_method: formData.payment_method,
         order_status: 'pending_payment_review',
-        payment_status: 'pending',
+        payment_status: 'unpaid',          // ✅ تغيير القيمة لتتفق مع check constraint
         notes: combinedNotes
       }
       
@@ -61,13 +61,14 @@ export default function CheckoutPage() {
       toast.success('تم إنشاء الطلب بنجاح')
       navigate(`/payment/${order.id}`)
     } catch (err) {
+      console.error('Order creation error:', err)
       toast.error(err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const totalPrice = product.final_price * quantity   // لا تزال موجودة للعرض
+  const totalPrice = product.final_price * quantity
 
   const colorOptions = ['أحمر', 'أزرق', 'أخضر', 'أسود', 'أبيض']
   const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
@@ -108,21 +109,36 @@ export default function CheckoutPage() {
 
         <div>
           <label className="block text-sm mb-1 text-text-secondary">اللون</label>
-          <select name="color" value={formData.color} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-secondary-blue/50 border border-gold/30 text-white focus:outline-none focus:border-gold">
+          <select
+            name="color"
+            value={formData.color}
+            onChange={handleChange}
+            className="w-full px-4 py-2 rounded-lg bg-white text-gray-900 border border-gold/30 focus:outline-none focus:border-gold"
+          >
             {colorOptions.map(color => <option key={color} value={color}>{color}</option>)}
           </select>
         </div>
 
         <div>
           <label className="block text-sm mb-1 text-text-secondary">المقاس</label>
-          <select name="size" value={formData.size} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-secondary-blue/50 border border-gold/30 text-white focus:outline-none focus:border-gold">
+          <select
+            name="size"
+            value={formData.size}
+            onChange={handleChange}
+            className="w-full px-4 py-2 rounded-lg bg-white text-gray-900 border border-gold/30 focus:outline-none focus:border-gold"
+          >
             {sizeOptions.map(size => <option key={size} value={size}>{size}</option>)}
           </select>
         </div>
 
         <div>
           <label className="block text-sm mb-1 text-text-secondary">طريقة الدفع</label>
-          <select name="payment_method" value={formData.payment_method} onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-secondary-blue/50 border border-gold/30 text-white focus:outline-none focus:border-gold">
+          <select
+            name="payment_method"
+            value={formData.payment_method}
+            onChange={handleChange}
+            className="w-full px-4 py-2 rounded-lg bg-white text-gray-900 border border-gold/30 focus:outline-none focus:border-gold"
+          >
             <option value="كريم">حساب كريمي</option>
             <option value="حوالة موحدة">حوالة موحدة</option>
           </select>
