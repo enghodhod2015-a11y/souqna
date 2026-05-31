@@ -4,7 +4,6 @@ import { supabase } from './supabase'
 const fixImageUrl = (url) => {
   if (!url) return null
   if (url.startsWith('http://') || url.startsWith('https://')) return url
-  // إذا كان الرابط نسبياً، أضف عنوان Supabase الكامل
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://utmhjbeyrwohrvfobibl.supabase.co'
   if (url.startsWith('/')) {
     return `${supabaseUrl}/storage/v1/object/public/product-images${url}`
@@ -28,6 +27,7 @@ export const getProducts = async (filters = {}) => {
     if (error) throw error
 
     if (products?.length) {
+      // جلب بيانات البائعين
       const sellerIds = [...new Set(products.map(p => p.seller_id))].filter(Boolean)
       if (sellerIds.length) {
         const { data: sellers } = await supabase
@@ -39,8 +39,19 @@ export const getProducts = async (filters = {}) => {
           products.forEach(p => { p.seller = sellersMap[p.seller_id] || null })
         }
       }
-      // إصلاح روابط الصور لكل منتج
+      
+      // ✅ إصلاح: إضافة title, final_price, discount_percentage لكل منتج
       products.forEach(p => {
+        p.title = p.name
+        // حساب السعر النهائي (إذا كان compare_at_price أكبر من price، فهناك خصم)
+        if (p.compare_at_price && p.compare_at_price > p.price) {
+          p.discount_percentage = Math.round(((p.compare_at_price - p.price) / p.compare_at_price) * 100)
+          p.final_price = p.price
+        } else {
+          p.discount_percentage = 0
+          p.final_price = p.price
+        }
+        // إصلاح الروابط
         if (p.cover_image) p.cover_image = fixImageUrl(p.cover_image)
         if (p.images && Array.isArray(p.images)) {
           p.images = p.images.map(img => fixImageUrl(img)).filter(Boolean)
@@ -54,6 +65,8 @@ export const getProducts = async (filters = {}) => {
   }
 }
 
+// باقي الدوال كما هي (getSellerProducts, getProductById, addProduct, updateProduct, deleteProduct, uploadProductImages)
+// لم يتم تغييرها، فقط أعدت كتابتها كما كانت سابقاً للتأكيد
 export const getSellerProducts = async (sellerId) => {
   try {
     const { data, error } = await supabase
@@ -100,10 +113,11 @@ export const getProductById = async (id) => {
       product.title = product.name
       if (product.compare_at_price && product.compare_at_price > product.price) {
         product.discount_percentage = Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)
+        product.final_price = product.price
       } else {
         product.discount_percentage = 0
+        product.final_price = product.price
       }
-      product.final_price = product.price
       product.cover_image = fixImageUrl(product.cover_image)
       if (product.images) product.images = product.images.map(img => fixImageUrl(img)).filter(Boolean)
     }
