@@ -38,22 +38,23 @@ export default function CheckoutPage() {
     setLoading(true)
     try {
       const additionalDetails = `اللون: ${formData.color}, المقاس: ${formData.size}`
-      const combinedNotes = additionalDetails
       const totalPrice = product.final_price * quantity
+
+      // ✅ إنشاء مصفوفة items المطلوبة في createOrder
+      const items = [{
+        product_id: product.id,
+        quantity: quantity,
+        unit_price: product.final_price
+      }]
 
       const orderData = {
         buyer_id: user?.id,
-        seller_id: product.seller_id,
-        product_id: product.id,
-        quantity: quantity,
-        unit_price: product.final_price,
         total_amount: totalPrice,
         shipping_address: formData.shipping_address,
         shipping_city: formData.shipping_city,
         payment_method: formData.payment_method,
-        notes: combinedNotes
-        // ✅ تم إزالة order_status و payment_status لاستخدام القيم الافتراضية في قاعدة البيانات
-        // تأكد من أن جدول orders له default مناسبة مثل status='pending_payment_review' و payment_status='unpaid'
+        notes: additionalDetails,
+        items: items                         // ✅ أضفنا items هنا
       }
       
       const order = await createOrder(orderData)
@@ -61,7 +62,7 @@ export default function CheckoutPage() {
       navigate(`/payment/${order.id}`)
     } catch (err) {
       console.error('Order creation error:', err)
-      toast.error(err.message)
+      toast.error(err.message || 'حدث خطأ أثناء إنشاء الطلب')
     } finally {
       setLoading(false)
     }
@@ -152,4 +153,5 @@ export default function CheckoutPage() {
     </div>
   )
 }
+
 
