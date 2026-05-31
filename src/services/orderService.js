@@ -21,7 +21,7 @@ export const createOrder = async (orderData) => {
     .single()
   if (orderError) throw orderError
 
-  // 2. تحضير عناصر الطلب مع جلب product_name لكل منتج
+  // 2. تحضير عناصر الطلب (فقط الأعمدة غير المحسوبة)
   const orderItems = await Promise.all(items.map(async (item) => {
     // جلب اسم المنتج من جدول products
     const { data: product, error: productError } = await supabase
@@ -33,10 +33,9 @@ export const createOrder = async (orderData) => {
 
     return {
       order_id: order.id,
-      product_name: product.name,          // ✅ إضافة product_name
-      quantity: item.quantity,
-      product_price: item.unit_price,      // ✅ إضافة product_price إذا كان العمود مطلوباً
-      total_price: item.unit_price * item.quantity  // ✅ إضافة total_price (يمكن تعديله حسب الجدول)
+      product_name: product.name,          // ✅ إضافة product_name (NOT NULL)
+      quantity: item.quantity
+      // ✅ تم إزالة product_price و total_price لأنهما إما محسوبان أو لهما قيم افتراضية
     }
   }))
 
@@ -48,7 +47,7 @@ export const createOrder = async (orderData) => {
   return order
 }
 
-// باقي الدوال (getBuyerOrders, getSellerOrders, updateOrderStatus, uploadReceipt, getSellerStats, getMonthlySales) كما هي بدون تغيير
+// باقي الدوال (getBuyerOrders, getSellerOrders, updateOrderStatus, uploadReceipt, getSellerStats, getMonthlySales) كما هي (محذوفة للاختصار ولكن يجب بقاؤها كما في الملف الأصلي)
 export const getBuyerOrders = async (buyerId) => {
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
