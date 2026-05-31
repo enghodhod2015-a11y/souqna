@@ -9,6 +9,7 @@ export default function PaymentPage() {
   const { orderId } = useParams()
   const navigate = useNavigate()
   const [order, setOrder] = useState(null)
+  const [productTitle, setProductTitle] = useState(null)
   const [file, setFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [fetchingOrder, setFetchingOrder] = useState(true)
@@ -20,18 +21,32 @@ export default function PaymentPage() {
   const loadOrder = async () => {
     try {
       setFetchingOrder(true)
-      const { data, error } = await supabase
+      // 1. جلب بيانات الطلب الرئيسي
+      const { data: orderData, error: orderError } = await supabase
         .from('orders')
-        .select('*, product:products(name)')  // استخدام name بدلاً من title
+        .select('*')
         .eq('id', orderId)
         .single()
 
-      if (error) throw error
-      if (!data) throw new Error('الطلب غير موجود')
-      setOrder(data)
+      if (orderError) throw orderError
+      if (!orderData) throw new Error('الطلب غير موجود')
+
+      // 2. جلب عناصر الطلب (order_items) للحصول على اسم المنتج
+      const { data: items, error: itemsError } = await supabase
+        .from('order_items')
+        .select('product_name')
+        .eq('order_id', orderId)
+        .maybeSingle()  // استخدام maybeSingle لتجنب خطأ إذا لم يوجد items
+
+      if (itemsError) throw itemsError
+
+      // تعيين بيانات الطلب مع اسم المنتج
+      setOrder(orderData)
+      setProductTitle(items?.product_name || 'منتج غير متوفر')
+
     } catch (error) {
-      console.error("Error loading order:", error)
-      toast.error(error.message || 'لم يتم العثور على الطلب')
+      console.error("Error loading order context:", error)
+      toast.error(error.message || 'لم يتم العثور على الطلب أو حدث خطأ في الشبكة')
       navigate('/')
     } finally {
       setFetchingOrder(false)
@@ -50,6 +65,7 @@ export default function PaymentPage() {
       toast.error('يرجى رفع صورة الإيصال أولاً')
       return
     }
+    
     setLoading(true)
     try {
       await uploadReceipt(orderId, file)
@@ -62,19 +78,17 @@ export default function PaymentPage() {
     }
   }
 
-  if (fetchingOrder) return <div className="text-center py-20">جاري تحميل بيانات الدفع...</div>
-  if (!order) return <div className="text-center py-20 text-red-500">الطلب غير موجود. تأكد من الرابط.</div>
-
-  // ✅ استخدام total_amount بدلاً من total_price (لأن الجدول يستخدم total_amount)
-  const totalAmount = order.total_amount || order.total_price
+  if (fetchingOrder) return <div className="text-center py-20 text-text-secondary">جاري تحميل بيانات الدفع...</div>
+  if (!order) return <div className="text-center py-20 text-text-secondary">الطلب غير موجود.</div>
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <h1 className="text-2xl font-bold text-gold mb-6">رفع إيصال الدفع</h1>
       
+      {/* تفاصيل الحساب البنكي والطلب */}
       <div className="bg-primary-card p-6 rounded-2xl border border-gold/30 mb-6 space-y-2">
-        <p><strong className="text-gold">المنتج:</strong> {order.product?.name || 'منتج غير متوفر'}</p>
-        <p><strong className="text-gold">المبلغ المطلوب:</strong> {totalAmount} ريال</p>
+        <p><strong className="text-gold">المنتج:</strong> {productTitle}</p>
+        <p><strong className="text-gold">المبلغ المطلوب:</strong> {order.total_amount} ريال</p>
         <hr className="border-gold/20 my-3" />
         <p className="text-sm bg-gold/5 p-3 rounded-lg border border-gold/10 text-text-secondary leading-relaxed">
           <strong className="text-gold block mb-1">تعليمات التحويل البنكي:</strong>
@@ -85,6 +99,7 @@ export default function PaymentPage() {
         </p>
       </div>
 
+      {/* نموذج الرفع */}
       <form onSubmit={handleSubmit} className="bg-primary-card p-6 rounded-2xl border border-gold/30 space-y-4">
         <div>
           <label className="block mb-2 text-sm text-text-secondary">صورة إيصال التحويل</label>
@@ -96,6 +111,7 @@ export default function PaymentPage() {
             required 
           />
         </div>
+        
         <div className="pt-2">
           <Button type="submit" disabled={loading} className="w-full">
             {loading ? 'جاري رفع الملف...' : 'تأكيد ورفع الإيصال'}
