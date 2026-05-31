@@ -8,7 +8,7 @@ export const createOrder = async (orderData) => {
     .insert([{
       user_id: buyer_id,
       order_number: `ORD-${Date.now()}`,
-      status: 'pending',              // ✅ تم التصحيح: 'pending_payment_review' → 'pending'
+      status: 'pending',
       total_amount: total_amount,
       shipping_address,
       shipping_city,
@@ -20,11 +20,12 @@ export const createOrder = async (orderData) => {
     .single()
   if (orderError) throw orderError
 
+  // ✅ إزالة total_price لأن العمود قد يكون GENERATED أو له قيمة افتراضية
   const orderItems = items.map(item => ({
     order_id: order.id,
     product_id: item.product_id,
-    quantity: item.quantity,
-    total_price: item.unit_price * item.quantity
+    quantity: item.quantity
+    // total_price: item.unit_price * item.quantity   // تم الحذف
   }))
   const { error: itemsError } = await supabase
     .from('order_items')
@@ -67,8 +68,6 @@ export const getSellerOrders = async (sellerId) => {
 }
 
 export const updateOrderStatus = async (orderId, status) => {
-  // تأكد من أن status المرسل هو واحد من القيم المسموحة:
-  // 'pending', 'processing', 'paid', 'shipped', 'delivered', 'cancelled', 'refunded'
   const { data, error } = await supabase
     .from('orders')
     .update({ status: status })
