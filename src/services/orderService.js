@@ -54,7 +54,7 @@ export const getBuyerOrders = async (buyerId) => {
   })
 }
 
-// ✅ النسخة الآمنة المكونة من 3 خطوات
+// ✅ النسخة الآمنة لطلبات البائع
 export const getSellerOrders = async (sellerId) => {
   // 1. جلب جميع product_ids الخاصة بالبائع
   const { data: sellerProducts, error: prodError } = await supabase
@@ -115,6 +115,7 @@ export const updateOrderStatus = async (orderId, status) => {
   return data
 }
 
+// ✅ دالة رفع الإيصال المعدلة (تحدّث status أيضاً)
 export const uploadReceipt = async (orderId, file, transferData) => {
   const { transfer_number, transfer_name, buyer_phone } = transferData
 
@@ -128,11 +129,13 @@ export const uploadReceipt = async (orderId, file, transferData) => {
     .from('receipts')
     .getPublicUrl(fileName)
   
+  // ✅ تحديث payment_status و status معاً
   const { error: updateError } = await supabase
     .from('orders')
     .update({ 
       receipt_image: publicUrl, 
       payment_status: 'paid',
+      status: 'payment_approved',   // <--- إضافة هذا السطر لنقل الطلب إلى مرحلة "تم الدفع"
       transfer_number: transfer_number,
       transfer_name: transfer_name,
       buyer_phone: buyer_phone
