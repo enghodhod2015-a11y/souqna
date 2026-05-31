@@ -18,21 +18,26 @@ export const ProductCard = ({ product }) => {
         />
       </Link>
       <div className="p-4">
-        <Link to={`/product/${product.id}`}>
-          <h3 className="text-lg font-bold mb-1 line-clamp-1 text-white">{product.title}</h3>
-        </Link>
-        <div className="flex items-center gap-1 mb-2">
+        {/* ✅ تم تعديل الترتيب: الاسم على اليمين (text-right) والسعر على اليسار */}
+        <div className="flex justify-between items-start gap-2 mb-2">
+          <Link to={`/product/${product.id}`} className="flex-1 text-right">
+            <h3 className="text-lg font-bold line-clamp-1 text-white">{product.title}</h3>
+          </Link>
+          <div className="flex flex-col items-end">
+            <span className="text-xl font-bold text-gold whitespace-nowrap">{product.final_price} ريال</span>
+            {product.discount_percentage > 0 && (
+              <span className="text-text-secondary line-through text-sm">{product.price} ريال</span>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-1 mb-3">
           {[...Array(5)].map((_, i) => (
             <Star key={i} size={16} className={i < Math.floor(product.average_rating || 0) ? 'text-gold fill-gold' : 'text-gray-400'} />
           ))}
           <span className="text-text-secondary text-sm ml-2">({product.total_reviews || 0})</span>
         </div>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-xl font-bold text-gold">{product.final_price} ريال</span>
-          {product.discount_percentage > 0 && (
-            <span className="text-text-secondary line-through text-sm">{product.price} ريال</span>
-          )}
-        </div>
+        
         <div className="flex gap-2">
           <Link to={`/checkout`} state={{ product, quantity: 1 }} className="flex-1">
             <Button className="w-full text-sm py-1.5">
