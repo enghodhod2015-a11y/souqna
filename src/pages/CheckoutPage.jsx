@@ -15,7 +15,9 @@ export default function CheckoutPage() {
   const [formData, setFormData] = useState({
     shipping_address: '',
     shipping_city: '',
-    payment_method: 'bank_transfer'
+    payment_method: 'كريم',
+    color: 'أحمر',
+    size: 'M'
   })
 
   if (!product) {
@@ -35,6 +37,11 @@ export default function CheckoutPage() {
 
     setLoading(true)
     try {
+      // تجميع التفاصيل الإضافية (اللون، المقاس) في حقل notes
+      const additionalDetails = `اللون: ${formData.color}, المقاس: ${formData.size}`
+      const existingNotes = ''
+      const combinedNotes = `${existingNotes} ${additionalDetails}`.trim()
+
       const orderData = {
         buyer_id: user?.id,
         seller_id: product.seller_id,
@@ -45,13 +52,13 @@ export default function CheckoutPage() {
         shipping_city: formData.shipping_city,
         payment_method: formData.payment_method,
         order_status: 'pending_payment_review',
-        payment_status: 'pending'
+        payment_status: 'pending',
+        notes: combinedNotes
       }
       
       const order = await createOrder(orderData)
       toast.success('تم إنشاء الطلب بنجاح')
       
-      // التوجيه الآمن باستخدام React Router
       navigate(`/payment/${order.id}`)
     } catch (err) {
       toast.error(err.message)
@@ -61,6 +68,10 @@ export default function CheckoutPage() {
   }
 
   const totalPrice = product.final_price * quantity
+
+  // خيارات الألوان والمقاسات (يمكن تعديلها حسب احتياجات المنتج)
+  const colorOptions = ['أحمر', 'أزرق', 'أخضر', 'أسود', 'أبيض']
+  const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
@@ -88,6 +99,7 @@ export default function CheckoutPage() {
       <form onSubmit={handleSubmit} className="bg-primary-card p-6 rounded-2xl border border-gold/30 space-y-4">
         <h3 className="text-lg font-bold text-gold mb-2">معلومات الشحن والدفع</h3>
         
+        {/* المدينة */}
         <div>
           <label className="block text-sm mb-1 text-text-secondary">المدينة</label>
           <Input 
@@ -100,6 +112,7 @@ export default function CheckoutPage() {
           />
         </div>
 
+        {/* العنوان بالتفصيل */}
         <div>
           <label className="block text-sm mb-1 text-text-secondary">العنوان بالتفصيل</label>
           <Input 
@@ -112,6 +125,37 @@ export default function CheckoutPage() {
           />
         </div>
 
+        {/* اللون */}
+        <div>
+          <label className="block text-sm mb-1 text-text-secondary">اللون</label>
+          <select
+            name="color"
+            value={formData.color}
+            onChange={handleChange}
+            className="w-full px-4 py-2 rounded-lg bg-secondary-blue/50 border border-gold/30 text-white focus:outline-none focus:border-gold"
+          >
+            {colorOptions.map(color => (
+              <option key={color} value={color}>{color}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* المقاس */}
+        <div>
+          <label className="block text-sm mb-1 text-text-secondary">المقاس</label>
+          <select
+            name="size"
+            value={formData.size}
+            onChange={handleChange}
+            className="w-full px-4 py-2 rounded-lg bg-secondary-blue/50 border border-gold/30 text-white focus:outline-none focus:border-gold"
+          >
+            {sizeOptions.map(size => (
+              <option key={size} value={size}>{size}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* طريقة الدفع (كريم أو حوالة موحدة) */}
         <div>
           <label className="block text-sm mb-1 text-text-secondary">طريقة الدفع</label>
           <select
@@ -120,7 +164,8 @@ export default function CheckoutPage() {
             onChange={handleChange}
             className="w-full px-4 py-2 rounded-lg bg-secondary-blue/50 border border-gold/30 text-white focus:outline-none focus:border-gold"
           >
-            <option value="bank_transfer">تحويل بنكي</option>
+            <option value="كريم">حساب كريمي</option>
+            <option value="حوالة موحدة">حوالة موحدة</option>
           </select>
         </div>
 
@@ -133,3 +178,4 @@ export default function CheckoutPage() {
     </div>
   )
 }
+
