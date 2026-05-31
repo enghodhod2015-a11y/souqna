@@ -45,7 +45,6 @@ export const createOrder = async (orderData) => {
   return order
 }
 
-// باقي الدوال (getBuyerOrders, getSellerOrders, updateOrderStatus, uploadReceipt, getSellerStats, getMonthlySales) تبقى كما هي في النسخة السابقة
 export const getBuyerOrders = async (buyerId) => {
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
@@ -75,7 +74,7 @@ export const getBuyerOrders = async (buyerId) => {
 }
 
 export const getSellerOrders = async (sellerId) => {
-  return []   // مبسط مؤقتاً
+  return []
 }
 
 export const updateOrderStatus = async (orderId, status) => {
@@ -132,4 +131,5 @@ export const getSellerStats = async (sellerId) => {
 export const getMonthlySales = async (sellerId) => {
   return []
 }
+
 
