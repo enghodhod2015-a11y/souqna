@@ -99,30 +99,30 @@ export default function SellerOrdersPage() {
                     <p className="text-text-secondary mt-1"><strong>المشتري:</strong> {order.buyer?.full_name || 'حساب غير متوفر'}</p>
                     <p className="text-text-secondary"><strong>رقم الهاتف:</strong> {order.buyer?.phone || 'غير متوفر'}</p>
                     <p className="text-text-secondary"><strong>العنوان:</strong> {order.shipping_address || 'لم يحدد'}</p>
-                    {/* ✅ التعديل هنا: دعم total_amount و total_price معاً */}
                     <p className="text-text-secondary"><strong>المبلغ:</strong> {order.total_amount || order.total_price} ريال</p>
                     <p className="text-text-secondary"><strong>الحالة الحالية:</strong> {order.status}</p>
                   </div>
                   <div className="flex gap-2 items-start">
+                    {/* ✅ تحسين ستايل القائمة المنسدلة */}
                     <select
                       value={order.status}
                       onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                      className="bg-primary-card border border-gold/30 rounded px-3 py-1 text-white focus:outline-none focus:border-gold"
+                      className="px-4 py-2 rounded-lg bg-secondary-blue text-white border border-gold/50 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold transition-all duration-200 cursor-pointer hover:bg-secondary-blue/80"
                     >
-                      <option value="pending_payment_review">انتظار الدفع</option>
-                      <option value="payment_approved">تم تأكيد الدفع</option>
-                      <option value="processing">قيد التجهيز</option>
-                      <option value="shipped">تم الشحن</option>
-                      <option value="delivered">تم التسليم</option>
-                      <option value="completed">مكتمل</option>
-                      <option value="cancelled">ملغي</option>
+                      <option value="pending_payment_review" className="bg-primary-card">⏳ انتظار الدفع</option>
+                      <option value="payment_approved" className="bg-primary-card">💰 تم تأكيد الدفع</option>
+                      <option value="processing" className="bg-primary-card">⚙️ قيد التجهيز</option>
+                      <option value="shipped" className="bg-primary-card">🚚 تم الشحن</option>
+                      <option value="delivered" className="bg-primary-card">📦 تم التسليم</option>
+                      <option value="completed" className="bg-primary-card">✅ مكتمل</option>
+                      <option value="cancelled" className="bg-primary-card">❌ ملغي</option>
                     </select>
                   </div>
                 </div>
                 {order.receipt_image && (
                   <div className="mt-4 pt-2 border-t border-gold/10">
-                    <a href={order.receipt_image} target="_blank" rel="noopener noreferrer" className="text-gold underline text-sm">
-                      عرض إيصال تحويل الدفع
+                    <a href={order.receipt_image} target="_blank" rel="noopener noreferrer" className="text-gold underline text-sm hover:text-gold/80 transition">
+                      🧾 عرض إيصال تحويل الدفع
                     </a>
                   </div>
                 )}
