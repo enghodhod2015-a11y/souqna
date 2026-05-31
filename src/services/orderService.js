@@ -44,54 +44,14 @@ export const getBuyerOrders = async (buyerId) => {
   })
 }
 
-// ✅ دالة getSellerOrders المعدلة بالطريقة المكونة من 3 خطوات (آمنة)
+// ✅ استدعاء الدالة المخزنة لجلب طلبات البائع
 export const getSellerOrders = async (sellerId) => {
-  // 1. جلب جميع product_ids الخاصة بالبائع
-  const { data: sellerProducts, error: prodError } = await supabase
-    .from('products')
-    .select('id')
-    .eq('seller_id', sellerId)
-  if (prodError) throw prodError
-  if (!sellerProducts || sellerProducts.length === 0) return []
-
-  const productIds = sellerProducts.map(p => p.id)
-
-  // 2. جلب order_items التي لها product_id في قائمة المنتجات
-  const { data: orderItems, error: itemsError } = await supabase
-    .from('order_items')
-    .select('order_id, product_id, quantity, product_price, product_name')
-    .in('product_id', productIds)
-  if (itemsError) throw itemsError
-  if (!orderItems || orderItems.length === 0) return []
-
-  const orderIds = [...new Set(orderItems.map(item => item.order_id))]
-
-  // 3. جلب تفاصيل الطلبات مع المشتري
-  const { data: orders, error: ordersError } = await supabase
-    .from('orders')
-    .select(`
-      *,
-      buyer:profiles!orders_user_id_fkey (id, full_name, email, phone)
-    `)
-    .in('id', orderIds)
-    .order('created_at', { ascending: false })
-
-  if (ordersError) throw ordersError
-
-  return orders.map(order => {
-    const relatedItems = orderItems.filter(item => item.order_id === order.id)
-    const firstItem = relatedItems[0]
-    return {
-      ...order,
-      product: firstItem ? {
-        name: firstItem.product_name,
-        price: firstItem.product_price,
-        quantity: firstItem.quantity
-      } : null,
-      total_price: order.total_amount,
-      order_status: order.status
-    }
-  })
+  const { data, error } = await supabase.rpc('get_seller_orders', { p_seller_id: sellerId })
+  if (error) {
+    console.error('RPC get_seller_orders error:', error)
+    throw error
+  }
+  return data || []
 }
 
 export const updateOrderStatus = async (orderId, status) => {
@@ -105,7 +65,6 @@ export const updateOrderStatus = async (orderId, status) => {
   return data
 }
 
-// ✅ دالة رفع الإيصال (تحديث status إلى 'processing')
 export const uploadReceipt = async (orderId, file, transferData) => {
   const { transfer_number, transfer_name, buyer_phone } = transferData
   const fileName = `receipts/${orderId}/${Date.now()}_${file.name}`
