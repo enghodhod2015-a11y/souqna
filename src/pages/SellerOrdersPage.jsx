@@ -97,6 +97,7 @@ export default function SellerOrdersPage() {
                   <div>
                     <h3 className="text-xl font-bold text-gold">{order.product?.name || order.product?.title || 'منتج غير متوفر'}</h3>
                     <p className="text-text-secondary mt-1"><strong>المشتري:</strong> {order.buyer?.full_name || 'حساب غير متوفر'}</p>
+                    <p className="text-text-secondary"><strong>رقم الهاتف:</strong> {order.buyer?.phone || 'غير متوفر'}</p>
                     <p className="text-text-secondary"><strong>العنوان:</strong> {order.shipping_address || 'لم يحدد'}</p>
                     <p className="text-text-secondary"><strong>المبلغ:</strong> {order.total_price} ريال</p>
                     <p className="text-text-secondary"><strong>الحالة الحالية:</strong> {order.status}</p>

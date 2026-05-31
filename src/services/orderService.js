@@ -54,9 +54,9 @@ export const getBuyerOrders = async (buyerId) => {
   })
 }
 
-// ✅ البديل الأكثر أماناً لـ getSellerOrders
+// ✅ النسخة الآمنة المكونة من 3 خطوات
 export const getSellerOrders = async (sellerId) => {
-  // الخطوة 1: جلب جميع product_ids الخاصة بالبائع
+  // 1. جلب جميع product_ids الخاصة بالبائع
   const { data: sellerProducts, error: prodError } = await supabase
     .from('products')
     .select('id')
@@ -66,7 +66,7 @@ export const getSellerOrders = async (sellerId) => {
 
   const productIds = sellerProducts.map(p => p.id)
 
-  // الخطوة 2: جلب order_items التي لها product_id في قائمة المنتجات
+  // 2. جلب order_items التي لها product_id في قائمة المنتجات
   const { data: orderItems, error: itemsError } = await supabase
     .from('order_items')
     .select('order_id, product_id, quantity, product_price, product_name')
@@ -76,7 +76,7 @@ export const getSellerOrders = async (sellerId) => {
 
   const orderIds = [...new Set(orderItems.map(item => item.order_id))]
 
-  // الخطوة 3: جلب تفاصيل الطلبات مع المشتري
+  // 3. جلب تفاصيل الطلبات مع المشتري
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
     .select(`
