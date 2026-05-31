@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { createOrder } from '../services/orderService'
@@ -11,8 +11,11 @@ export default function CheckoutPage() {
   const { user } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
-  const { product, quantity = 1 } = location.state || {}
+  const { product, quantity: initialQuantity = 1 } = location.state || {}
   const [loading, setLoading] = useState(false)
+  const [quantity, setQuantity] = useState(initialQuantity)
+  const [stock, setStock] = useState(null)
+  const [actualPrice, setActualPrice] = useState(null)
   const [formData, setFormData] = useState({
     shipping_address: '',
     shipping_city: '',
@@ -20,6 +23,31 @@ export default function CheckoutPage() {
     color: 'أحمر',
     size: 'M'
   })
+
+  // جلب بيانات المنتج الحية (السعر والمخزون) عند تحميل الصفحة
+  useEffect(() => {
+    const fetchProductData = async () => {
+      if (!product?.id) return
+      const { data, error } = await supabase
+        .from('products')
+        .select('price, stock_quantity, name')
+        .eq('id', product.id)
+        .single()
+      if (error) {
+        console.error('Error fetching product data:', error)
+        toast.error('تعذر التحقق من بيانات المنتج')
+      } else {
+        setActualPrice(data.price)
+        setStock(data.stock_quantity)
+        // إذا كانت الكمية الابتدائية أكبر من المخزون، اضبطها على المخزون
+        if (initialQuantity > data.stock_quantity) {
+          setQuantity(data.stock_quantity)
+          toast.warning(`تم تعديل الكمية إلى الحد الأقصى المتاح (${data.stock_quantity})`)
+        }
+      }
+    }
+    fetchProductData()
+  }, [product?.id])
 
   if (!product) {
     return <div className="text-center py-20 text-text-secondary">لا توجد بيانات منتج. يرجى المحاولة مرة أخرى.</div>
@@ -29,6 +57,19 @@ export default function CheckoutPage() {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
+  const handleQuantityChange = (e) => {
+    let newQuantity = parseInt(e.target.value, 10)
+    if (isNaN(newQuantity)) newQuantity = 1
+    if (stock !== null && newQuantity > stock) {
+      toast.error(`الكمية المطلوبة (${newQuantity}) تتجاوز المتوفر في المخزون (${stock})`)
+      setQuantity(stock)
+    } else if (newQuantity < 1) {
+      setQuantity(1)
+    } else {
+      setQuantity(newQuantity)
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.shipping_address.trim() || !formData.shipping_city.trim()) {
@@ -36,35 +77,24 @@ export default function CheckoutPage() {
       return
     }
 
+    if (stock === null || actualPrice === null) {
+      toast.error('جاري تحميل بيانات المنتج، يرجى المحاولة مرة أخرى')
+      return
+    }
+
+    if (quantity > stock) {
+      toast.error(`الكمية المطلوبة (${quantity}) تتجاوز المتوفر في المخزون (${stock})`)
+      return
+    }
+
     setLoading(true)
     try {
-      // 1. جلب بيانات المنتج الحالية من قاعدة البيانات (السعر، المخزون)
-      const { data: freshProduct, error: fetchError } = await supabase
-        .from('products')
-        .select('price, stock_quantity, name')
-        .eq('id', product.id)
-        .single()
-
-      if (fetchError) throw new Error('تعذر التحقق من بيانات المنتج')
-
-      // 2. التحقق من الكمية المطلوبة
-      if (quantity > freshProduct.stock_quantity) {
-        toast.error(`الكمية المطلوبة (${quantity}) تتجاوز المتوفر في المخزون (${freshProduct.stock_quantity})`)
-        setLoading(false)
-        return
-      }
-
-      // 3. حساب الإجمالي بناءً على السعر الفعلي من قاعدة البيانات
-      const actualPrice = freshProduct.price
       const totalPrice = actualPrice * quantity
-
-      // 4. إعداد عناصر الطلب
       const items = [{
         product_id: product.id,
         quantity: quantity,
         unit_price: actualPrice
       }]
-
       const additionalDetails = `اللون: ${formData.color}, المقاس: ${formData.size}`
 
       const orderData = {
@@ -88,10 +118,8 @@ export default function CheckoutPage() {
     }
   }
 
-  // إعادة حساب السعر الإجمالي بناءً على سعر المنتج الأصلي (قد لا يتطابق مع final_price إذا كان هناك خصم)
-  // نستخدم product.price أو product.final_price، لكن للعرض نستخدم final_price مع مراعاة أن السعر الفعلي قد يختلف
   const displayPrice = product.final_price || product.price
-  const totalPriceDisplay = displayPrice * quantity
+  const totalPriceDisplay = (actualPrice !== null ? actualPrice : displayPrice) * quantity
 
   const colorOptions = ['أحمر', 'أزرق', 'أخضر', 'أسود', 'أبيض']
   const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
@@ -106,11 +134,21 @@ export default function CheckoutPage() {
           <span>سعر الوحدة:</span>
           <span>{displayPrice} ريال</span>
         </div>
-        <div className="flex justify-between text-text-secondary text-sm mb-4">
-          <span>الكمية:</span>
-          <span>{quantity}</span>
+        <div className="flex flex-col gap-3 mt-3">
+          <label className="block text-sm text-text-secondary">الكمية المطلوبة</label>
+          <input
+            type="number"
+            min="1"
+            max={stock !== null ? stock : undefined}
+            value={quantity}
+            onChange={handleQuantityChange}
+            className="w-full px-4 py-2 rounded-lg bg-white text-gray-900 border border-gold/30 focus:outline-none focus:border-gold"
+          />
+          {stock !== null && (
+            <p className="text-xs text-text-secondary">المتاح في المخزون: {stock} قطعة</p>
+          )}
         </div>
-        <hr className="border-gold/20 mb-4" />
+        <hr className="border-gold/20 my-4" />
         <div className="flex justify-between font-bold text-lg text-gold">
           <span>إجمالي المبلغ:</span>
           <span>{totalPriceDisplay} ريال</span>
@@ -168,7 +206,7 @@ export default function CheckoutPage() {
         </div>
 
         <div className="pt-4">
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || stock === null || actualPrice === null}>
             {loading ? 'جاري معالجة الطلب...' : 'تأكيد وإنشاء الطلب'}
           </Button>
         </div>
@@ -176,5 +214,4 @@ export default function CheckoutPage() {
     </div>
   )
 }
-
 
