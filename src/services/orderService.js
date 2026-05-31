@@ -8,12 +8,12 @@ export const createOrder = async (orderData) => {
     .insert([{
       user_id: buyer_id,
       order_number: `ORD-${Date.now()}`,
-      status: 'pending_payment_review',
+      status: 'pending',              // ✅ تم التصحيح: 'pending_payment_review' → 'pending'
       total_amount: total_amount,
       shipping_address,
       shipping_city,
       payment_method,
-      payment_status: 'unpaid',   // ✅ تم التصحيح: 'pending' → 'unpaid'
+      payment_status: 'unpaid',
       notes
     }])
     .select()
@@ -67,6 +67,8 @@ export const getSellerOrders = async (sellerId) => {
 }
 
 export const updateOrderStatus = async (orderId, status) => {
+  // تأكد من أن status المرسل هو واحد من القيم المسموحة:
+  // 'pending', 'processing', 'paid', 'shipped', 'delivered', 'cancelled', 'refunded'
   const { data, error } = await supabase
     .from('orders')
     .update({ status: status })
@@ -88,7 +90,7 @@ export const uploadReceipt = async (orderId, file) => {
     .getPublicUrl(fileName)
   const { error: updateError } = await supabase
     .from('orders')
-    .update({ receipt_image: publicUrl, payment_status: 'paid' })   // ✅ تم التصحيح: 'pending' → 'paid'
+    .update({ receipt_image: publicUrl, payment_status: 'paid' })
     .eq('id', orderId)
   if (updateError) throw updateError
   return publicUrl
@@ -120,4 +122,5 @@ export const getSellerStats = async (sellerId) => {
 export const getMonthlySales = async (sellerId) => {
   return []
 }
+
 
