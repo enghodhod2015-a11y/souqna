@@ -1,50 +1,34 @@
 import { supabase } from './supabase'
 
+// ─────────────────────────────────────────────────────────────
+// استخدام RPC لإنشاء الطلب وعناصره دفعة واحدة (تجاوز RLS والأعمدة المحسوبة)
+// ─────────────────────────────────────────────────────────────
 export const createOrder = async (orderData) => {
   const { buyer_id, total_amount, shipping_address, shipping_city, payment_method, notes, items } = orderData
-  
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .insert([{
-      user_id: buyer_id,
-      order_number: `ORD-${Date.now()}`,
-      status: 'pending',
-      total_amount: total_amount,
-      shipping_address,
-      shipping_city,
-      payment_method,
-      payment_status: 'unpaid',
-      notes
-    }])
-    .select()
-    .single()
-  if (orderError) throw orderError
 
-  const orderItems = await Promise.all(items.map(async (item) => {
-    const { data: product, error: productError } = await supabase
-      .from('products')
-      .select('name, price')
-      .eq('id', item.product_id)
-      .single()
-    if (productError) throw productError
-
-    return {
-      order_id: order.id,
-      product_name: product.name,
-      quantity: item.quantity,
-      product_price: product.price
-      // ✅ تم حذف total_price لأنه عمود GENERATED
-    }
+  // تحويل items إلى الصيغة المطلوبة للـ RPC
+  const rpcItems = items.map(item => ({
+    product_id: item.product_id,
+    quantity: item.quantity
   }))
 
-  const { error: itemsError } = await supabase
-    .from('order_items')
-    .insert(orderItems)
-  if (itemsError) throw itemsError
+  const { data, error } = await supabase.rpc('create_order_with_items', {
+    p_user_id: buyer_id,
+    p_total_amount: total_amount,
+    p_shipping_address: shipping_address,
+    p_shipping_city: shipping_city,
+    p_payment_method: payment_method,
+    p_notes: notes,
+    p_items: rpcItems
+  })
 
-  return order
+  if (error) throw error
+  return { id: data.id }
 }
 
+// ─────────────────────────────────────────────────────────────
+// جلب طلبات المشتري (مع بيانات المنتج من order_items)
+// ─────────────────────────────────────────────────────────────
 export const getBuyerOrders = async (buyerId) => {
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
@@ -73,10 +57,16 @@ export const getBuyerOrders = async (buyerId) => {
   })
 }
 
+// ─────────────────────────────────────────────────────────────
+// جلب طلبات البائع (مبسط مؤقتاً)
+// ─────────────────────────────────────────────────────────────
 export const getSellerOrders = async (sellerId) => {
   return []
 }
 
+// ─────────────────────────────────────────────────────────────
+// تحديث حالة الطلب
+// ─────────────────────────────────────────────────────────────
 export const updateOrderStatus = async (orderId, status) => {
   const { data, error } = await supabase
     .from('orders')
@@ -88,6 +78,9 @@ export const updateOrderStatus = async (orderId, status) => {
   return data
 }
 
+// ─────────────────────────────────────────────────────────────
+// رفع إيصال الدفع
+// ─────────────────────────────────────────────────────────────
 export const uploadReceipt = async (orderId, file) => {
   const fileName = `receipts/${orderId}/${Date.now()}_${file.name}`
   const { error: uploadError } = await supabase.storage
@@ -105,6 +98,9 @@ export const uploadReceipt = async (orderId, file) => {
   return publicUrl
 }
 
+// ─────────────────────────────────────────────────────────────
+// إحصائيات البائع (مبسطة مؤقتاً)
+// ─────────────────────────────────────────────────────────────
 export const getSellerStats = async (sellerId) => {
   const { count: productsCount, error: prodCountErr } = await supabase
     .from('products')
@@ -128,6 +124,9 @@ export const getSellerStats = async (sellerId) => {
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// المبيعات الشهرية (مبسطة مؤقتاً)
+// ─────────────────────────────────────────────────────────────
 export const getMonthlySales = async (sellerId) => {
   return []
 }
