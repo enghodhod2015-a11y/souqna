@@ -92,7 +92,7 @@ export default function ProductDetailsPage() {
   return (
     <div className="min-h-screen bg-primary-blue text-white py-10 px-4 md:px-8">
       <div className="max-w-7xl mx-auto">
-        {/* تخطيط عمودين على الشاشات المتوسطة والكبيرة، عمود واحد على الموبايل */}
+        {/* تخطيط عمودين على الشاشات المتوسطة والكبيرة */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           {/* العمود الأول: الصور فقط */}
           <div>
@@ -116,23 +116,23 @@ export default function ProductDetailsPage() {
             </div>
           </div>
 
-          {/* العمود الثاني: كل المحتوى الآخر (عنوان، سعر، وصف، تفاصيل، أزرار) */}
+          {/* العمود الثاني: كل المحتوى الآخر */}
           <div className="flex flex-col gap-6">
-            {/* عنوان المنتج */}
-            <h1 className="text-3xl md:text-4xl font-extrabold text-gold text-right">
-              {product.name || product.title}
-            </h1>
-
-            {/* السعر والخصم */}
-            <div className="flex items-baseline gap-3 justify-end flex-wrap">
-              <span className="text-4xl font-bold text-gold">
-                {product.final_price || product.price} ريال
-              </span>
-              {product.discount_percentage > 0 && (
-                <span className="text-lg text-gray-400 line-through">
-                  {product.price} ريال
+            {/* صف واحد: اسم المنتج في جهة اليمين، السعر في أقصى اليسار */}
+            <div className="flex justify-between items-center flex-wrap gap-3">
+              <h1 className="text-3xl md:text-4xl font-extrabold text-gold text-right">
+                {product.name || product.title}
+              </h1>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl md:text-4xl font-bold text-gold">
+                  {product.final_price || product.price} ريال
                 </span>
-              )}
+                {product.discount_percentage > 0 && (
+                  <span className="text-md text-gray-400 line-through">
+                    {product.price} ريال
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* الوصف */}
@@ -166,23 +166,23 @@ export default function ProductDetailsPage() {
               )}
             </div>
 
-            {/* صف الأزرار (بنفس الألوان والأشكال المطلوبة) */}
-            <div className="flex flex-wrap gap-4 justify-end mt-4">
+            {/* صف واحد للأزرار (جميعها في سطر واحد على الشاشات الكبيرة) */}
+            <div className="flex flex-wrap lg:flex-nowrap gap-3 justify-start mt-4">
               <button
                 onClick={handleInquiry}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 hover:-translate-y-0.5 active:scale-95 transition-all shadow-md"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 hover:-translate-y-0.5 active:scale-95 transition-all shadow-md"
               >
                 💬 استعلام
               </button>
               <button
                 onClick={handleBuy}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 hover:-translate-y-0.5 active:scale-95 transition-all shadow-md"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 hover:-translate-y-0.5 active:scale-95 transition-all shadow-md"
               >
                 🛒 شراء
               </button>
               <button
                 onClick={handleShare}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-purple-600 hover:bg-purple-700 hover:-translate-y-0.5 active:scale-95 transition-all shadow-md"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white bg-purple-600 hover:bg-purple-700 hover:-translate-y-0.5 active:scale-95 transition-all shadow-md"
               >
                 🔗 مشاركة
               </button>
@@ -190,13 +190,13 @@ export default function ProductDetailsPage() {
                 <>
                   <button
                     onClick={handleEdit}
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-amber-500 hover:bg-amber-600 hover:-translate-y-0.5 active:scale-95 transition-all shadow-md"
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white bg-amber-500 hover:bg-amber-600 hover:-translate-y-0.5 active:scale-95 transition-all shadow-md"
                   >
                     ✏️ تعديل
                   </button>
                   <button
                     onClick={handleDelete}
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 hover:-translate-y-0.5 active:scale-95 transition-all shadow-md"
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 hover:-translate-y-0.5 active:scale-95 transition-all shadow-md"
                   >
                     🗑️ حذف
                   </button>
