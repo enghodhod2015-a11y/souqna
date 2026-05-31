@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { createOrder } from '../services/orderService'
+import { supabase } from '../services/supabase'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import toast from 'react-hot-toast'
@@ -37,15 +38,34 @@ export default function CheckoutPage() {
 
     setLoading(true)
     try {
-      const additionalDetails = `اللون: ${formData.color}, المقاس: ${formData.size}`
-      const totalPrice = product.final_price * quantity
+      // 1. جلب بيانات المنتج الحالية من قاعدة البيانات (السعر، المخزون)
+      const { data: freshProduct, error: fetchError } = await supabase
+        .from('products')
+        .select('price, stock_quantity, name')
+        .eq('id', product.id)
+        .single()
 
-      // ✅ إنشاء مصفوفة items المطلوبة في createOrder
+      if (fetchError) throw new Error('تعذر التحقق من بيانات المنتج')
+
+      // 2. التحقق من الكمية المطلوبة
+      if (quantity > freshProduct.stock_quantity) {
+        toast.error(`الكمية المطلوبة (${quantity}) تتجاوز المتوفر في المخزون (${freshProduct.stock_quantity})`)
+        setLoading(false)
+        return
+      }
+
+      // 3. حساب الإجمالي بناءً على السعر الفعلي من قاعدة البيانات
+      const actualPrice = freshProduct.price
+      const totalPrice = actualPrice * quantity
+
+      // 4. إعداد عناصر الطلب
       const items = [{
         product_id: product.id,
         quantity: quantity,
-        unit_price: product.final_price
+        unit_price: actualPrice
       }]
+
+      const additionalDetails = `اللون: ${formData.color}, المقاس: ${formData.size}`
 
       const orderData = {
         buyer_id: user?.id,
@@ -54,9 +74,9 @@ export default function CheckoutPage() {
         shipping_city: formData.shipping_city,
         payment_method: formData.payment_method,
         notes: additionalDetails,
-        items: items                         // ✅ أضفنا items هنا
+        items: items
       }
-      
+
       const order = await createOrder(orderData)
       toast.success('تم إنشاء الطلب بنجاح')
       navigate(`/payment/${order.id}`)
@@ -68,7 +88,10 @@ export default function CheckoutPage() {
     }
   }
 
-  const totalPrice = product.final_price * quantity
+  // إعادة حساب السعر الإجمالي بناءً على سعر المنتج الأصلي (قد لا يتطابق مع final_price إذا كان هناك خصم)
+  // نستخدم product.price أو product.final_price، لكن للعرض نستخدم final_price مع مراعاة أن السعر الفعلي قد يختلف
+  const displayPrice = product.final_price || product.price
+  const totalPriceDisplay = displayPrice * quantity
 
   const colorOptions = ['أحمر', 'أزرق', 'أخضر', 'أسود', 'أبيض']
   const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
@@ -81,7 +104,7 @@ export default function CheckoutPage() {
         <h2 className="text-xl font-bold mb-2">{product.title}</h2>
         <div className="flex justify-between text-text-secondary text-sm mb-2">
           <span>سعر الوحدة:</span>
-          <span>{product.final_price} ريال</span>
+          <span>{displayPrice} ريال</span>
         </div>
         <div className="flex justify-between text-text-secondary text-sm mb-4">
           <span>الكمية:</span>
@@ -90,7 +113,7 @@ export default function CheckoutPage() {
         <hr className="border-gold/20 mb-4" />
         <div className="flex justify-between font-bold text-lg text-gold">
           <span>إجمالي المبلغ:</span>
-          <span>{totalPrice} ريال</span>
+          <span>{totalPriceDisplay} ريال</span>
         </div>
       </div>
 
