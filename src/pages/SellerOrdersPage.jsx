@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { getSellerOrders, updateOrderStatus } from '../services/orderService'
+import { getSellerOrders, updateOrderStatus, approveReturn } from '../services/orderService'
 import toast from 'react-hot-toast'
 
 export default function SellerOrdersPage() {
@@ -35,6 +35,8 @@ export default function SellerOrdersPage() {
         return allOrders.filter(o => o.status === 'completed')
       case 'cancelled':
         return allOrders.filter(o => o.status === 'cancelled')
+      case 'returns':
+        return allOrders.filter(o => o.return_status && o.return_status !== 'none')
       default:
         return allOrders
     }
@@ -83,6 +85,12 @@ export default function SellerOrdersPage() {
         >
           🚫 ملغية
         </button>
+        <button
+          onClick={() => setActiveTab('returns')}
+          className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'returns' ? 'bg-gold text-primary-blue font-bold' : 'hover:bg-secondary-blue'}`}
+        >
+          ↩️ الاسترجاعات
+        </button>
       </div>
 
       {filteredOrders.length === 0 ? (
@@ -91,6 +99,8 @@ export default function SellerOrdersPage() {
         <div className="space-y-4">
           {filteredOrders.map(order => {
             if (!order?.id) return null
+            const isCompleted = order.status === 'completed'
+
             return (
               <div key={order.id} className="bg-primary-card p-4 rounded-2xl border border-gold/30">
                 <div className="flex flex-col md:flex-row justify-between gap-4">
@@ -101,22 +111,61 @@ export default function SellerOrdersPage() {
                     <p className="text-text-secondary"><strong>العنوان:</strong> {order.shipping_address || 'لم يحدد'}</p>
                     <p className="text-text-secondary"><strong>المبلغ:</strong> {order.total_amount || order.total_price} ريال</p>
                     <p className="text-text-secondary"><strong>الحالة الحالية:</strong> {order.status}</p>
+                    {order.return_status && order.return_status !== 'none' && (
+                      <p className="text-text-secondary mt-2"><strong>حالة الاسترجاع:</strong> {
+                        order.return_status === 'requested' ? 'طلب استرجاع قيد المراجعة' :
+                        order.return_status === 'approved' ? 'تم قبول الاسترجاع' :
+                        order.return_status === 'rejected' ? 'تم رفض الاسترجاع' : order.return_status
+                      }</p>
+                    )}
+                    {order.return_reason && (
+                      <p className="text-text-secondary text-sm"><strong>سبب الاسترجاع:</strong> {order.return_reason}</p>
+                    )}
                   </div>
-                  <div className="flex gap-2 items-start">
-                    {/* ✅ تحسين ستايل القائمة المنسدلة - خلفية بيضاء ونص داكن */}
-                    <select
-                      value={order.status}
-                      onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                      className="px-4 py-2 rounded-lg bg-white text-gray-800 border border-gold/50 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold transition-all duration-200 cursor-pointer hover:bg-gray-100"
-                    >
-                      <option value="pending_payment_review">⏳ انتظار الدفع</option>
-                      <option value="payment_approved">💰 تم تأكيد الدفع</option>
-                      <option value="processing">⚙️ قيد التجهيز</option>
-                      <option value="shipped">🚚 تم الشحن</option>
-                      <option value="delivered">📦 تم التسليم</option>
-                      <option value="completed">✅ مكتمل</option>
-                      <option value="cancelled">❌ ملغي</option>
-                    </select>
+                  <div className="flex gap-2 items-start flex-col">
+                    {!isCompleted ? (
+                      <select
+                        value={order.status}
+                        onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                        className="px-4 py-2 rounded-lg bg-white text-gray-800 border border-gold/50 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold transition-all duration-200 cursor-pointer hover:bg-gray-100"
+                      >
+                        <option value="pending_payment_review">⏳ انتظار الدفع</option>
+                        <option value="payment_approved">💰 تم تأكيد الدفع</option>
+                        <option value="processing">⚙️ قيد التجهيز</option>
+                        <option value="shipped">🚚 تم الشحن</option>
+                        <option value="delivered">📦 تم التسليم</option>
+                        <option value="completed">✅ مكتمل</option>
+                        <option value="cancelled">❌ ملغي</option>
+                      </select>
+                    ) : (
+                      <span className="px-4 py-2 rounded-lg bg-green-800 text-white font-bold">
+                        ✅ مكتمل (غير قابل للتعديل)
+                      </span>
+                    )}
+                    {order.return_status === 'requested' && (
+                      <div className="flex gap-2 mt-2">
+                        <Button 
+                          onClick={async () => {
+                            await approveReturn(order.id, true)
+                            toast.success('تم قبول الاسترجاع')
+                            loadOrders()
+                          }}
+                        >
+                          ✅ قبول الاسترجاع
+                        </Button>
+                        <Button 
+                          variant="danger"
+                          onClick={async () => {
+                            const notes = prompt('سبب الرفض (اختياري):')
+                            await approveReturn(order.id, false, notes)
+                            toast.success('تم رفض الاسترجاع')
+                            loadOrders()
+                          }}
+                        >
+                          ❌ رفض الاسترجاع
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {order.receipt_image && (

@@ -61,12 +61,68 @@ export const updateOrderStatus = async (orderId, status) => {
   return data
 }
 
+// ✅ تأكيد الاستلام مع تسجيل تاريخ الإكمال
 export const confirmDelivery = async (orderId) => {
   const { data, error } = await supabase
     .from('orders')
-    .update({ status: 'completed' })
+    .update({ 
+      status: 'completed',
+      completed_at: new Date().toISOString()
+    })
     .eq('id', orderId)
     .eq('status', 'delivered')
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+// ✅ طلب استرجاع المنتج (مع التحقق من مهلة 3 أيام)
+export const requestReturn = async (orderId, reason) => {
+  const { data: order, error: fetchError } = await supabase
+    .from('orders')
+    .select('completed_at')
+    .eq('id', orderId)
+    .single()
+  if (fetchError) throw fetchError
+  
+  if (!order.completed_at) {
+    throw new Error('الطلب لم يكتمل بعد، لا يمكن الاسترجاع')
+  }
+  
+  const completedDate = new Date(order.completed_at)
+  const now = new Date()
+  const daysDiff = (now - completedDate) / (1000 * 60 * 60 * 24)
+  
+  if (daysDiff > 3) {
+    throw new Error('انتهت مهلة الاسترجاع (3 أيام فقط من تاريخ الاستلام)')
+  }
+  
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ 
+      return_status: 'requested',
+      return_reason: reason,
+      status: 'return_requested'
+    })
+    .eq('id', orderId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+// ✅ الموافقة على الاسترجاع (للبائع)
+export const approveReturn = async (orderId, approve, adminNotes = '') => {
+  const newStatus = approve ? 'return_approved' : 'return_rejected'
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ 
+      return_status: approve ? 'approved' : 'rejected',
+      status: newStatus,
+      return_admin_notes: adminNotes
+    })
+    .eq('id', orderId)
     .select()
     .single()
   if (error) throw error
@@ -101,4 +157,5 @@ export const getSellerStats = async (sellerId) => {
 }
 
 export const getMonthlySales = async () => []
+
 

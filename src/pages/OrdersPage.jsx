@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { getBuyerOrders, confirmDelivery } from '../services/orderService'
+import { getBuyerOrders, confirmDelivery, requestReturn } from '../services/orderService'
 import { Link } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import toast from 'react-hot-toast'
@@ -105,6 +105,33 @@ export default function OrdersPage() {
                       ✅ تأكيد الاستلام
                     </Button>
                   )}
+                  {order.status === 'completed' && (() => {
+                    const completedDate = new Date(order.completed_at)
+                    const now = new Date()
+                    const daysDiff = (now - completedDate) / (1000 * 60 * 60 * 24)
+                    if (daysDiff <= 3 && (!order.return_status || order.return_status === 'none')) {
+                      return (
+                        <Button 
+                          variant="secondary"
+                          onClick={async () => {
+                            const reason = prompt('الرجاء كتابة سبب الاسترجاع:')
+                            if (reason) {
+                              try {
+                                await requestReturn(order.id, reason)
+                                toast.success('تم إرسال طلب الاسترجاع، سيتم مراجعته قريباً')
+                                loadOrders()
+                              } catch (err) {
+                                toast.error(err.message)
+                              }
+                            }
+                          }}
+                        >
+                          ↩️ استرجاع (خلال 3 أيام)
+                        </Button>
+                      )
+                    }
+                    return null
+                  })()}
                 </div>
               </div>
               {order.receipt_image && (
@@ -121,3 +148,5 @@ export default function OrdersPage() {
     </div>
   )
 }
+
+
