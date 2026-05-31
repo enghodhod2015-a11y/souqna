@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 export const createOrder = async (orderData) => {
   const { buyer_id, total_amount, shipping_address, shipping_city, payment_method, notes, items } = orderData
   
+  // 1. إنشاء الطلب الرئيسي
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert([{
@@ -20,13 +21,25 @@ export const createOrder = async (orderData) => {
     .single()
   if (orderError) throw orderError
 
-  // ✅ إزالة total_price لأن العمود قد يكون GENERATED أو له قيمة افتراضية
-  const orderItems = items.map(item => ({
-    order_id: order.id,
-    product_id: item.product_id,
-    quantity: item.quantity
-    // total_price: item.unit_price * item.quantity   // تم الحذف
+  // 2. تحضير عناصر الطلب مع جلب product_name لكل منتج
+  const orderItems = await Promise.all(items.map(async (item) => {
+    // جلب اسم المنتج من جدول products
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .select('name')
+      .eq('id', item.product_id)
+      .single()
+    if (productError) throw productError
+
+    return {
+      order_id: order.id,
+      product_name: product.name,          // ✅ إضافة product_name
+      quantity: item.quantity,
+      product_price: item.unit_price,      // ✅ إضافة product_price إذا كان العمود مطلوباً
+      total_price: item.unit_price * item.quantity  // ✅ إضافة total_price (يمكن تعديله حسب الجدول)
+    }
   }))
+
   const { error: itemsError } = await supabase
     .from('order_items')
     .insert(orderItems)
@@ -35,6 +48,7 @@ export const createOrder = async (orderData) => {
   return order
 }
 
+// باقي الدوال (getBuyerOrders, getSellerOrders, updateOrderStatus, uploadReceipt, getSellerStats, getMonthlySales) كما هي بدون تغيير
 export const getBuyerOrders = async (buyerId) => {
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
@@ -121,5 +135,3 @@ export const getSellerStats = async (sellerId) => {
 export const getMonthlySales = async (sellerId) => {
   return []
 }
-
-
