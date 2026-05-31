@@ -1,8 +1,5 @@
 import { supabase } from './supabase'
 
-// ─────────────────────────────────────────────────────────────
-// إنشاء طلب جديد باستخدام RPC (يتجاوز RLS والأعمدة المحسوبة)
-// ─────────────────────────────────────────────────────────────
 export const createOrder = async (orderData) => {
   const { buyer_id, total_amount, shipping_address, shipping_city, payment_method, notes, items } = orderData
 
@@ -29,9 +26,6 @@ export const createOrder = async (orderData) => {
   return { id: data.id }
 }
 
-// ─────────────────────────────────────────────────────────────
-// جلب طلبات المشتري (جميع الطلبات)
-// ─────────────────────────────────────────────────────────────
 export const getBuyerOrders = async (buyerId) => {
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
@@ -60,24 +54,29 @@ export const getBuyerOrders = async (buyerId) => {
   })
 }
 
-// ─────────────────────────────────────────────────────────────
-// جلب طلبات البائع (الطلبات التي تحتوي على منتجاته)
-// ─────────────────────────────────────────────────────────────
+// ✅ البديل الأكثر أماناً لـ getSellerOrders
 export const getSellerOrders = async (sellerId) => {
+  // الخطوة 1: جلب جميع product_ids الخاصة بالبائع
+  const { data: sellerProducts, error: prodError } = await supabase
+    .from('products')
+    .select('id')
+    .eq('seller_id', sellerId)
+  if (prodError) throw prodError
+  if (!sellerProducts || sellerProducts.length === 0) return []
+
+  const productIds = sellerProducts.map(p => p.id)
+
+  // الخطوة 2: جلب order_items التي لها product_id في قائمة المنتجات
   const { data: orderItems, error: itemsError } = await supabase
     .from('order_items')
-    .select(`
-      order_id,
-      product_id,
-      products!inner (seller_id, name, cover_image)
-    `)
-    .eq('products.seller_id', sellerId)
-
+    .select('order_id, product_id, quantity, product_price, product_name')
+    .in('product_id', productIds)
   if (itemsError) throw itemsError
   if (!orderItems || orderItems.length === 0) return []
 
   const orderIds = [...new Set(orderItems.map(item => item.order_id))]
 
+  // الخطوة 3: جلب تفاصيل الطلبات مع المشتري
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
     .select(`
@@ -90,19 +89,21 @@ export const getSellerOrders = async (sellerId) => {
   if (ordersError) throw ordersError
 
   return orders.map(order => {
-    const orderProduct = orderItems.find(item => item.order_id === order.id)
+    const relatedItems = orderItems.filter(item => item.order_id === order.id)
+    const firstItem = relatedItems[0]
     return {
       ...order,
-      product: orderProduct?.products || null,
+      product: firstItem ? {
+        name: firstItem.product_name,
+        price: firstItem.product_price,
+        quantity: firstItem.quantity
+      } : null,
       total_price: order.total_amount,
       order_status: order.status
     }
   })
 }
 
-// ─────────────────────────────────────────────────────────────
-// تحديث حالة الطلب
-// ─────────────────────────────────────────────────────────────
 export const updateOrderStatus = async (orderId, status) => {
   const { data, error } = await supabase
     .from('orders')
@@ -114,9 +115,6 @@ export const updateOrderStatus = async (orderId, status) => {
   return data
 }
 
-// ─────────────────────────────────────────────────────────────
-// رفع الإيصال مع بيانات الحوالة والمحول
-// ─────────────────────────────────────────────────────────────
 export const uploadReceipt = async (orderId, file, transferData) => {
   const { transfer_number, transfer_name, buyer_phone } = transferData
 
@@ -145,9 +143,6 @@ export const uploadReceipt = async (orderId, file, transferData) => {
   return publicUrl
 }
 
-// ─────────────────────────────────────────────────────────────
-// إحصائيات البائع (مؤقتة)
-// ─────────────────────────────────────────────────────────────
 export const getSellerStats = async (sellerId) => {
   const { count: productsCount, error: prodCountErr } = await supabase
     .from('products')
@@ -174,4 +169,5 @@ export const getSellerStats = async (sellerId) => {
 export const getMonthlySales = async (sellerId) => {
   return []
 }
+
 
