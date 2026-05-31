@@ -77,19 +77,32 @@ export const updateOrderStatus = async (orderId, status) => {
   return data
 }
 
-export const uploadReceipt = async (orderId, file) => {
+// ✅ دالة رفع الإيصال مع حفظ بيانات الحوالة والمحول
+export const uploadReceipt = async (orderId, file, transferData) => {
+  const { transfer_number, transfer_name, buyer_phone } = transferData
+
   const fileName = `receipts/${orderId}/${Date.now()}_${file.name}`
   const { error: uploadError } = await supabase.storage
     .from('receipts')
     .upload(fileName, file)
   if (uploadError) throw uploadError
+  
   const { data: { publicUrl } } = supabase.storage
     .from('receipts')
     .getPublicUrl(fileName)
+  
+  // ✅ تحديث الطلب بإضافة بيانات الحوالة والإيصال
   const { error: updateError } = await supabase
     .from('orders')
-    .update({ receipt_image: publicUrl, payment_status: 'paid' })
+    .update({ 
+      receipt_image: publicUrl, 
+      payment_status: 'paid',
+      transfer_number: transfer_number,
+      transfer_name: transfer_name,
+      buyer_phone: buyer_phone
+    })
     .eq('id', orderId)
+  
   if (updateError) throw updateError
   return publicUrl
 }

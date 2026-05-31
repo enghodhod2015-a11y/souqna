@@ -13,6 +13,11 @@ export default function PaymentPage() {
   const [file, setFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [fetchingOrder, setFetchingOrder] = useState(true)
+  
+  // ✅ حالات جديدة للحقول الإضافية
+  const [transferNumber, setTransferNumber] = useState('')
+  const [transferName, setTransferName] = useState('')
+  const [buyerPhone, setBuyerPhone] = useState('')
 
   useEffect(() => {
     if (orderId) loadOrder()
@@ -21,7 +26,6 @@ export default function PaymentPage() {
   const loadOrder = async () => {
     try {
       setFetchingOrder(true)
-      // 1. جلب الطلب من جدول orders
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select('*')
@@ -31,7 +35,6 @@ export default function PaymentPage() {
       if (orderError) throw orderError
       if (!orderData) throw new Error('الطلب غير موجود')
 
-      // 2. جلب اسم المنتج من جدول order_items
       const { data: items, error: itemsError } = await supabase
         .from('order_items')
         .select('product_name')
@@ -57,13 +60,36 @@ export default function PaymentPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    // ✅ التحقق من صحة الحقول الجديدة
     if (!file) {
       toast.error('يرجى رفع صورة الإيصال أولاً')
       return
     }
+    if (!transferNumber.trim()) {
+      toast.error('يرجى إدخال رقم الحوالة')
+      return
+    }
+    if (!transferName.trim()) {
+      toast.error('يرجى إدخال الاسم الرباعي للمحول')
+      return
+    }
+    if (!buyerPhone.trim()) {
+      toast.error('يرجى إدخال رقم هاتف المشتري')
+      return
+    }
+    if (!/^05\d{8}$/.test(buyerPhone.trim()) && !/^(\+9665\d{8})$/.test(buyerPhone.trim())) {
+      toast.error('رقم الهاتف يجب أن يكون سعودياً (05xxxxxxxx أو +9665xxxxxxxx)')
+      return
+    }
+
     setLoading(true)
     try {
-      await uploadReceipt(orderId, file)
+      await uploadReceipt(orderId, file, {
+        transfer_number: transferNumber.trim(),
+        transfer_name: transferName.trim(),
+        buyer_phone: buyerPhone.trim()
+      })
       toast.success('تم رفع الإيصال بنجاح، سيتم مراجعته قريباً')
       navigate('/orders')
     } catch (err) {
@@ -79,6 +105,7 @@ export default function PaymentPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <h1 className="text-2xl font-bold text-gold mb-6">رفع إيصال الدفع</h1>
+      
       <div className="bg-primary-card p-6 rounded-2xl border border-gold/30 mb-6 space-y-2">
         <p><strong className="text-gold">المنتج:</strong> {productTitle}</p>
         <p><strong className="text-gold">المبلغ المطلوب:</strong> {order.total_amount} ريال</p>
@@ -93,6 +120,43 @@ export default function PaymentPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="bg-primary-card p-6 rounded-2xl border border-gold/30 space-y-4">
+        {/* ✅ حقول جديدة */}
+        <div>
+          <label className="block mb-2 text-sm text-text-secondary">رقم الحوالة</label>
+          <input 
+            type="text" 
+            value={transferNumber}
+            onChange={(e) => setTransferNumber(e.target.value)}
+            placeholder="مثال: 1234567890"
+            className="w-full px-4 py-2 rounded-lg bg-white text-gray-900 border border-gold/30 focus:outline-none focus:border-gold"
+            required 
+          />
+        </div>
+
+        <div>
+          <label className="block mb-2 text-sm text-text-secondary">الاسم الرباعي للمحول</label>
+          <input 
+            type="text" 
+            value={transferName}
+            onChange={(e) => setTransferName(e.target.value)}
+            placeholder="مثال: أحمد بن محمد العلي"
+            className="w-full px-4 py-2 rounded-lg bg-white text-gray-900 border border-gold/30 focus:outline-none focus:border-gold"
+            required 
+          />
+        </div>
+
+        <div>
+          <label className="block mb-2 text-sm text-text-secondary">رقم هاتف المشتري (واتساب للتواصل)</label>
+          <input 
+            type="tel" 
+            value={buyerPhone}
+            onChange={(e) => setBuyerPhone(e.target.value)}
+            placeholder="05xxxxxxxx"
+            className="w-full px-4 py-2 rounded-lg bg-white text-gray-900 border border-gold/30 focus:outline-none focus:border-gold"
+            required 
+          />
+        </div>
+
         <div>
           <label className="block mb-2 text-sm text-text-secondary">صورة إيصال التحويل</label>
           <input 
@@ -103,6 +167,7 @@ export default function PaymentPage() {
             required 
           />
         </div>
+
         <div className="pt-2">
           <Button type="submit" disabled={loading} className="w-full">
             {loading ? 'جاري رفع الملف...' : 'تأكيد ورفع الإيصال'}
