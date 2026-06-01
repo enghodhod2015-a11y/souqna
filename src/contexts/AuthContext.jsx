@@ -30,7 +30,13 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null)
     setLoading(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      // إضافة مهلة 20 ثانية لمنع التعلق الأبدي
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('انتهت مهلة الاتصال بالخادم (20 ثانية)')), 20000)
+      )
+      const sessionPromise = supabase.auth.getSession()
+      const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise])
+      
       if (!isMounted.current) return
       const currentUser = session?.user ?? null
       setUser(currentUser)
@@ -66,6 +72,16 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     isMounted.current = true
+
+    // ✅ تنظيف أي جلسة عالقة في localStorage (من الإصدارات القديمة) لمرة واحدة
+    if (typeof window !== 'undefined') {
+      const oldSession = localStorage.getItem('supabase.auth.token')
+      if (oldSession) {
+        localStorage.removeItem('supabase.auth.token')
+        console.log('تم مسح جلسة localStorage القديمة')
+      }
+    }
+
     loadAuth()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -92,11 +108,15 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const logout = async () => {
-    await supabase.auth.signOut()
-    setUser(null)
-    setProfile(null)
-    toast.success('تم تسجيل الخروج')
-    window.location.href = '/'
+    try {
+      await supabase.auth.signOut()
+      setUser(null)
+      setProfile(null)
+      toast.success('تم تسجيل الخروج')
+      window.location.href = '/'
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   if (loading) {
@@ -133,4 +153,5 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   )
 }
+
 

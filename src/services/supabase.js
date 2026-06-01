@@ -9,4 +9,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(errorMsg);
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// ✅ استخدام sessionStorage لمنع تعارض الجلسات بين المتصفحات والنوافذ المختلفة
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: sessionStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+});
+
