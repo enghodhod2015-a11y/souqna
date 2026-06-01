@@ -13,7 +13,7 @@ export default function ResetPasswordPage() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    // CHANGED: الاستماع لحدث استرداد كلمة المرور من Supabase
+    // الاستماع لحدث استرداد كلمة المرور من Supabase
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         setIsRecovery(true)
@@ -95,5 +95,4 @@ export default function ResetPasswordPage() {
     </div>
   )
 }
-
 

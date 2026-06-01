@@ -9,7 +9,7 @@ import ProductDetailsPage from '../pages/ProductDetailsPage'
 import SearchPage from '../pages/SearchPage'
 import ContactPage from '../pages/ContactPage'
 import ForgotPasswordPage from '../pages/ForgotPasswordPage'
-import ResetPasswordPage from '../pages/ResetPasswordPage'  // CHANGED: استبدال UpdatePasswordPage بـ ResetPasswordPage
+import ResetPasswordPage from '../pages/ResetPasswordPage'
 
 // ─── صفحات المشتري ───
 import OrdersPage from '../pages/OrdersPage'
@@ -42,7 +42,6 @@ export default function AppRoutes() {
       <Route path="/search" element={<SearchPage />} />
       <Route path="/contact" element={<ContactPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      {/* CHANGED: إضافة مسار reset-password بدلاً من update-password */}
       <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {/* صفحات المشتري (محمية) */}
