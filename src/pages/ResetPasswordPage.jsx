@@ -9,22 +9,29 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [validToken, setValidToken] = useState(false)
+  const [isRecovery, setIsRecovery] = useState(false)
   const navigate = useNavigate()
 
-  // CHANGED: التحقق من وجود token في URL hash
   useEffect(() => {
+    // CHANGED: الاستماع لحدث استرداد كلمة المرور من Supabase
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecovery(true)
+        toast.success('يرجى إدخال كلمة المرور الجديدة')
+      } else if (event === 'USER_UPDATED') {
+        toast.success('تم تغيير كلمة المرور بنجاح')
+        navigate('/login')
+      }
+    })
+
+    // التحقق من وجود token في URL hash كحل بديل
     const hash = window.location.hash
     if (hash && hash.includes('access_token')) {
-      setValidToken(true)
-    } else {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) setValidToken(true)
-        else {
-          toast.error('رابط إعادة التعيين غير صالح')
-          navigate('/login')
-        }
-      })
+      setIsRecovery(true)
+    }
+
+    return () => {
+      listener?.subscription.unsubscribe()
     }
   }, [navigate])
 
@@ -42,9 +49,7 @@ export default function ResetPasswordPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
-      toast.success('تم تغيير كلمة المرور بنجاح')
-      await supabase.auth.signOut()
-      navigate('/login')
+      // سيتم التعامل مع النجاح عبر onAuthStateChange (USER_UPDATED)
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -52,12 +57,12 @@ export default function ResetPasswordPage() {
     }
   }
 
-  if (!validToken) {
+  if (!isRecovery) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="bg-primary-card p-8 rounded-2xl w-full max-w-md border border-gold/30 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold mx-auto mb-4"></div>
-          <p className="text-white">جاري التحقق من الرابط...</p>
+          <p className="text-text-secondary">هذه الصفحة مخصصة لإعادة تعيين كلمة المرور فقط.</p>
+          <button onClick={() => navigate('/login')} className="text-gold underline mt-4">العودة لتسجيل الدخول</button>
         </div>
       </div>
     )
@@ -90,4 +95,5 @@ export default function ResetPasswordPage() {
     </div>
   )
 }
+
 
