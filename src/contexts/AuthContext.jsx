@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '../services/supabase'
 import toast from 'react-hot-toast'
 
@@ -9,8 +9,8 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const isMounted = useRef(true)
 
-  // دالة لجلب البروفايل بشكل مباشر
   const fetchProfile = async (userId) => {
     try {
       const { data, error } = await supabase
@@ -18,7 +18,6 @@ export const AuthProvider = ({ children }) => {
         .select('*')
         .eq('id', userId)
         .maybeSingle()
-      
       if (error) {
         console.error('خطأ في جلب البروفايل:', error)
         return null
@@ -31,26 +30,22 @@ export const AuthProvider = ({ children }) => {
   }
 
   useEffect(() => {
-    let isMounted = true
+    isMounted.current = true
 
     const initAuth = async () => {
-      setLoading(true)
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        if (!isMounted) return
+        if (!isMounted.current) return
         
         const currentUser = session?.user ?? null
         setUser(currentUser)
 
         if (currentUser) {
-          // جلب البروفايل
           const profileData = await fetchProfile(currentUser.id)
-          if (!isMounted) return
-          
+          if (!isMounted.current) return
           if (profileData) {
             setProfile(profileData)
           } else {
-            // إذا لم يوجد بروفايل، قم بإنشائه تلقائياً
             const newProfile = {
               id: currentUser.id,
               full_name: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0],
@@ -66,7 +61,7 @@ export const AuthProvider = ({ children }) => {
               setProfile(newProfile)
             } else {
               console.error('فشل إنشاء البروفايل:', insertError)
-              setProfile(newProfile) // استخدم البيانات المحلية مؤقتاً
+              setProfile(newProfile)
             }
           }
         } else {
@@ -75,21 +70,20 @@ export const AuthProvider = ({ children }) => {
       } catch (err) {
         console.error('خطأ في تهيئة المصادقة:', err)
       } finally {
-        if (isMounted) setLoading(false)
+        if (isMounted.current) setLoading(false)
       }
     }
 
     initAuth()
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!isMounted) return
-      
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted.current) return
       const currentUser = session?.user ?? null
       setUser(currentUser)
 
       if (currentUser) {
         const profileData = await fetchProfile(currentUser.id)
-        if (!isMounted) return
+        if (!isMounted.current) return
         setProfile(profileData || {
           id: currentUser.id,
           full_name: currentUser.user_metadata?.full_name || currentUser.email,
@@ -98,36 +92,35 @@ export const AuthProvider = ({ children }) => {
       } else {
         setProfile(null)
       }
-      setLoading(false)
     })
 
     return () => {
-      isMounted = false
-      listener?.subscription.unsubscribe()
+      isMounted.current = false
+      subscription?.unsubscribe()
     }
   }, [])
 
   const logout = async () => {
     try {
-      setLoading(true)
       await supabase.auth.signOut()
       setUser(null)
       setProfile(null)
-      // لا تمسح localStorage بالكامل، فقط مفاتيح supabase
-      localStorage.removeItem('supabase.auth.token')
       toast.success('تم تسجيل الخروج')
       window.location.href = '/'
     } catch (err) {
       toast.error(err.message)
-    } finally {
-      setLoading(false)
     }
   }
 
+  if (loading) {
+    return <div className="text-center py-20">جاري تحميل بيانات المستخدم...</div>
+  }
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading: false, logout }}>
       {children}
     </AuthContext.Provider>
   )
 }
+
 

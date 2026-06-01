@@ -3,14 +3,18 @@ import AppRoutesComponent from './routes/AppRoutes'
 import { Header } from './components/common/Header'
 import { Footer } from './components/common/Footer'
 import { requestNotificationPermission } from './services/notificationService'
+import { useAuth } from './contexts/AuthContext'
 
 const AppRoutes = AppRoutesComponent.AppRoutes || AppRoutesComponent;
 
 function App() {
-  // ✅ طلب إذن الإشعارات عند تحميل التطبيق
+  const { user } = useAuth()
+  
   useEffect(() => {
-    requestNotificationPermission()
-  }, [])
+    if (user) {
+      requestNotificationPermission()
+    }
+  }, [user])
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -26,4 +30,5 @@ function App() {
 }
 
 export default App
+
 
