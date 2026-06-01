@@ -24,10 +24,17 @@ export default function ResetPasswordPage() {
       }
     })
 
-    // التحقق من وجود token في URL hash كحل بديل
+    // التحقق من وجود token في URL hash
     const hash = window.location.hash
     if (hash && hash.includes('access_token')) {
       setIsRecovery(true)
+    } else {
+      // إذا لم يكن هناك hash، قد يكون المستخدم وصل مباشرة - نتحقق من الجلسة
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user?.aud === 'authenticated') {
+          setIsRecovery(true)
+        }
+      })
     }
 
     return () => {
@@ -49,7 +56,6 @@ export default function ResetPasswordPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
-      // سيتم التعامل مع النجاح عبر onAuthStateChange (USER_UPDATED)
     } catch (err) {
       toast.error(err.message)
     } finally {
