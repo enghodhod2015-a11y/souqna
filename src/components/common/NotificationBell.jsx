@@ -2,34 +2,66 @@ import { useEffect, useState } from 'react'
 import { Bell, CheckCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { getUserNotifications, markNotificationAsRead, playNotificationSound } from '../../services/notificationService'
 import { supabase } from '../../services/supabase'
+import { playNotificationSound } from '../../services/notificationService'
 
 export const NotificationBell = () => {
   const { user } = useAuth()
-  const [notifications, setNotifications] = useState([])
-  const [isOpen, setIsOpen] = useState(false)
-  const unreadCount = notifications.filter(n => !n.is_read).length
+  const [notifications, setNotifications] = useState([])  // CHANGED: تخزين جميع الإشعارات غير المقروءة
+  const [isOpen, setIsOpen] = useState(false)             // CHANGED: حالة فتح القائمة
+  const unreadCount = notifications.length                // CHANGED: عدد الإشعارات غير المقروءة
 
+  // CHANGED: جلب الإشعارات من Supabase
+  const loadNotifications = async () => {
+    if (!user) return
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_read', false)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setNotifications(data || [])
+    } catch (err) {
+      console.error('خطأ في جلب الإشعارات:', err)
+    }
+  }
+
+  // CHANGED: تعليم إشعار كمقروء وإعادة تحميل القائمة
+  const markAsRead = async (notificationId) => {
+    try {
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId)
+      // تحديث القائمة محلياً بإزالة الإشعار
+      setNotifications(prev => prev.filter(n => n.id !== notificationId))
+    } catch (err) {
+      console.error('خطأ في تحديث الإشعار:', err)
+    }
+  }
+
+  // CHANGED: الاشتراك في Realtime لإضافة إشعارات جديدة فوراً
   useEffect(() => {
     if (!user) return
     loadNotifications()
 
-    // ✅ الاستماع للإشعارات الجديدة عبر Realtime
     const channel = supabase
-      .channel(`notifications-${user.id}`)
+      .channel(`notifications-bell-${user.id}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'notifications',
         filter: `user_id=eq.${user.id}`
       }, (payload) => {
-        // ✅ إضافة الإشعار الجديد إلى القائمة
-        setNotifications(prev => [payload.new, ...prev])
-        playNotificationSound()
-        // عرض إشعار المتصفح
-        if (Notification.permission === 'granted') {
-          new Notification(payload.new.title, { body: payload.new.message, icon: '/logo192.png' })
+        // إضافة الإشعار الجديد إلى القائمة إذا لم يكن مقروءاً
+        if (payload.new && !payload.new.is_read) {
+          setNotifications(prev => [payload.new, ...prev])
+          playNotificationSound()
+          if (Notification.permission === 'granted') {
+            new Notification(payload.new.title, { body: payload.new.message, icon: '/logo192.png' })
+          }
         }
       })
       .subscribe()
@@ -39,70 +71,63 @@ export const NotificationBell = () => {
     }
   }, [user])
 
-  const loadNotifications = async () => {
-    try {
-      const data = await getUserNotifications(user.id)
-      setNotifications(data)
-    } catch (err) {
-      console.error('خطأ في جلب الإشعارات:', err)
+  // CHANGED: إغلاق القائمة عند النقر خارجها
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      const dropdown = document.getElementById('notification-dropdown')
+      const bellButton = document.getElementById('notification-bell-button')
+      if (dropdown && bellButton && !dropdown.contains(e.target) && !bellButton.contains(e.target)) {
+        setIsOpen(false)
+      }
     }
-  }
-
-  const handleMarkAsRead = async (id) => {
-    try {
-      await markNotificationAsRead(id)
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
-    } catch (err) {
-      console.error('خطأ في تعليم الإشعار كمقروء:', err)
-    }
-  }
-
-  const handleMarkAllAsRead = async () => {
-    const unread = notifications.filter(n => !n.is_read)
-    for (const n of unread) {
-      await handleMarkAsRead(n.id)
-    }
-  }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   return (
     <div className="relative">
-      <button onClick={() => setIsOpen(!isOpen)} className="relative p-2 rounded-full hover:bg-primary-card transition">
+      <button
+        id="notification-bell-button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="relative p-2 rounded-full hover:bg-primary-card transition"
+      >
         <Bell size={22} />
+        {/* CHANGED: Badge يظهر فقط إذا كان العدد أكبر من 0 */}
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
+
+      {/* CHANGED: القائمة المنسدلة */}
       {isOpen && (
-        <div className="absolute left-0 mt-2 w-80 bg-primary-card rounded-lg shadow-xl z-50 border border-gold/30">
-          <div className="p-3 border-b border-gold/30 flex justify-between">
-            <h3 className="font-bold">الإشعارات</h3>
-            {unreadCount > 0 && (
-              <button onClick={handleMarkAllAsRead} className="text-gold text-sm hover:underline">
-                تعليم الكل كمقروء
-              </button>
-            )}
+        <div
+          id="notification-dropdown"
+          className="absolute left-0 mt-2 w-80 bg-primary-card rounded-lg shadow-xl z-50 border border-gold/30"
+        >
+          <div className="p-3 border-b border-gold/30">
+            <h3 className="font-bold text-gold">الإشعارات</h3>
           </div>
           <div className="max-h-96 overflow-y-auto">
             {notifications.length === 0 ? (
-              <p className="p-4 text-center text-text-secondary">لا توجد إشعارات</p>
+              <p className="p-4 text-center text-text-secondary">لا توجد إشعارات جديدة</p>
             ) : (
-              notifications.slice(0, 10).map(notif => (
-                <div key={notif.id} className={`p-3 border-b border-gold/20 hover:bg-secondary-blue transition ${!notif.is_read ? 'bg-secondary-blue/30' : ''}`}>
+              notifications.map(notif => (
+                <div
+                  key={notif.id}
+                  className="p-3 border-b border-gold/20 hover:bg-secondary-blue transition cursor-pointer"
+                  onClick={() => markAsRead(notif.id)}
+                >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <p className="font-bold text-sm">{notif.title}</p>
+                      <p className="font-bold text-sm text-gold">{notif.title}</p>
                       <p className="text-sm text-text-secondary">{notif.message}</p>
                       <p className="text-xs text-text-secondary mt-1">
                         {new Date(notif.created_at).toLocaleString('ar')}
                       </p>
                     </div>
-                    {!notif.is_read && (
-                      <button onClick={() => handleMarkAsRead(notif.id)} className="mr-2">
-                        <CheckCircle size={16} className="text-gold" />
-                      </button>
-                    )}
+                    <CheckCircle size={16} className="text-gold shrink-0 mr-2 mt-1" />
                   </div>
                 </div>
               ))
