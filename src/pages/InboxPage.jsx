@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getUserConversations } from '../services/chatService'
-import { useAbortController } from '../hooks/useAbortController'  // ✅
+import { useAbortController } from '../hooks/useAbortController'
 
 export default function InboxPage() {
   const { user } = useAuth()
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
-  const abortController = useAbortController()  // ✅
+  const abortController = useAbortController()
 
   useEffect(() => {
     if (user?.id) loadConversations()
@@ -16,6 +16,10 @@ export default function InboxPage() {
   }, [user?.id])
 
   const loadConversations = async () => {
+    const timeoutId = setTimeout(() => {
+      abortController?.abort()
+    }, 15000)
+
     try {
       setLoading(true)
       const data = await getUserConversations(user.id)
@@ -24,6 +28,7 @@ export default function InboxPage() {
     } catch (err) {
       if (err.name !== 'AbortError') console.error("Error loading inbox conversations:", err)
     } finally {
+      clearTimeout(timeoutId)
       if (!abortController?.signal.aborted) setLoading(false)
     }
   }
@@ -38,16 +43,10 @@ export default function InboxPage() {
       ) : (
         <div className="space-y-3">
           {conversations.map(conv => {
-            // فحص أمني لمنع انهيار الرندر إذا كانت المحادثة فارغة
             if (!conv?.id) return null
-
             const isBuyer = conv.buyer_id === user?.id
             const unreadCount = isBuyer ? conv.buyer_unread_count : conv.seller_unread_count
-            
-            // 🔒 حظر الهويات: استبدال الاسم الصريح بلقب مبهم يحمي الخصوصية
             const anonymousLabel = isBuyer ? "البائع" : "مشتري محتمل"
-
-            // 🔒 تأمين الرابط: التوجيه الآمن باستخدام معرف المحادثة الموحد لحماية معرف البائع والمشتري
             return (
               <Link to={`/chat/c/${conv.id}`} key={conv.id}>
                 <div className="bg-primary-card p-4 rounded-2xl border border-gold/30 hover:border-gold transition">

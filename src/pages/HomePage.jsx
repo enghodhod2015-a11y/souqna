@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getProducts } from '../services/productService'
 import { ProductCard } from '../components/products/ProductCard'
-import { useAbortController } from '../hooks/useAbortController'  // ✅ إضافة
+import { useAbortController } from '../hooks/useAbortController'
 
 const categories = [
   { id: 'electronics', name: 'الإلكترونيات', icon: '📱' },
@@ -61,11 +61,19 @@ export default function HomePage() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState('')
-  const abortController = useAbortController()  // ✅ إضافة
+  const abortController = useAbortController()
 
   useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      abortController?.abort()
+    }, 15000)
+
     loadProducts()
-    return () => abortController?.abort()  // ✅ إلغاء عند المغادرة
+
+    return () => {
+      clearTimeout(timeoutId)
+      abortController?.abort()
+    }
   }, [selectedCategory])
 
   const loadProducts = async () => {
@@ -158,5 +166,4 @@ export default function HomePage() {
     </div>
   )
 }
-
 

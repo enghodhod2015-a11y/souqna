@@ -9,7 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(errorMsg);
 }
 
-// ✅ إنشاء العميل مع sessionStorage لمنع تعارض الجلسات
+// ✅ استخدام sessionStorage لمنع تعارض الجلسات بين المتصفحات والنوافذ المختلفة
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: sessionStorage,
@@ -19,7 +19,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-// ✅ دالة مساعدة لإضافة مهلة لأي Promise (تستخدم في الطلبات المهمة)
+// ✅ دالة مساعدة لإضافة مهلة لأي Promise (للاحتياط)
 export const withTimeout = (promise, timeoutMs = 15000) => {
   return Promise.race([
     promise,

@@ -8,7 +8,7 @@ import { Button } from '../components/ui/Button'
 import { Package, ShoppingBag, MessageCircle, DollarSign, TrendingUp, Eye, Edit } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import toast from 'react-hot-toast'
-import { useAbortController } from '../hooks/useAbortController'  // ✅ إضافة
+import { useAbortController } from '../hooks/useAbortController'
 
 export default function SellerDashboardPage() {
   const { user } = useAuth()
@@ -17,14 +17,18 @@ export default function SellerDashboardPage() {
   const [recentProducts, setRecentProducts] = useState([])
   const [recentConversations, setRecentConversations] = useState([])
   const [loading, setLoading] = useState(true)
-  const abortController = useAbortController()  // ✅ إضافة
+  const abortController = useAbortController()
 
   useEffect(() => {
     if (user) loadDashboard()
-    return () => abortController?.abort()  // ✅ إلغاء الطلبات عند المغادرة
+    return () => abortController?.abort()
   }, [user])
 
   const loadDashboard = async () => {
+    const timeoutId = setTimeout(() => {
+      abortController?.abort()
+    }, 15000)
+
     try {
       const signal = abortController?.signal
       const [statsData, salesData, productsData, conversationsData] = await Promise.all([
@@ -41,6 +45,7 @@ export default function SellerDashboardPage() {
     } catch (err) {
       if (err.name !== 'AbortError') toast.error(err.message)
     } finally {
+      clearTimeout(timeoutId)
       if (!abortController?.signal.aborted) setLoading(false)
     }
   }
@@ -54,7 +59,6 @@ export default function SellerDashboardPage() {
         <Link to="/add-product"><Button>+ إضافة منتج</Button></Link>
       </div>
 
-      {/* الإحصائيات */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         <div className="bg-primary-card p-4 rounded-2xl border border-gold/30 text-center">
           <Package className="text-gold mx-auto mb-2" size={28} />
@@ -83,7 +87,6 @@ export default function SellerDashboardPage() {
         </div>
       </div>
 
-      {/* الرسم البياني */}
       {monthlySales.length > 0 && (
         <div className="bg-primary-card p-4 rounded-2xl border border-gold/30 mb-8">
           <h2 className="text-xl font-bold mb-4">المبيعات الشهرية</h2>
@@ -99,7 +102,6 @@ export default function SellerDashboardPage() {
         </div>
       )}
 
-      {/* آخر المنتجات - مع إضافة الصورة المصغرة وإزالة views_count */}
       <div className="bg-primary-card p-4 rounded-2xl border border-gold/30 mb-8">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">آخر المنتجات</h2>
@@ -111,7 +113,6 @@ export default function SellerDashboardPage() {
           <div className="space-y-3">
             {recentProducts.map(product => {
               if (!product?.id) return null;
-              // صورة احتياطية إذا كانت cover_image غير موجودة
               const imgSrc = product.cover_image || 'https://placehold.co/60x60/06264D/D4AF37?text=صورة';
               return (
                 <div key={product.id} className="flex justify-between items-center p-3 bg-secondary-blue/30 rounded-xl">
@@ -138,7 +139,6 @@ export default function SellerDashboardPage() {
         )}
       </div>
 
-      {/* آخر الاستفسارات (بدون تعديل) */}
       <div className="bg-primary-card p-4 rounded-2xl border border-gold/30">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">آخر الاستفسارات</h2>
@@ -150,12 +150,9 @@ export default function SellerDashboardPage() {
           <div className="space-y-3">
             {recentConversations.map(conv => {
               if (!conv?.id) return null;
-              
               const isBuyer = conv.buyer_id === user?.id
               const unreadCount = isBuyer ? conv.buyer_unread_count : conv.seller_unread_count
-              
               const anonymousLabel = isBuyer ? "البائع" : "مشتري محتمل";
-
               return (
                 <Link to={`/chat/c/${conv.id}`} key={conv.id}>
                   <div className="flex justify-between items-center p-3 bg-secondary-blue/30 rounded-xl hover:bg-secondary-blue transition">
@@ -179,5 +176,4 @@ export default function SellerDashboardPage() {
     </div>
   )
 }
-
 

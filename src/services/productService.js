@@ -1,4 +1,4 @@
-import { supabase, withTimeout } from './supabase'
+import { supabase } from './supabase'
 
 const fixImageUrl = (url) => {
   if (!url) return null
@@ -10,6 +10,7 @@ const fixImageUrl = (url) => {
   return `${supabaseUrl}/storage/v1/object/public/product-images/${url}`
 }
 
+// ✅ دالة getProducts مع دعم AbortSignal
 export const getProducts = async (filters = {}, signal = null) => {
   try {
     let query = supabase
@@ -22,8 +23,11 @@ export const getProducts = async (filters = {}, signal = null) => {
     if (filters.category) query = query.eq('category', filters.category)
     if (filters.search) query = query.ilike('name', '%' + filters.search + '%')
 
-    // ✅ تطبيق المهلة على الاستعلام
-    const { data: products, error } = await withTimeout(query, 15000)
+    // ✅ تمرير AbortSignal إلى Supabase
+    const { data: products, error } = signal 
+      ? await query.abortSignal(signal)
+      : await query
+
     if (error) throw error
 
     if (products?.length) {
@@ -185,4 +189,3 @@ export const uploadProductImages = async (files, productId) => {
     throw error
   }
 }
-
