@@ -22,6 +22,7 @@ export const getOrCreateConversation = async (productId, buyerId, sellerId) => {
 }
 
 export const sendMessage = async (conversationId, senderId, receiverId, message) => {
+  // 1. إدراج الرسالة
   const { data, error } = await supabase
     .from('messages')
     .insert({ conversation_id: conversationId, sender_id: senderId, receiver_id: receiverId, message })
@@ -29,31 +30,35 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
     .single()
   if (error) throw error
 
+  // 2. تحديث آخر رسالة في المحادثة
   await supabase
     .from('conversations')
     .update({ last_message: message, last_message_at: new Date() })
     .eq('id', conversationId)
 
+  // 3. إضافة إشعار للمستقبل (receiverId)
   try {
+    // جلب اسم المرسل
     const { data: senderProfile } = await supabase
       .from('profiles')
       .select('full_name')
       .eq('id', senderId)
       .single()
     const senderName = senderProfile?.full_name || 'مستخدم'
+    const shortMessage = message.length > 50 ? message.substring(0, 50) + '...' : message
 
-    // ✅ إضافة إشعار للمستقبل
     await addNotification(
       receiverId,
       'message',
       'رسالة جديدة',
-      `${senderName}: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
-      null
+      `${senderName} أرسل لك: ${shortMessage}`,
+      null   // معرف المحادثة من نوع UUID لا يمكن تخزينه في related_id (integer) فنتركه فارغاً
     )
   } catch (err) {
     console.error('خطأ في إضافة الإشعار:', err)
   }
 
+  // 4. إشعار المتصفح (اختياري – يمكن إزالته)
   try {
     if (Notification.permission === 'granted') {
       const { data: senderProfile } = await supabase
@@ -67,9 +72,7 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
         icon: '/logo192.png'
       })
     }
-  } catch (err) {
-    console.error('خطأ في إشعار المتصفح:', err)
-  }
+  } catch (err) { console.error('خطأ في إشعار المتصفح:', err) }
 
   return data
 }
@@ -104,15 +107,11 @@ export const getUserConversations = async (userId) => {
         .select('id, name, cover_image, seller_id')
         .eq('id', conv.product_id)
         .maybeSingle()
-      if (prodError) {
-        console.error('خطأ في جلب المنتج:', prodError)
-        return { ...conv, product: null }
-      }
+      if (prodError) return { ...conv, product: null }
       const productWithTitle = product ? { ...product, title: product.name } : null
       return { ...conv, product: productWithTitle }
     })
   )
-
   return conversationsWithProduct
 }
 

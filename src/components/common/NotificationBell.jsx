@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Bell, CheckCircle } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../services/supabase'
-import { playNotificationSound } from '../../services/notificationService'
+import { getUserNotifications, markNotificationAsRead, playNotificationSound } from '../../services/notificationService'
 
 export const NotificationBell = () => {
   const { user } = useAuth()
@@ -10,41 +10,28 @@ export const NotificationBell = () => {
   const [isOpen, setIsOpen] = useState(false)
   const unreadCount = notifications.length
 
-  // CHANGED: جلب الإشعارات غير المقروءة فقط
   const loadNotifications = async () => {
     if (!user) return
     try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_read', false)
-        .order('created_at', { ascending: false })
-      if (error) throw error
-      setNotifications(data || [])
+      const data = await getUserNotifications(user.id)
+      // CHANGED: نعرض جميع الإشعارات غير المقروءة فقط (مرشحة داخل getUserNotifications)
+      setNotifications(data.filter(n => !n.is_read))
     } catch (err) {
       console.error('خطأ في جلب الإشعارات:', err)
     }
   }
 
-  // CHANGED: تعليم الإشعار كمقروء وإعادة جلب القائمة
   const markAsRead = async (notificationId) => {
     try {
-      await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('id', notificationId)
-      // إعادة الجلب بعد التحديث لضمان تحديث العدد
-      await loadNotifications()
+      await markNotificationAsRead(notificationId)
+      setNotifications(prev => prev.filter(n => n.id !== notificationId))
     } catch (err) {
       console.error('خطأ في تحديث الإشعار:', err)
     }
   }
 
-  // CHANGED: الاشتراك في Realtime وإعادة جلب الإشعارات عند أي إضافة جديدة
   useEffect(() => {
     if (!user) return
-
     loadNotifications()
 
     const channel = supabase
@@ -55,12 +42,10 @@ export const NotificationBell = () => {
         table: 'notifications',
         filter: `user_id=eq.${user.id}`
       }, async (payload) => {
-        // CHANGED: إعادة جلب الإشعارات من قاعدة البيانات بدلاً من إضافتها يدوياً
-        // هذا يضمن أن العدد والقائمة متطابقان مع ما هو موجود في الجدول
+        // CHANGED: إعادة جلب الإشعارات بالكامل لضمان التحديث
         await loadNotifications()
-        // تشغيل الصوت وإشعار المتصفح فقط (إذا كان المستخدم خارج التطبيق أو مسموح)
         playNotificationSound()
-        if (Notification.permission === 'granted') {
+        if (Notification.permission === 'granted' && !document.hasFocus()) {
           new Notification(payload.new.title, { body: payload.new.message, icon: '/logo192.png' })
         }
       })
@@ -71,7 +56,6 @@ export const NotificationBell = () => {
     }
   }, [user])
 
-  // CHANGED: إغلاق القائمة عند النقر خارجها
   useEffect(() => {
     const handleClickOutside = (e) => {
       const dropdown = document.getElementById('notification-dropdown')
