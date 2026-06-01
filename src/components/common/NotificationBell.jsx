@@ -10,23 +10,44 @@ export const NotificationBell = () => {
   const [isOpen, setIsOpen] = useState(false)
   const unreadCount = notifications.length
 
+  // CHANGED: إعادة الجلب مع تصفية غير المقروء فقط
   const loadNotifications = async () => {
     if (!user) return
     try {
       const data = await getUserNotifications(user.id)
-      // CHANGED: نعرض جميع الإشعارات غير المقروءة فقط (مرشحة داخل getUserNotifications)
-      setNotifications(data.filter(n => !n.is_read))
+      // التأكد من عرض غير المقروء فقط
+      const unread = data.filter(n => !n.is_read)
+      setNotifications(unread)
     } catch (err) {
       console.error('خطأ في جلب الإشعارات:', err)
     }
   }
 
+  // CHANGED: تعليم إشعار كمقروء وتحديث القائمة محلياً فوراً
   const markAsRead = async (notificationId) => {
     try {
       await markNotificationAsRead(notificationId)
+      // إزالة الإشعار من القائمة مباشرة (تحديث محلي سريع)
       setNotifications(prev => prev.filter(n => n.id !== notificationId))
     } catch (err) {
       console.error('خطأ في تحديث الإشعار:', err)
+    }
+  }
+
+  // CHANGED: تعليم الكل كمقروء وتحديث القائمة محلياً
+  const markAllAsRead = async () => {
+    if (notifications.length === 0) return
+    try {
+      // تحديث كل الإشعارات في قاعدة البيانات
+      const ids = notifications.map(n => n.id)
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .in('id', ids)
+      // إفراغ القائمة محلياً
+      setNotifications([])
+    } catch (err) {
+      console.error('خطأ في تعليم الكل كمقروء:', err)
     }
   }
 
@@ -42,11 +63,20 @@ export const NotificationBell = () => {
         table: 'notifications',
         filter: `user_id=eq.${user.id}`
       }, async (payload) => {
-        // CHANGED: إعادة جلب الإشعارات بالكامل لضمان التحديث
-        await loadNotifications()
-        playNotificationSound()
-        if (Notification.permission === 'granted' && !document.hasFocus()) {
-          new Notification(payload.new.title, { body: payload.new.message, icon: '/logo192.png' })
+        // فقط إذا كان الإشعار الجديد غير مقروء نضيفه
+        if (payload.new && !payload.new.is_read) {
+          // نضيفه إلى القائمة محلياً (مع تجنب التكرار)
+          setNotifications(prev => {
+            if (prev.some(n => n.id === payload.new.id)) return prev
+            return [payload.new, ...prev]
+          })
+          playNotificationSound()
+          if (Notification.permission === 'granted' && !document.hasFocus()) {
+            new Notification(payload.new.title, { body: payload.new.message, icon: '/logo192.png' })
+          }
+        } else {
+          // إذا كان مقروءاً، نعيد الجلب للتأكد من المزامنة
+          await loadNotifications()
         }
       })
       .subscribe()
@@ -88,8 +118,16 @@ export const NotificationBell = () => {
           id="notification-dropdown"
           className="absolute left-0 mt-2 w-80 bg-primary-card rounded-lg shadow-xl z-50 border border-gold/30"
         >
-          <div className="p-3 border-b border-gold/30">
+          <div className="p-3 border-b border-gold/30 flex justify-between items-center">
             <h3 className="font-bold text-gold">الإشعارات</h3>
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllAsRead}
+                className="text-xs text-gold hover:underline"
+              >
+                تعليم الكل كمقروء
+              </button>
+            )}
           </div>
           <div className="max-h-96 overflow-y-auto">
             {notifications.length === 0 ? (
