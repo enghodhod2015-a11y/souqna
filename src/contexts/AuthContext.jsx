@@ -10,7 +10,6 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState(null)
-  const [retryCount, setRetryCount] = useState(0)
   const isMounted = useRef(true)
 
   const fetchProfile = async (userId) => {
@@ -57,22 +56,9 @@ export const AuthProvider = ({ children }) => {
       } else {
         setProfile(null)
       }
-      setRetryCount(0)
     } catch (err) {
       console.error('خطأ في المصادقة:', err)
-      if (isMounted.current) {
-        const errorMessage = err.message || 'فشل الاتصال بخادم المصادقة'
-        setAuthError(errorMessage)
-        // إذا كان الخطأ متعلقاً بالاتصال، نسمح بإعادة المحاولة تلقائياً بعد 3 ثوانٍ (بحد أقصى 3 مرات)
-        if (retryCount < 3 && (errorMessage.includes('مهلة') || errorMessage.includes('اتصال') || errorMessage.includes('network'))) {
-          setTimeout(() => {
-            if (isMounted.current) {
-              setRetryCount(prev => prev + 1)
-              loadAuth()
-            }
-          }, 3000)
-        }
-      }
+      if (isMounted.current) setAuthError(err.message || 'فشل الاتصال بخادم المصادقة')
     } finally {
       if (isMounted.current) setLoading(false)
     }
@@ -80,16 +66,13 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     isMounted.current = true
-
-    // تنظيف الجلسات القديمة في localStorage
+    // تنظيف الجلسات القديمة
     if (typeof window !== 'undefined') {
       const oldSession = localStorage.getItem('supabase.auth.token')
       if (oldSession) {
         localStorage.removeItem('supabase.auth.token')
-        console.log('تم مسح جلسة localStorage القديمة')
       }
     }
-
     loadAuth()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -138,17 +121,14 @@ export const AuthProvider = ({ children }) => {
     )
   }
 
-  if (authError && retryCount >= 3) {
+  if (authError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-primary-blue">
         <div className="text-center bg-primary-card p-6 rounded-2xl border border-gold/30 max-w-md">
           <p className="text-red-400 mb-4">⚠️ {authError}</p>
-          <p className="text-text-secondary mb-4">فشل الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت وجدار الحماية.</p>
+          <p className="text-text-secondary mb-4">يرجى التحقق من اتصالك بالإنترنت أو تحديث الصفحة.</p>
           <button
-            onClick={() => {
-              setRetryCount(0)
-              loadAuth()
-            }}
+            onClick={() => loadAuth()}
             className="px-4 py-2 bg-gold text-primary-blue rounded-lg font-bold hover:bg-gold/90"
           >
             إعادة المحاولة

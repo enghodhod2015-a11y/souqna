@@ -9,8 +9,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(errorMsg);
 }
 
-// إنشاء العميل الأساسي
-const originalSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+// ✅ إنشاء العميل مع sessionStorage لمنع تعارض الجلسات
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: sessionStorage,
     autoRefreshToken: true,
@@ -19,8 +19,8 @@ const originalSupabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-// ✅ دالة مساعدة لإضافة مهلة إلى أي promise
-const withTimeout = (promise, timeoutMs = 15000) => {
+// ✅ دالة مساعدة لإضافة مهلة لأي Promise (تستخدم في الطلبات المهمة)
+export const withTimeout = (promise, timeoutMs = 15000) => {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
@@ -28,22 +28,4 @@ const withTimeout = (promise, timeoutMs = 15000) => {
     )
   ]);
 };
-
-// ✅ تغليف جميع دوال supabase لإضافة مهلة تلقائية
-export const supabase = new Proxy(originalSupabase, {
-  get(target, prop) {
-    const original = target[prop];
-    if (typeof original === 'function') {
-      return async (...args) => {
-        try {
-          return await withTimeout(original.apply(target, args), 15000);
-        } catch (err) {
-          console.error(`Supabase error in ${prop}:`, err);
-          throw err;
-        }
-      };
-    }
-    return original;
-  }
-});
 
