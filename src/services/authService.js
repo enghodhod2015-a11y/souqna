@@ -37,7 +37,7 @@ export const signUp = async (email, password, fullName, accountType, phone) => {
         full_name: fullName,
         email: email,
         account_type: accountType,
-        phone: phone   // ✅ إضافة رقم الهاتف
+        phone: phone
       })
     
     if (profileError) console.error('Profile creation error:', profileError)
@@ -46,7 +46,7 @@ export const signUp = async (email, password, fullName, accountType, phone) => {
   return data
 }
 
-// ─── تسجيل الدخول (بدون تغيير) ───
+// ─── تسجيل الدخول ───
 export const signIn = async (email, password) => {
   if (!email || !password) {
     throw new Error('البريد وكلمة المرور مطلوبان')
@@ -70,6 +70,24 @@ export const signIn = async (email, password) => {
 // ─── تسجيل الخروج ───
 export const signOut = async () => {
   const { error } = await supabase.auth.signOut()
+  if (error) throw error
+}
+
+// ─── إعادة تعيين كلمة المرور (نسيت كلمة المرور) ───
+export const resetPassword = async (email) => {
+  if (!email) throw new Error('البريد الإلكتروني مطلوب')
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/update-password`,
+  })
+  if (error) throw error
+}
+
+// ─── تحديث كلمة المرور بعد النقر على الرابط ───
+export const updatePassword = async (newPassword) => {
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error('كلمة المرور يجب أن تكون 6 أحرف على الأقل')
+  }
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
   if (error) throw error
 }
 

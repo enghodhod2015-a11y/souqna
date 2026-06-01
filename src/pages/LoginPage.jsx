@@ -31,8 +31,14 @@ export default function LoginPage() {
           <Input label="كلمة المرور" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
           <Button type="submit" className="w-full" disabled={loading}>{loading ? 'جاري...' : 'دخول'}</Button>
         </form>
-        <p className="mt-4 text-center">ليس لديك حساب؟ <Link to="/register" className="text-gold">إنشاء حساب جديد</Link></p>
+        <p className="mt-4 text-center">
+          <Link to="/forgot-password" className="text-gold text-sm">نسيت كلمة المرور؟</Link>
+        </p>
+        <p className="mt-2 text-center">
+          ليس لديك حساب؟ <Link to="/register" className="text-gold">إنشاء حساب جديد</Link>
+        </p>
       </div>
     </div>
   )
 }
+

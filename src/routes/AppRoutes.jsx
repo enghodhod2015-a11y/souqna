@@ -8,13 +8,15 @@ import RegisterPage from '../pages/RegisterPage'
 import ProductDetailsPage from '../pages/ProductDetailsPage'
 import SearchPage from '../pages/SearchPage'
 import ContactPage from '../pages/ContactPage'
+import ForgotPasswordPage from '../pages/ForgotPasswordPage'
+import UpdatePasswordPage from '../pages/UpdatePasswordPage'
 
 // ─── صفحات المشتري ───
 import OrdersPage from '../pages/OrdersPage'
 import InboxPage from '../pages/InboxPage'
 import ProfilePage from '../pages/ProfilePage'
 import CheckoutPage from '../pages/CheckoutPage'
-import PaymentPage from '../pages/PaymentPage'  // ✅ تمت الإضافة
+import PaymentPage from '../pages/PaymentPage'
 
 // ─── صفحات البائع ───
 import AddProductPage from '../pages/AddProductPage'
@@ -39,6 +41,8 @@ export default function AppRoutes() {
       <Route path="/product/:id" element={<ProductDetailsPage />} />
       <Route path="/search" element={<SearchPage />} />
       <Route path="/contact" element={<ContactPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/update-password" element={<UpdatePasswordPage />} />
 
       {/* صفحات المشتري (محمية) */}
       <Route path="/orders" element={
@@ -61,8 +65,6 @@ export default function AppRoutes() {
           <CheckoutPage />
         </ProtectedRoute>
       } />
-      
-      {/* ✅ إضافة مسار الدفع */}
       <Route path="/payment/:orderId" element={
         <ProtectedRoute allowedRoles={['buyer', 'seller', 'admin']}>
           <PaymentPage />
@@ -117,5 +119,4 @@ export default function AppRoutes() {
     </Routes>
   )
 }
-
 
