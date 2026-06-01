@@ -13,8 +13,9 @@ export default function ResetPasswordPage() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    // الاستماع لحدث استرداد كلمة المرور من Supabase
+    // 1. الاستماع لحدث استرداد كلمة المرور من Supabase
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔐 onAuthStateChange event:', event)
       if (event === 'PASSWORD_RECOVERY') {
         setIsRecovery(true)
         toast.success('يرجى إدخال كلمة المرور الجديدة')
@@ -24,12 +25,13 @@ export default function ResetPasswordPage() {
       }
     })
 
-    // التحقق من وجود token في URL hash
+    // 2. التحقق من وجود access_token في URL hash
     const hash = window.location.hash
+    console.log('🔐 hash:', hash)
     if (hash && hash.includes('access_token')) {
       setIsRecovery(true)
     } else {
-      // إذا لم يكن هناك hash، قد يكون المستخدم وصل مباشرة - نتحقق من الجلسة
+      // 3. التحقق من وجود جلسة نشطة (في حالة الوصول المباشر)
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user?.aud === 'authenticated') {
           setIsRecovery(true)
@@ -56,6 +58,10 @@ export default function ResetPasswordPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
+      // الانتظار قليلاً حتى يتم تحديث الجلسة
+      setTimeout(() => {
+        navigate('/login')
+      }, 1500)
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -68,6 +74,7 @@ export default function ResetPasswordPage() {
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="bg-primary-card p-8 rounded-2xl w-full max-w-md border border-gold/30 text-center">
           <p className="text-text-secondary">هذه الصفحة مخصصة لإعادة تعيين كلمة المرور فقط.</p>
+          <p className="text-text-secondary text-sm mt-2">لم يتم العثور على رمز إعادة التعيين.</p>
           <button onClick={() => navigate('/login')} className="text-gold underline mt-4">العودة لتسجيل الدخول</button>
         </div>
       </div>

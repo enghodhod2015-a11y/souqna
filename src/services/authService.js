@@ -68,9 +68,11 @@ export const signOut = async () => {
 // ─── إعادة تعيين كلمة المرور (نسيت كلمة المرور) ───
 export const resetPassword = async (email) => {
   if (!email) throw new Error('البريد الإلكتروني مطلوب')
-  // CHANGED: استخدام المسار الكامل مع /souqna/ ليتوافق مع base في vite.config.js
+  // CHANGED: المسار الكامل مع /souqna/ ليتوافق مع basename
+  const redirectUrl = `${window.location.origin}/souqna/reset-password`
+  console.log('🔐 إرسال رابط إعادة التعيين إلى:', redirectUrl)
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/souqna/reset-password`,
+    redirectTo: redirectUrl,
   })
   if (error) throw error
 }
