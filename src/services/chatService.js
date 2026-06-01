@@ -37,7 +37,6 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
 
   // 3. إدراج إشعار في جدول notifications (ليظهر في الجرس)
   try {
-    // جلب اسم المرسل
     const { data: senderProfile } = await supabase
       .from('profiles')
       .select('full_name')
@@ -45,7 +44,6 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
       .single()
     const senderName = senderProfile?.full_name || 'مستخدم'
 
-    // إدراج الإشعار باستخدام الأعمدة الموجودة في الجدول
     const { error: notifError } = await supabase
       .from('notifications')
       .insert({
@@ -55,19 +53,18 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
         message: `${senderName} أرسل لك: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
         related_id: conversationId,
         is_read: false
-        // created_at ستُضاف تلقائياً (DEFAULT NOW())
       })
 
     if (notifError) {
-      console.error('خطأ في إدراج الإشعار في قاعدة البيانات:', notifError)
+      console.error('خطأ في إدراج الإشعار:', notifError)
     }
   } catch (err) {
     console.error('خطأ في إضافة الإشعار:', err)
   }
 
-  // 4. إشعار المتصفح المنبثق (اختياري - يظهر حتى بدون إذن)
+  // 4. إشعار المتصفح المنبثق (إذا تم الإذن)
   try {
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+    if (Notification.permission === 'granted') {
       const { data: senderProfile } = await supabase
         .from('profiles')
         .select('full_name')
@@ -137,4 +134,6 @@ export const markMessagesAsRead = async (conversationId, userId) => {
     .eq('is_read', false)
   if (error) throw error
 }
+
+
 

@@ -26,14 +26,16 @@ export const NotificationBell = () => {
       }, (payload) => {
         setNotifications(prev => [payload.new, ...prev])
         playNotificationSound() // تشغيل الصوت
-        // عرض إشعار المتصفح
+        // عرض إشعار المتصفح إذا تم الإذن
         if (Notification.permission === 'granted') {
           new Notification(payload.new.title, { body: payload.new.message, icon: '/logo192.png' })
         }
       })
       .subscribe()
 
-    return () => supabase.removeChannel(channel)
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [user])
 
   const loadNotifications = async () => {
@@ -41,20 +43,24 @@ export const NotificationBell = () => {
       const data = await getUserNotifications(user.id)
       setNotifications(data)
     } catch (err) {
-      console.error(err)
+      console.error('خطأ في جلب الإشعارات:', err)
     }
   }
 
   const handleMarkAsRead = async (id) => {
-    await markNotificationAsRead(id)
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+    try {
+      await markNotificationAsRead(id)
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+    } catch (err) {
+      console.error('خطأ في تعليم الإشعار كمقروء:', err)
+    }
   }
 
   const handleMarkAllAsRead = async () => {
-    for (const n of notifications.filter(n => !n.is_read)) {
-      await markNotificationAsRead(n.id)
+    const unread = notifications.filter(n => !n.is_read)
+    for (const n of unread) {
+      await handleMarkAsRead(n.id)
     }
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
   }
 
   return (
@@ -62,7 +68,7 @@ export const NotificationBell = () => {
       <button onClick={() => setIsOpen(!isOpen)} className="relative p-2 rounded-full hover:bg-primary-card transition">
         <Bell size={22} />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-danger text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -72,7 +78,9 @@ export const NotificationBell = () => {
           <div className="p-3 border-b border-gold/30 flex justify-between">
             <h3 className="font-bold">الإشعارات</h3>
             {unreadCount > 0 && (
-              <button onClick={handleMarkAllAsRead} className="text-gold text-sm">تعليم الكل كمقروء</button>
+              <button onClick={handleMarkAllAsRead} className="text-gold text-sm hover:underline">
+                تعليم الكل كمقروء
+              </button>
             )}
           </div>
           <div className="max-h-96 overflow-y-auto">
@@ -81,14 +89,16 @@ export const NotificationBell = () => {
             ) : (
               notifications.slice(0, 10).map(notif => (
                 <div key={notif.id} className={`p-3 border-b border-gold/20 hover:bg-secondary-blue transition ${!notif.is_read ? 'bg-secondary-blue/30' : ''}`}>
-                  <div className="flex justify-between">
-                    <div>
-                      <p className="font-bold">{notif.title}</p>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <p className="font-bold text-sm">{notif.title}</p>
                       <p className="text-sm text-text-secondary">{notif.message}</p>
-                      <p className="text-xs text-text-secondary">{new Date(notif.created_at).toLocaleString()}</p>
+                      <p className="text-xs text-text-secondary mt-1">
+                        {new Date(notif.created_at).toLocaleString('ar')}
+                      </p>
                     </div>
                     {!notif.is_read && (
-                      <button onClick={() => handleMarkAsRead(notif.id)}>
+                      <button onClick={() => handleMarkAsRead(notif.id)} className="mr-2">
                         <CheckCircle size={16} className="text-gold" />
                       </button>
                     )}
@@ -102,3 +112,4 @@ export const NotificationBell = () => {
     </div>
   )
 }
+
