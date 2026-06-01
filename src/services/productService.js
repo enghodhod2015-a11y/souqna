@@ -10,8 +10,7 @@ const fixImageUrl = (url) => {
   return `${supabaseUrl}/storage/v1/object/public/product-images/${url}`
 }
 
-// ✅ دالة getProducts مع دعم AbortSignal
-export const getProducts = async (filters = {}, signal = null) => {
+export const getProducts = async (filters = {}) => {
   try {
     let query = supabase
       .from('products')
@@ -23,11 +22,7 @@ export const getProducts = async (filters = {}, signal = null) => {
     if (filters.category) query = query.eq('category', filters.category)
     if (filters.search) query = query.ilike('name', '%' + filters.search + '%')
 
-    // ✅ تمرير AbortSignal إلى Supabase
-    const { data: products, error } = signal 
-      ? await query.abortSignal(signal)
-      : await query
-
+    const { data: products, error } = await query
     if (error) throw error
 
     if (products?.length) {
@@ -59,12 +54,12 @@ export const getProducts = async (filters = {}, signal = null) => {
     }
     return products || []
   } catch (error) {
-    if (error.name === 'AbortError') throw error
     console.error('⚠️ فشل جلب المنتجات:', error)
     return []
   }
 }
 
+// باقي الدوال (getSellerProducts, getProductById, إلخ) كما هي بدون تغيير
 export const getSellerProducts = async (sellerId) => {
   try {
     const { data, error } = await supabase
@@ -189,3 +184,5 @@ export const uploadProductImages = async (files, productId) => {
     throw error
   }
 }
+
+

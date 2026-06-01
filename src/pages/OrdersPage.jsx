@@ -4,36 +4,28 @@ import { getBuyerOrders, confirmDelivery, requestReturn } from '../services/orde
 import { Link } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import toast from 'react-hot-toast'
-import { useAbortController } from '../hooks/useAbortController'
 
 export default function OrdersPage() {
   const { user } = useAuth()
   const [allOrders, setAllOrders] = useState([])
   const [activeTab, setActiveTab] = useState('pending_payment')
   const [loading, setLoading] = useState(true)
-  const abortController = useAbortController()
 
   useEffect(() => {
-    if (user) loadOrders()
-    return () => abortController?.abort()
-  }, [user])
-
-  const loadOrders = async () => {
-    const timeoutId = setTimeout(() => {
-      abortController?.abort()
-    }, 15000)
-
-    try {
-      const data = await getBuyerOrders(user.id)
-      if (abortController?.signal.aborted) return
-      setAllOrders(data)
-    } catch (err) {
-      if (err.name !== 'AbortError') console.error(err)
-    } finally {
-      clearTimeout(timeoutId)
-      if (!abortController?.signal.aborted) setLoading(false)
+    let isMounted = true
+    const loadOrders = async () => {
+      try {
+        const data = await getBuyerOrders(user.id)
+        if (isMounted) setAllOrders(data)
+      } catch (err) {
+        if (isMounted) console.error(err)
+      } finally {
+        if (isMounted) setLoading(false)
+      }
     }
-  }
+    if (user) loadOrders()
+    return () => { isMounted = false }
+  }, [user])
 
   const getFilteredOrders = () => {
     switch (activeTab) {
@@ -105,7 +97,9 @@ export default function OrdersPage() {
                         try {
                           await confirmDelivery(order.id)
                           toast.success('تم تأكيد الاستلام، شكراً لك')
-                          loadOrders()
+                          // إعادة تحميل الطلبات
+                          const data = await getBuyerOrders(user.id)
+                          setAllOrders(data)
                         } catch (err) {
                           toast.error(err.message)
                         }
@@ -128,7 +122,8 @@ export default function OrdersPage() {
                               try {
                                 await requestReturn(order.id, reason)
                                 toast.success('تم إرسال طلب الاسترجاع، سيتم مراجعته قريباً')
-                                loadOrders()
+                                const data = await getBuyerOrders(user.id)
+                                setAllOrders(data)
                               } catch (err) {
                                 toast.error(err.message)
                               }
@@ -157,5 +152,4 @@ export default function OrdersPage() {
     </div>
   )
 }
-
 

@@ -2,36 +2,28 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getUserConversations } from '../services/chatService'
-import { useAbortController } from '../hooks/useAbortController'
 
 export default function InboxPage() {
   const { user } = useAuth()
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
-  const abortController = useAbortController()
 
   useEffect(() => {
-    if (user?.id) loadConversations()
-    return () => abortController?.abort()
-  }, [user?.id])
-
-  const loadConversations = async () => {
-    const timeoutId = setTimeout(() => {
-      abortController?.abort()
-    }, 15000)
-
-    try {
-      setLoading(true)
-      const data = await getUserConversations(user.id)
-      if (abortController?.signal.aborted) return
-      setConversations(data || [])
-    } catch (err) {
-      if (err.name !== 'AbortError') console.error("Error loading inbox conversations:", err)
-    } finally {
-      clearTimeout(timeoutId)
-      if (!abortController?.signal.aborted) setLoading(false)
+    let isMounted = true
+    const loadConversations = async () => {
+      try {
+        setLoading(true)
+        const data = await getUserConversations(user.id)
+        if (isMounted) setConversations(data || [])
+      } catch (err) {
+        if (isMounted) console.error("Error loading inbox conversations:", err)
+      } finally {
+        if (isMounted) setLoading(false)
+      }
     }
-  }
+    if (user?.id) loadConversations()
+    return () => { isMounted = false }
+  }, [user?.id])
 
   if (loading) return <div className="text-center py-20">جاري التحميل...</div>
 

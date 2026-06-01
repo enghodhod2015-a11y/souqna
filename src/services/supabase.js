@@ -9,7 +9,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(errorMsg);
 }
 
-// ✅ استخدام sessionStorage لمنع تعارض الجلسات بين المتصفحات والنوافذ المختلفة
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: sessionStorage,
@@ -18,14 +17,4 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true
   }
 });
-
-// ✅ دالة مساعدة لإضافة مهلة لأي Promise (للاحتياط)
-export const withTimeout = (promise, timeoutMs = 15000) => {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`انتهت المهلة بعد ${timeoutMs / 1000} ثانية`)), timeoutMs)
-    )
-  ]);
-};
 

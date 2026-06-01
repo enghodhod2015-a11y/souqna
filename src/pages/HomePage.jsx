@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getProducts } from '../services/productService'
 import { ProductCard } from '../components/products/ProductCard'
-import { useAbortController } from '../hooks/useAbortController'
 
 const categories = [
   { id: 'electronics', name: 'الإلكترونيات', icon: '📱' },
@@ -61,36 +60,25 @@ export default function HomePage() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState('')
-  const abortController = useAbortController()
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      abortController?.abort()
-    }, 15000)
-
-    loadProducts()
-
-    return () => {
-      clearTimeout(timeoutId)
-      abortController?.abort()
-    }
-  }, [selectedCategory])
-
-  const loadProducts = async () => {
-    setLoading(true)
-    try {
-      const filters = {}
-      if (selectedCategory) filters.category = selectedCategory
-      const data = await getProducts(filters, abortController?.signal)
-      if (!abortController?.signal.aborted) {
-        setProducts(data || [])
+    let isMounted = true
+    const loadProducts = async () => {
+      setLoading(true)
+      try {
+        const filters = {}
+        if (selectedCategory) filters.category = selectedCategory
+        const data = await getProducts(filters)
+        if (isMounted) setProducts(data || [])
+      } catch (err) {
+        if (isMounted) console.error(err)
+      } finally {
+        if (isMounted) setLoading(false)
       }
-    } catch (err) {
-      if (err.name !== 'AbortError') console.error(err)
-    } finally {
-      if (!abortController?.signal.aborted) setLoading(false)
     }
-  }
+    loadProducts()
+    return () => { isMounted = false }
+  }, [selectedCategory])
 
   return (
     <div className="container mx-auto px-4 py-8">
