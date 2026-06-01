@@ -36,7 +36,7 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
     .update({ last_message: message, last_message_at: new Date() })
     .eq('id', conversationId)
 
-  // 3. إدراج إشعار في جدول notifications (ليظهر في الجرس)
+  // 3. إدراج إشعار للمستقبل (receiverId)
   try {
     const { data: senderProfile } = await supabase
       .from('profiles')
@@ -45,18 +45,19 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
       .single()
     const senderName = senderProfile?.full_name || 'مستخدم'
 
+    // ✅ نمرر related_id = null لأن conversationId هو UUID وليس integer
     await addNotification(
       receiverId,
       'message',
       'رسالة جديدة',
       `${senderName} أرسل لك: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
-      conversationId
+      null
     )
   } catch (err) {
     console.error('خطأ في إضافة الإشعار:', err)
   }
 
-  // 4. إشعار المتصفح المنبثق (إذا تم الإذن)
+  // 4. إشعار المتصفح المنبثق
   try {
     if (Notification.permission === 'granted') {
       const { data: senderProfile } = await supabase

@@ -32,7 +32,7 @@ export const NotificationBell = () => {
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)  // ✅ إلغاء الاشتراك عند فك التركيب
+      supabase.removeChannel(channel)
     }
   }, [user])
 
@@ -110,4 +110,5 @@ export const NotificationBell = () => {
     </div>
   )
 }
+
 

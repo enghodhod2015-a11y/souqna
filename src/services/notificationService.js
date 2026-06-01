@@ -1,6 +1,5 @@
 import { supabase } from './supabase'
 
-// طلب إذن الإشعارات من المستخدم
 export const requestNotificationPermission = async () => {
   if (!('Notification' in window)) {
     console.log('المتصفح لا يدعم الإشعارات')
@@ -17,13 +16,11 @@ export const requestNotificationPermission = async () => {
   return permission === 'granted'
 }
 
-// تشغيل صوت الإشعار (مع ملف احتياطي)
 export const playNotificationSound = () => {
   try {
     const audio = new Audio('/notification.mp3')
     audio.volume = 0.5
     audio.play().catch(() => {
-      // إذا فشل تشغيل الصوت (ملف غير موجود)، استخدم صوت تنبيه بسيط عبر Web Audio API
       try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)()
         const oscillator = audioContext.createOscillator()
@@ -45,25 +42,30 @@ export const playNotificationSound = () => {
   }
 }
 
-// إرسال إشعار داخلي (يُضاف إلى جدول notifications)
-export const addNotification = async (userId, type, title, message, relatedId) => {
+// ✅ تعديل: relatedId اختياري (يمكن أن يكون null أو integer)
+export const addNotification = async (userId, type, title, message, relatedId = null) => {
+  const insertData = {
+    user_id: userId,
+    type,
+    title,
+    message,
+    is_read: false
+  }
+  // فقط إذا كان relatedId رقماً (ليس UUID) نضيفه
+  if (relatedId && typeof relatedId === 'number') {
+    insertData.related_id = relatedId
+  }
+  // إذا كان relatedId من نوع string (مثل UUID) نضيفه في حقل related_id? لا، لأنه integer. نتجاهله.
+  
   const { data, error } = await supabase
     .from('notifications')
-    .insert({
-      user_id: userId,
-      type,
-      title,
-      message,
-      related_id: relatedId,   // ✅ استخدام related_id الموجود في الجدول
-      is_read: false
-    })
+    .insert(insertData)
     .select()
     .single()
   if (error) throw error
   return data
 }
 
-// جلب إشعارات المستخدم
 export const getUserNotifications = async (userId) => {
   const { data, error } = await supabase
     .from('notifications')
@@ -75,7 +77,6 @@ export const getUserNotifications = async (userId) => {
   return data || []
 }
 
-// تعليم الإشعار كمقروء
 export const markNotificationAsRead = async (notificationId) => {
   const { error } = await supabase
     .from('notifications')
@@ -84,14 +85,12 @@ export const markNotificationAsRead = async (notificationId) => {
   if (error) throw error
 }
 
-// إلغاء الاشتراك من Push Notifications (غير مستخدم حالياً)
 export const unsubscribeFromPush = async () => {
   if (!('serviceWorker' in navigator)) return
   const registration = await navigator.serviceWorker.ready
   const subscription = await registration.pushManager.getSubscription()
   if (subscription) {
     await subscription.unsubscribe()
-    // حذف الاشتراك من قاعدة البيانات إن وجد
     const { error } = await supabase
       .from('push_subscriptions')
       .delete()
@@ -99,5 +98,4 @@ export const unsubscribeFromPush = async () => {
     if (error) console.error(error)
   }
 }
-
 
