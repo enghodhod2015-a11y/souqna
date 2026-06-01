@@ -5,48 +5,27 @@ import { Input } from '../components/ui/Input'
 import { supabase } from '../services/supabase'
 import toast from 'react-hot-toast'
 
-export default function UpdatePasswordPage() {
+export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [isValidToken, setIsValidToken] = useState(false)
+  const [validToken, setValidToken] = useState(false)
   const navigate = useNavigate()
 
-  // CHANGED: التحقق من صحة الرابط واستعادة الجلسة من hash token
+  // CHANGED: التحقق من وجود token في URL hash
   useEffect(() => {
-    const handleResetPassword = async () => {
-      // Supabase يضع token في hash URL عند إعادة تعيين كلمة المرور
-      const hashParams = new URLSearchParams(window.location.hash.substring(1))
-      const accessToken = hashParams.get('access_token')
-      const refreshToken = hashParams.get('refresh_token')
-      const type = hashParams.get('type')
-
-      if (accessToken && refreshToken && type === 'recovery') {
-        // تعيين الجلسة يدوياً باستخدام التوكنات المستلمة
-        const { error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken
-        })
-        if (error) {
-          console.error('خطأ في تعيين الجلسة:', error)
-          toast.error('الرابط غير صالح أو منتهي الصلاحية')
-          navigate('/login')
-        } else {
-          setIsValidToken(true)
-        }
-      } else {
-        // التحقق من وجود جلسة نشطة بالفعل
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
-          setIsValidToken(true)
-        } else {
+    const hash = window.location.hash
+    if (hash && hash.includes('access_token')) {
+      setValidToken(true)
+    } else {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) setValidToken(true)
+        else {
           toast.error('رابط إعادة التعيين غير صالح')
           navigate('/login')
         }
-      }
+      })
     }
-
-    handleResetPassword()
   }, [navigate])
 
   const handleSubmit = async (e) => {
@@ -64,7 +43,6 @@ export default function UpdatePasswordPage() {
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
       toast.success('تم تغيير كلمة المرور بنجاح')
-      // تسجيل الخروج للتأكد من استخدام كلمة المرور الجديدة
       await supabase.auth.signOut()
       navigate('/login')
     } catch (err) {
@@ -74,7 +52,7 @@ export default function UpdatePasswordPage() {
     }
   }
 
-  if (!isValidToken) {
+  if (!validToken) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="bg-primary-card p-8 rounded-2xl w-full max-w-md border border-gold/30 text-center">

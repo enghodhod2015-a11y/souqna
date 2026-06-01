@@ -28,7 +28,6 @@ export const signUp = async (email, password, fullName, accountType, phone) => {
     throw error
   }
   
-  // إنشاء profile مع رقم الهاتف
   if (data.user) {
     const { error: profileError } = await supabase
       .from('profiles')
@@ -39,7 +38,6 @@ export const signUp = async (email, password, fullName, accountType, phone) => {
         account_type: accountType,
         phone: phone
       })
-    
     if (profileError) console.error('Profile creation error:', profileError)
   }
   
@@ -51,19 +49,13 @@ export const signIn = async (email, password) => {
   if (!email || !password) {
     throw new Error('البريد وكلمة المرور مطلوبان')
   }
-  
-  const { data, error } = await supabase.auth.signInWithPassword({ 
-    email, 
-    password 
-  })
-  
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) {
     if (error.message.includes('Invalid login')) {
       throw new Error('البريد أو كلمة المرور غير صحيحة')
     }
     throw error
   }
-  
   return data
 }
 
@@ -76,9 +68,9 @@ export const signOut = async () => {
 // ─── إعادة تعيين كلمة المرور (نسيت كلمة المرور) ───
 export const resetPassword = async (email) => {
   if (!email) throw new Error('البريد الإلكتروني مطلوب')
-  // CHANGED: تغيير redirectTo من '/' إلى '/update-password' ليتجه إلى صفحة تعيين كلمة المرور الجديدة
+  // CHANGED: تغيير redirectTo إلى '/reset-password'
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/update-password`,
+    redirectTo: `${window.location.origin}/reset-password`,
   })
   if (error) throw error
 }
