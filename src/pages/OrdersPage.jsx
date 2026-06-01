@@ -4,12 +4,14 @@ import { getBuyerOrders, confirmDelivery, requestReturn } from '../services/orde
 import { Link } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import toast from 'react-hot-toast'
+import { useAbortController } from '../hooks/useAbortController'
 
 export default function OrdersPage() {
   const { user } = useAuth()
   const [allOrders, setAllOrders] = useState([])
   const [activeTab, setActiveTab] = useState('pending_payment')
   const [loading, setLoading] = useState(true)
+  const abortController = useAbortController()
 
   useEffect(() => {
     let isMounted = true
@@ -24,8 +26,11 @@ export default function OrdersPage() {
       }
     }
     if (user) loadOrders()
-    return () => { isMounted = false }
-  }, [user])
+    return () => {
+      isMounted = false
+      abortController?.abort()
+    }
+  }, [user, abortController])
 
   const getFilteredOrders = () => {
     switch (activeTab) {

@@ -10,7 +10,8 @@ const fixImageUrl = (url) => {
   return `${supabaseUrl}/storage/v1/object/public/product-images/${url}`
 }
 
-export const getProducts = async (filters = {}) => {
+// CHANGED: إضافة معامل signal لتمكين الإلغاء من الصفحة
+export const getProducts = async (filters = {}, signal = null) => {
   try {
     let query = supabase
       .from('products')
@@ -22,7 +23,9 @@ export const getProducts = async (filters = {}) => {
     if (filters.category) query = query.eq('category', filters.category)
     if (filters.search) query = query.ilike('name', '%' + filters.search + '%')
 
-    const { data: products, error } = await query
+    const { data: products, error } = signal 
+      ? await query.abortSignal(signal)
+      : await query
     if (error) throw error
 
     if (products?.length) {
@@ -54,12 +57,16 @@ export const getProducts = async (filters = {}) => {
     }
     return products || []
   } catch (error) {
+    if (error.name === 'AbortError') {
+      // تجاهل الإلغاء
+      return []
+    }
     console.error('⚠️ فشل جلب المنتجات:', error)
     return []
   }
 }
 
-// باقي الدوال (getSellerProducts, getProductById, إلخ) كما هي بدون تغيير
+// باقي الدوال بدون تغيير
 export const getSellerProducts = async (sellerId) => {
   try {
     const { data, error } = await supabase

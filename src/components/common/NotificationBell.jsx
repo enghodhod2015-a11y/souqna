@@ -15,6 +15,7 @@ export const NotificationBell = () => {
     if (!user) return
     loadNotifications()
 
+    // ✅ الاستماع للإشعارات الجديدة عبر Realtime
     const channel = supabase
       .channel(`notifications-${user.id}`)
       .on('postgres_changes', {
@@ -23,8 +24,10 @@ export const NotificationBell = () => {
         table: 'notifications',
         filter: `user_id=eq.${user.id}`
       }, (payload) => {
+        // ✅ إضافة الإشعار الجديد إلى القائمة
         setNotifications(prev => [payload.new, ...prev])
         playNotificationSound()
+        // عرض إشعار المتصفح
         if (Notification.permission === 'granted') {
           new Notification(payload.new.title, { body: payload.new.message, icon: '/logo192.png' })
         }
@@ -110,5 +113,4 @@ export const NotificationBell = () => {
     </div>
   )
 }
-
 

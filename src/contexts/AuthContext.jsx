@@ -30,6 +30,7 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null)
     setLoading(true)
     try {
+      // CHANGED: التحقق من وجود جلسة في sessionStorage مباشرة، ثم محاولة استعادتها من Supabase
       const { data: { session } } = await supabase.auth.getSession()
       if (!isMounted.current) return
       const currentUser = session?.user ?? null
@@ -71,6 +72,7 @@ export const AuthProvider = ({ children }) => {
       const oldSession = localStorage.getItem('supabase.auth.token')
       if (oldSession) {
         localStorage.removeItem('supabase.auth.token')
+        console.log('تم مسح جلسة localStorage القديمة')
       }
     }
     loadAuth()
@@ -144,4 +146,5 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   )
 }
+
 

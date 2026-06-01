@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getUserConversations } from '../services/chatService'
+import { useAbortController } from '../hooks/useAbortController'
 
 export default function InboxPage() {
   const { user } = useAuth()
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
+  const abortController = useAbortController()
 
   useEffect(() => {
     let isMounted = true
@@ -22,8 +24,11 @@ export default function InboxPage() {
       }
     }
     if (user?.id) loadConversations()
-    return () => { isMounted = false }
-  }, [user?.id])
+    return () => {
+      isMounted = false
+      abortController?.abort()
+    }
+  }, [user?.id, abortController])
 
   if (loading) return <div className="text-center py-20">جاري التحميل...</div>
 
@@ -65,5 +70,4 @@ export default function InboxPage() {
     </div>
   )
 }
-
 

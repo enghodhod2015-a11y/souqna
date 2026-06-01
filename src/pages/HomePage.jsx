@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getProducts } from '../services/productService'
 import { ProductCard } from '../components/products/ProductCard'
+import { useAbortController } from '../hooks/useAbortController'
 
 const categories = [
   { id: 'electronics', name: 'الإلكترونيات', icon: '📱' },
@@ -60,6 +61,7 @@ export default function HomePage() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState('')
+  const abortController = useAbortController()
 
   useEffect(() => {
     let isMounted = true
@@ -68,17 +70,20 @@ export default function HomePage() {
       try {
         const filters = {}
         if (selectedCategory) filters.category = selectedCategory
-        const data = await getProducts(filters)
+        const data = await getProducts(filters, abortController?.signal)
         if (isMounted) setProducts(data || [])
       } catch (err) {
-        if (isMounted) console.error(err)
+        if (isMounted && err.name !== 'AbortError') console.error(err)
       } finally {
         if (isMounted) setLoading(false)
       }
     }
     loadProducts()
-    return () => { isMounted = false }
-  }, [selectedCategory])
+    return () => {
+      isMounted = false
+      abortController?.abort()
+    }
+  }, [selectedCategory, abortController])
 
   return (
     <div className="container mx-auto px-4 py-8">

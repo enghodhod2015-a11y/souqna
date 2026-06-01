@@ -22,7 +22,6 @@ export const getOrCreateConversation = async (productId, buyerId, sellerId) => {
 }
 
 export const sendMessage = async (conversationId, senderId, receiverId, message) => {
-  // 1. إدراج الرسالة
   const { data, error } = await supabase
     .from('messages')
     .insert({ conversation_id: conversationId, sender_id: senderId, receiver_id: receiverId, message })
@@ -30,13 +29,11 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
     .single()
   if (error) throw error
 
-  // 2. تحديث آخر رسالة في المحادثة
   await supabase
     .from('conversations')
     .update({ last_message: message, last_message_at: new Date() })
     .eq('id', conversationId)
 
-  // 3. إدراج إشعار للمستقبل (receiverId)
   try {
     const { data: senderProfile } = await supabase
       .from('profiles')
@@ -45,19 +42,18 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
       .single()
     const senderName = senderProfile?.full_name || 'مستخدم'
 
-    // ✅ نمرر related_id = null لأن conversationId هو UUID وليس integer
+    // ✅ إضافة إشعار للمستقبل
     await addNotification(
       receiverId,
       'message',
       'رسالة جديدة',
-      `${senderName} أرسل لك: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
+      `${senderName}: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
       null
     )
   } catch (err) {
     console.error('خطأ في إضافة الإشعار:', err)
   }
 
-  // 4. إشعار المتصفح المنبثق
   try {
     if (Notification.permission === 'granted') {
       const { data: senderProfile } = await supabase
@@ -129,5 +125,4 @@ export const markMessagesAsRead = async (conversationId, userId) => {
     .eq('is_read', false)
   if (error) throw error
 }
-
 
