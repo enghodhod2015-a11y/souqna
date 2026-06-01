@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { getSellerOrders, updateOrderStatus, approveReturn } from '../services/orderService'
+import { addNotification } from '../services/notificationService'
+import { Button } from '../components/ui/Button'
 import toast from 'react-hot-toast'
 
 export default function SellerOrdersPage() {
@@ -46,8 +48,26 @@ export default function SellerOrdersPage() {
 
   const handleStatusChange = async (orderId, newStatus) => {
     try {
+      // 1. الحصول على بيانات الطلب (لإرسال الإشعار للمشتري)
+      const order = allOrders.find(o => o.id === orderId)
       await updateOrderStatus(orderId, newStatus)
       toast.success('تم تحديث حالة الطلب')
+      
+      // 2. إضافة إشعار للمشتري
+      if (order && order.buyer?.id) {
+        const statusMessages = {
+          pending_payment_review: 'طلبك في انتظار مراجعة الدفع',
+          payment_approved: 'تم تأكيد دفع طلبك',
+          processing: 'طلبك قيد التجهيز',
+          shipped: 'تم شحن طلبك',
+          delivered: 'طلبك تم تسليمه',
+          completed: 'طلبك مكتمل',
+          cancelled: 'تم إلغاء طلبك'
+        }
+        const message = statusMessages[newStatus] || `تم تغيير حالة طلبك إلى ${newStatus}`
+        await addNotification(order.buyer.id, 'order_status', 'تحديث حالة الطلب', message, orderId)
+      }
+      
       loadOrders()
     } catch (err) {
       toast.error(err.message)
@@ -148,6 +168,10 @@ export default function SellerOrdersPage() {
                           onClick={async () => {
                             await approveReturn(order.id, true)
                             toast.success('تم قبول الاسترجاع')
+                            // إضافة إشعار للمشتري
+                            if (order.buyer?.id) {
+                              await addNotification(order.buyer.id, 'return', 'تم قبول الاسترجاع', 'تم قبول طلب استرجاع منتجك', order.id)
+                            }
                             loadOrders()
                           }}
                         >
@@ -159,6 +183,9 @@ export default function SellerOrdersPage() {
                             const notes = prompt('سبب الرفض (اختياري):')
                             await approveReturn(order.id, false, notes)
                             toast.success('تم رفض الاسترجاع')
+                            if (order.buyer?.id) {
+                              await addNotification(order.buyer.id, 'return', 'تم رفض الاسترجاع', notes || 'تم رفض طلب استرجاع منتجك', order.id)
+                            }
                             loadOrders()
                           }}
                         >

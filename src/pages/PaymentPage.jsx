@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import { uploadReceipt } from '../services/orderService'
+import { addNotification } from '../services/notificationService'
 import { Button } from '../components/ui/Button'
 import toast from 'react-hot-toast'
 
@@ -27,13 +28,14 @@ export default function PaymentPage() {
       setFetchingOrder(true)
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
-        .select('*')
+        .select('*, product:order_items(product_name)')
         .eq('id', orderId)
         .single()
 
       if (orderError) throw orderError
       if (!orderData) throw new Error('الطلب غير موجود')
 
+      // جلب اسم المنتج (طريقة بديلة)
       const { data: items, error: itemsError } = await supabase
         .from('order_items')
         .select('product_name')
@@ -76,7 +78,6 @@ export default function PaymentPage() {
       toast.error('يرجى إدخال رقم هاتف المشتري')
       return
     }
-    // ✅ التحقق من صحة الرقم اليمني (يبدأ بـ 7 ويليها 8 أرقام)
     if (!/^7[0-9]{8}$/.test(buyerPhone.trim())) {
       toast.error('رقم الهاتف يجب أن يكون يمنياً (يبدأ بـ 7 ويليها 8 أرقام، مثال: 771234567)')
       return
@@ -89,6 +90,26 @@ export default function PaymentPage() {
         transfer_name: transferName.trim(),
         buyer_phone: buyerPhone.trim()
       })
+      
+      // ✅ إضافة إشعار للبائع
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('user_id, seller:products(seller_id)')
+        .eq('id', orderId)
+        .single()
+      
+      // جلب seller_id من المنتج (الطريقة تعتمد على هيكلك، قد تحتاج تعديل)
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('product:products(seller_id)')
+        .eq('order_id', orderId)
+        .maybeSingle()
+      
+      const sellerId = orderItems?.product?.seller_id
+      if (sellerId) {
+        await addNotification(sellerId, 'payment', 'إيصال دفع جديد', `تم رفع إيصال دفع للطلب #${orderId}، يرجى مراجعته`, orderId)
+      }
+      
       toast.success('تم رفع الإيصال بنجاح، سيتم مراجعته قريباً')
       navigate('/orders')
     } catch (err) {

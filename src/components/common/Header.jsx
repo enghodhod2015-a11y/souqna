@@ -51,7 +51,7 @@ export const Header = () => {
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)  // ✅ إلغاء الاشتراك
+      supabase.removeChannel(channel)
     }
   }, [user])
 
