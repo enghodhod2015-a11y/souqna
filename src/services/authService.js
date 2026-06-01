@@ -76,6 +76,7 @@ export const signOut = async () => {
 // ─── إعادة تعيين كلمة المرور (نسيت كلمة المرور) ───
 export const resetPassword = async (email) => {
   if (!email) throw new Error('البريد الإلكتروني مطلوب')
+  // CHANGED: تغيير redirectTo من '/' إلى '/update-password' ليتجه إلى صفحة تعيين كلمة المرور الجديدة
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${window.location.origin}/update-password`,
   })
