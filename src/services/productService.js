@@ -11,7 +11,8 @@ const fixImageUrl = (url) => {
   return `${supabaseUrl}/storage/v1/object/public/product-images/${url}`
 }
 
-export const getProducts = async (filters = {}) => {
+// ✅ دالة getProducts مع دعم AbortController عبر إضافة معامل signal
+export const getProducts = async (filters = {}, signal = null) => {
   try {
     let query = supabase
       .from('products')
@@ -23,7 +24,11 @@ export const getProducts = async (filters = {}) => {
     if (filters.category) query = query.eq('category', filters.category)
     if (filters.search) query = query.ilike('name', '%' + filters.search + '%')
 
-    const { data: products, error } = await query
+    // تمرير signal إلى Supabase إن وُجد (Supabase JS v2 يدعم AbortSignal)
+    const { data: products, error } = signal 
+      ? await query.abortSignal(signal)
+      : await query
+
     if (error) throw error
 
     if (products?.length) {
@@ -40,10 +45,9 @@ export const getProducts = async (filters = {}) => {
         }
       }
       
-      // ✅ إصلاح: إضافة title, final_price, discount_percentage لكل منتج
+      // إضافة title, final_price, discount_percentage لكل منتج
       products.forEach(p => {
         p.title = p.name
-        // حساب السعر النهائي (إذا كان compare_at_price أكبر من price، فهناك خصم)
         if (p.compare_at_price && p.compare_at_price > p.price) {
           p.discount_percentage = Math.round(((p.compare_at_price - p.price) / p.compare_at_price) * 100)
           p.final_price = p.price
@@ -51,7 +55,6 @@ export const getProducts = async (filters = {}) => {
           p.discount_percentage = 0
           p.final_price = p.price
         }
-        // إصلاح الروابط
         if (p.cover_image) p.cover_image = fixImageUrl(p.cover_image)
         if (p.images && Array.isArray(p.images)) {
           p.images = p.images.map(img => fixImageUrl(img)).filter(Boolean)
@@ -60,13 +63,14 @@ export const getProducts = async (filters = {}) => {
     }
     return products || []
   } catch (error) {
+    // إذا تم الإلغاء، نعيد الخطأ كما هو دون طباعة
+    if (error.name === 'AbortError') throw error
     console.error('⚠️ فشل جلب المنتجات:', error)
     return []
   }
 }
 
-// باقي الدوال كما هي (getSellerProducts, getProductById, addProduct, updateProduct, deleteProduct, uploadProductImages)
-// لم يتم تغييرها، فقط أعدت كتابتها كما كانت سابقاً للتأكيد
+// باقي الدوال بدون تغيير (مع إضافة دعم signal اختياري لها إن احتجت)
 export const getSellerProducts = async (sellerId) => {
   try {
     const { data, error } = await supabase
@@ -191,5 +195,4 @@ export const uploadProductImages = async (files, productId) => {
     throw error
   }
 }
-
 

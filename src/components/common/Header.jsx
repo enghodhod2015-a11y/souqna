@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
-import { NotificationBell } from './NotificationBell'  // ✅ إضافة الإشعارات
+import { NotificationBell } from './NotificationBell'
 
 export const Header = () => {
   const { user, profile, logout } = useAuth()
@@ -44,13 +44,15 @@ export const Header = () => {
     fetchUnreadCount()
 
     const channel = supabase
-      .channel('public:conversations')
+      .channel(`conversations-${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
         fetchUnreadCount()
       })
       .subscribe()
 
-    return () => supabase.removeChannel(channel)
+    return () => {
+      supabase.removeChannel(channel)  // ✅ إلغاء الاشتراك
+    }
   }, [user])
 
   useEffect(() => {
@@ -121,7 +123,6 @@ export const Header = () => {
                 )}
               </Link>
 
-              {/* ✅ إضافة زر الإشعارات */}
               <NotificationBell />
 
               <div className="relative" ref={dropdownRef}>

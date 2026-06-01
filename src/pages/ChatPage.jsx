@@ -19,9 +19,15 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false)
   const messagesEndRef = useRef(null)
   const [product, setProduct] = useState(null)
+  const channelRef = useRef(null)
 
   useEffect(() => {
     if (user) initChat()
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)  // ✅ إلغاء الاشتراك عند مغادرة الصفحة
+      }
+    }
   }, [productId, conversationId, user])
 
   const initChat = async () => {
@@ -78,6 +84,11 @@ export default function ChatPage() {
   useEffect(() => {
     if (!conversation?.id || !user?.id) return
 
+    // إلغاء الاشتراك السابق إن وجد
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current)
+    }
+
     const channel = supabase
       .channel(`messages:${conversation.id}`)
       .on('postgres_changes', {
@@ -98,8 +109,13 @@ export default function ChatPage() {
       })
       .subscribe()
 
+    channelRef.current = channel
+
     return () => {
-      if (channel) supabase.removeChannel(channel)
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
     }
   }, [conversation?.id, user?.id])
 
@@ -143,7 +159,6 @@ export default function ChatPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="bg-white rounded-2xl border border-gold/40 shadow-xl overflow-hidden">
-        {/* رأس المحادثة */}
         <div className="p-5 border-b border-gold/30 bg-gradient-to-r from-gray-50 to-white">
           <h2 className="text-2xl font-bold text-gold flex items-center gap-2">
             💬 محادثة مع: {chatPartnerRole}
@@ -151,7 +166,6 @@ export default function ChatPage() {
           <p className="text-sm text-gray-600 mt-1">بخصوص منتج: <span className="text-gold font-medium">{product?.title}</span></p>
         </div>
 
-        {/* منطقة الرسائل */}
         <div className="h-[500px] overflow-y-auto p-5 space-y-4 bg-gray-50">
           {messages.map((msg) => {
             const isOwn = msg.sender_id === user.id
@@ -178,7 +192,6 @@ export default function ChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* شريط إرسال الرسالة */}
         <div className="p-4 border-t border-gold/30 bg-white">
           <div className="flex gap-3 items-center">
             <input
@@ -203,5 +216,4 @@ export default function ChatPage() {
     </div>
   )
 }
-
 

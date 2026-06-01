@@ -23,7 +23,6 @@ const sideLinks = [
   { name: 'مميز / مختار لك', slug: 'featured', icon: '⭐' }
 ]
 
-// مكون مساعد للأزرار (الأقسام)
 const SidebarItem = ({ children, isActive, onClick, className = '' }) => {
   return (
     <button
@@ -42,7 +41,6 @@ const SidebarItem = ({ children, isActive, onClick, className = '' }) => {
   )
 }
 
-// مكون مساعد للروابط (اكتشف)
 const SidebarLink = ({ children, to, className = '' }) => {
   return (
     <Link
@@ -64,20 +62,24 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState('')
 
   useEffect(() => {
-    loadProducts()
+    const abortController = new AbortController()
+    loadProducts(abortController)
+    return () => abortController.abort()  // ✅ إلغاء الطلب إذا غادر المستخدم الصفحة
   }, [selectedCategory])
 
-  const loadProducts = async () => {
+  const loadProducts = async (abortController) => {
     setLoading(true)
     try {
       const filters = {}
       if (selectedCategory) filters.category = selectedCategory
-      const data = await getProducts(filters)
-      setProducts(data || [])
+      const data = await getProducts(filters, abortController.signal)
+      if (!abortController.signal.aborted) {
+        setProducts(data || [])
+      }
     } catch (err) {
-      console.error(err)
+      if (err.name !== 'AbortError') console.error(err)
     } finally {
-      setLoading(false)
+      if (!abortController.signal.aborted) setLoading(false)
     }
   }
 
@@ -86,11 +88,9 @@ export default function HomePage() {
       <h1 className="text-3xl font-bold text-gold mb-8 text-center">مرحباً بكم في سوقنا</h1>
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* ========== القائمة اليسرى (الأقسام) ========== */}
         <aside className="lg:w-1/5">
           <div className="sticky top-20">
             <h2 className="text-xl font-bold text-gold mb-4">الأقسام</h2>
-            {/* Container كبير مع خلفية أصلية وحواف ذهبية وظل */}
             <div className="bg-primary-card rounded-xl shadow-md p-4 border border-gold/30 flex flex-col gap-3">
               <SidebarItem
                 isActive={!selectedCategory}
@@ -117,7 +117,6 @@ export default function HomePage() {
           </div>
         </aside>
 
-        {/* منطقة المنتجات الرئيسية - بدون تعديل */}
         <main className="lg:w-3/5">
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -139,11 +138,9 @@ export default function HomePage() {
           )}
         </main>
 
-        {/* ========== القائمة اليمنى (اكتشف) ========== */}
         <aside className="lg:w-1/5">
           <div className="sticky top-20">
             <h2 className="text-xl font-bold text-gold mb-4">اكتشف</h2>
-            {/* Container كبير مع خلفية أصلية وحواف ذهبية وظل */}
             <div className="bg-primary-card rounded-xl shadow-md p-4 border border-gold/30 flex flex-col gap-3">
               {sideLinks.map((link) => (
                 <SidebarLink key={link.slug} to={`/${link.slug}`}>
@@ -160,5 +157,4 @@ export default function HomePage() {
     </div>
   )
 }
-
 

@@ -15,9 +15,8 @@ export const NotificationBell = () => {
     if (!user) return
     loadNotifications()
 
-    // الاستماع للإشعارات الجديدة عبر Realtime
     const channel = supabase
-      .channel('public:notifications')
+      .channel(`notifications-${user.id}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -25,8 +24,7 @@ export const NotificationBell = () => {
         filter: `user_id=eq.${user.id}`
       }, (payload) => {
         setNotifications(prev => [payload.new, ...prev])
-        playNotificationSound() // تشغيل الصوت
-        // عرض إشعار المتصفح إذا تم الإذن
+        playNotificationSound()
         if (Notification.permission === 'granted') {
           new Notification(payload.new.title, { body: payload.new.message, icon: '/logo192.png' })
         }
@@ -34,7 +32,7 @@ export const NotificationBell = () => {
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(channel)  // ✅ إلغاء الاشتراك عند فك التركيب
     }
   }, [user])
 
