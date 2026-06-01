@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Bell, CheckCircle } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../services/supabase'
 import { playNotificationSound } from '../../services/notificationService'
@@ -11,13 +10,9 @@ export const NotificationBell = () => {
   const [isOpen, setIsOpen] = useState(false)
   const unreadCount = notifications.length
 
-  // CHANGED: إضافة console.log لتتبع جلب الإشعارات والتأكد من user.id
+  // CHANGED: جلب الإشعارات غير المقروءة فقط
   const loadNotifications = async () => {
-    if (!user) {
-      console.log('🔔 [NotificationBell] لا يوجد مستخدم، لن يتم جلب الإشعارات')
-      return
-    }
-    console.log('🔔 [NotificationBell] جلب الإشعارات للمستخدم:', user.id, 'الاسم:', user.email)
+    if (!user) return
     try {
       const { data, error } = await supabase
         .from('notifications')
@@ -26,63 +21,52 @@ export const NotificationBell = () => {
         .eq('is_read', false)
         .order('created_at', { ascending: false })
       if (error) throw error
-      console.log(`🔔 [NotificationBell] تم جلب ${data?.length || 0} إشعار غير مقروء`, data)
       setNotifications(data || [])
     } catch (err) {
-      console.error('🔔 [NotificationBell] خطأ في جلب الإشعارات:', err)
+      console.error('خطأ في جلب الإشعارات:', err)
     }
   }
 
-  // CHANGED: تعليم إشعار كمقروء مع تحديث القائمة محلياً
+  // CHANGED: تعليم الإشعار كمقروء وإعادة جلب القائمة
   const markAsRead = async (notificationId) => {
     try {
       await supabase
         .from('notifications')
         .update({ is_read: true })
         .eq('id', notificationId)
-      setNotifications(prev => prev.filter(n => n.id !== notificationId))
-      console.log(`🔔 [NotificationBell] تم تعليم الإشعار ${notificationId} كمقروء`)
+      // إعادة الجلب بعد التحديث لضمان تحديث العدد
+      await loadNotifications()
     } catch (err) {
-      console.error('🔔 [NotificationBell] خطأ في تحديث الإشعار:', err)
+      console.error('خطأ في تحديث الإشعار:', err)
     }
   }
 
-  // CHANGED: الاشتراك في Realtime مع إضافة اسم قناة فريد ومتابعة الحالة
+  // CHANGED: الاشتراك في Realtime وإعادة جلب الإشعارات عند أي إضافة جديدة
   useEffect(() => {
     if (!user) return
 
     loadNotifications()
 
-    const channelName = `notifications-bell-${user.id}`
     const channel = supabase
-      .channel(channelName)
+      .channel(`notifications-bell-${user.id}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'notifications',
         filter: `user_id=eq.${user.id}`
-      }, (payload) => {
-        console.log('🔔 [NotificationBell] حدث Realtime: تم إدراج إشعار جديد', payload.new)
-        if (payload.new && !payload.new.is_read) {
-          setNotifications(prev => {
-            // تجنب التكرار
-            if (prev.some(n => n.id === payload.new.id)) return prev
-            return [payload.new, ...prev]
-          })
-          playNotificationSound()
-          if (Notification.permission === 'granted') {
-            new Notification(payload.new.title, { body: payload.new.message, icon: '/logo192.png' })
-          }
-        } else if (payload.new && payload.new.is_read) {
-          console.log('🔔 [NotificationBell] الإشعار الجديد مقروء بالفعل، لن يضاف للعداد')
+      }, async (payload) => {
+        // CHANGED: إعادة جلب الإشعارات من قاعدة البيانات بدلاً من إضافتها يدوياً
+        // هذا يضمن أن العدد والقائمة متطابقان مع ما هو موجود في الجدول
+        await loadNotifications()
+        // تشغيل الصوت وإشعار المتصفح فقط (إذا كان المستخدم خارج التطبيق أو مسموح)
+        playNotificationSound()
+        if (Notification.permission === 'granted') {
+          new Notification(payload.new.title, { body: payload.new.message, icon: '/logo192.png' })
         }
       })
-      .subscribe((status) => {
-        console.log(`🔔 [NotificationBell] حالة اشتراك قناة ${channelName}:`, status)
-      })
+      .subscribe()
 
     return () => {
-      console.log(`🔔 [NotificationBell] إلغاء الاشتراك من قناة ${channelName}`)
       supabase.removeChannel(channel)
     }
   }, [user])
