@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getProducts } from '../services/productService'
 import { ProductCard } from '../components/products/ProductCard'
+import { useAbortController } from '../hooks/useAbortController'  // ✅ إضافة
 
 const categories = [
   { id: 'electronics', name: 'الإلكترونيات', icon: '📱' },
@@ -60,26 +61,26 @@ export default function HomePage() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState('')
+  const abortController = useAbortController()  // ✅ إضافة
 
   useEffect(() => {
-    const abortController = new AbortController()
-    loadProducts(abortController)
-    return () => abortController.abort()  // ✅ إلغاء الطلب إذا غادر المستخدم الصفحة
+    loadProducts()
+    return () => abortController?.abort()  // ✅ إلغاء عند المغادرة
   }, [selectedCategory])
 
-  const loadProducts = async (abortController) => {
+  const loadProducts = async () => {
     setLoading(true)
     try {
       const filters = {}
       if (selectedCategory) filters.category = selectedCategory
-      const data = await getProducts(filters, abortController.signal)
-      if (!abortController.signal.aborted) {
+      const data = await getProducts(filters, abortController?.signal)
+      if (!abortController?.signal.aborted) {
         setProducts(data || [])
       }
     } catch (err) {
       if (err.name !== 'AbortError') console.error(err)
     } finally {
-      if (!abortController.signal.aborted) setLoading(false)
+      if (!abortController?.signal.aborted) setLoading(false)
     }
   }
 
@@ -157,4 +158,5 @@ export default function HomePage() {
     </div>
   )
 }
+
 

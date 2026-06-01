@@ -2,25 +2,29 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getUserConversations } from '../services/chatService'
+import { useAbortController } from '../hooks/useAbortController'  // ✅
 
 export default function InboxPage() {
   const { user } = useAuth()
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
+  const abortController = useAbortController()  // ✅
 
   useEffect(() => {
     if (user?.id) loadConversations()
+    return () => abortController?.abort()
   }, [user?.id])
 
   const loadConversations = async () => {
     try {
       setLoading(true)
       const data = await getUserConversations(user.id)
+      if (abortController?.signal.aborted) return
       setConversations(data || [])
     } catch (err) {
-      console.error("Error loading inbox conversations:", err)
+      if (err.name !== 'AbortError') console.error("Error loading inbox conversations:", err)
     } finally {
-      setLoading(false)
+      if (!abortController?.signal.aborted) setLoading(false)
     }
   }
 
@@ -70,3 +74,5 @@ export default function InboxPage() {
     </div>
   )
 }
+
+

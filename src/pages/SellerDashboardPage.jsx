@@ -8,6 +8,7 @@ import { Button } from '../components/ui/Button'
 import { Package, ShoppingBag, MessageCircle, DollarSign, TrendingUp, Eye, Edit } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import toast from 'react-hot-toast'
+import { useAbortController } from '../hooks/useAbortController'  // ✅ إضافة
 
 export default function SellerDashboardPage() {
   const { user } = useAuth()
@@ -16,27 +17,31 @@ export default function SellerDashboardPage() {
   const [recentProducts, setRecentProducts] = useState([])
   const [recentConversations, setRecentConversations] = useState([])
   const [loading, setLoading] = useState(true)
+  const abortController = useAbortController()  // ✅ إضافة
 
   useEffect(() => {
     if (user) loadDashboard()
+    return () => abortController?.abort()  // ✅ إلغاء الطلبات عند المغادرة
   }, [user])
 
   const loadDashboard = async () => {
     try {
+      const signal = abortController?.signal
       const [statsData, salesData, productsData, conversationsData] = await Promise.all([
-        getSellerStats(user.id).catch(err => { console.error('Stats error:', err); return null }),
-        getMonthlySales(user.id).catch(err => { console.error('MonthlySales error:', err); return null }),
+        getSellerStats(user.id).catch(err => { if (err.name !== 'AbortError') console.error('Stats error:', err); return null }),
+        getMonthlySales(user.id).catch(err => { if (err.name !== 'AbortError') console.error('MonthlySales error:', err); return null }),
         getSellerProducts(user.id),
         getUserConversations(user.id)
       ])
+      if (signal?.aborted) return
       setStats(statsData)
       setMonthlySales(salesData || [])
       setRecentProducts(productsData ? productsData.slice(0, 5) : [])
       setRecentConversations(conversationsData ? conversationsData.slice(0, 5) : [])
     } catch (err) {
-      toast.error(err.message)
+      if (err.name !== 'AbortError') toast.error(err.message)
     } finally {
-      setLoading(false)
+      if (!abortController?.signal.aborted) setLoading(false)
     }
   }
 
@@ -174,4 +179,5 @@ export default function SellerDashboardPage() {
     </div>
   )
 }
+
 
