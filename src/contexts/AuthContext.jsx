@@ -34,7 +34,13 @@ export const AuthProvider = ({ children }) => {
 
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        // ✅ إضافة مهلة قصيرة لمنع التعلق الأبدي
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('انتهت مهلة الاتصال بخادم المصادقة')), 8000)
+        )
+        const sessionPromise = supabase.auth.getSession()
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise])
+        
         if (!isMounted.current) return
         
         const currentUser = session?.user ?? null
@@ -46,6 +52,7 @@ export const AuthProvider = ({ children }) => {
           if (profileData) {
             setProfile(profileData)
           } else {
+            // إنشاء بروفايل جديد إذا لم يوجد
             const newProfile = {
               id: currentUser.id,
               full_name: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0],
@@ -61,7 +68,7 @@ export const AuthProvider = ({ children }) => {
               setProfile(newProfile)
             } else {
               console.error('فشل إنشاء البروفايل:', insertError)
-              setProfile(newProfile)
+              setProfile(newProfile) // استخدام بيانات محلية مؤقتة
             }
           }
         } else {
@@ -69,8 +76,15 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (err) {
         console.error('خطأ في تهيئة المصادقة:', err)
+        // ✅ في حالة الخطأ، نضع user و profile كـ null ونخرج من حالة التحميل
+        if (isMounted.current) {
+          setUser(null)
+          setProfile(null)
+        }
       } finally {
-        if (isMounted.current) setLoading(false)
+        if (isMounted.current) {
+          setLoading(false)
+        }
       }
     }
 
@@ -92,6 +106,7 @@ export const AuthProvider = ({ children }) => {
       } else {
         setProfile(null)
       }
+      // ✅ لا نغير loading هنا لأنها أصبحت false بالفعل
     })
 
     return () => {
@@ -112,8 +127,26 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  // إذا ظل loading بعد 5 ثوانٍ من أول محاولة، نعيد تعيينه قسراً (أمان إضافي)
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (loading && isMounted.current) {
+        console.warn('انتهت مهلة التحميل، سيتم إعادة تعيين حالة التحميل قسراً')
+        setLoading(false)
+      }
+    }, 10000)
+    return () => clearTimeout(timeout)
+  }, [loading])
+
   if (loading) {
-    return <div className="text-center py-20">جاري تحميل بيانات المستخدم...</div>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-primary-blue">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold mx-auto mb-4"></div>
+          <p className="text-white">جاري تحميل بيانات المستخدم...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
