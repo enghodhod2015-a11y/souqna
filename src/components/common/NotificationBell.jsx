@@ -23,39 +23,29 @@ export const NotificationBell = () => {
     }
   }
 
-  // CHANGED: إضافة دالة لتحديد مسار التوجيه بناءً على نوع الإشعار و related_id
+  // CHANGED: دالة تحديد المسار بناءً على نوع الإشعار و related_id
   const getNotificationPath = (notif) => {
     const relatedId = notif.related_id
     const type = notif.type
 
-    switch (type) {
-      case 'message':
-        if (relatedId) return `/chat/c/${relatedId}`
-        return '/inbox'
-      case 'order_status':
-      case 'payment':
-        if (relatedId) return `/orders`
-        return '/orders'
-      case 'return':
-        if (relatedId) return `/seller-orders`
-        return '/seller-orders'
-      case 'info':
-      default:
-        if (notif.title?.includes('منتج') && relatedId) return `/product/${relatedId}`
-        return '/'
+    // حل مؤقت: إذا كان relatedId موجود نذهب إلى صفحة المنتج (لتجربة التوجيه)
+    if (relatedId) {
+      return `/product/${relatedId}`
     }
+    // إذا لم يكن هناك relatedId نذهب إلى صفحة الإشعارات العامة
+    return '/inbox'
   }
 
-  // CHANGED: تعديل markAsRead لتنتقل إلى الصفحة المناسبة قبل تعليم الإشعار كمقروء
+  // CHANGED: تعديل دالة markAsRead لتشمل التوجيه
   const markAsReadAndNavigate = async (notif) => {
     try {
-      // تعليم الإشعار كمقروء في الخلفية (لا ننتظر النتيجة لإعطاء تجربة أسرع)
+      // تعليم الإشعار كمقروء في الخلفية
       markNotificationAsRead(notif.id).catch(err => console.error(err))
-      // إزالة الإشعار من القائمة محلياً فوراً
+      // إزالة الإشعار من القائمة محلياً
       setNotifications(prev => prev.filter(n => n.id !== notif.id))
       // إغلاق القائمة المنسدلة
       setIsOpen(false)
-      // التوجيه إلى الصفحة المناسبة
+      // التوجيه إلى المسار المناسب
       const path = getNotificationPath(notif)
       navigate(path)
     } catch (err) {
@@ -181,4 +171,5 @@ export const NotificationBell = () => {
     </div>
   )
 }
+
 
