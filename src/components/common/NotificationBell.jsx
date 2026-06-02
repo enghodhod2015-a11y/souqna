@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Bell, CheckCircle } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../services/supabase'
@@ -6,16 +7,15 @@ import { getUserNotifications, markNotificationAsRead, playNotificationSound } f
 
 export const NotificationBell = () => {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [notifications, setNotifications] = useState([])
   const [isOpen, setIsOpen] = useState(false)
   const unreadCount = notifications.length
 
-  // CHANGED: إعادة الجلب مع تصفية غير المقروء فقط
   const loadNotifications = async () => {
     if (!user) return
     try {
       const data = await getUserNotifications(user.id)
-      // التأكد من عرض غير المقروء فقط
       const unread = data.filter(n => !n.is_read)
       setNotifications(unread)
     } catch (err) {
@@ -23,28 +23,54 @@ export const NotificationBell = () => {
     }
   }
 
-  // CHANGED: تعليم إشعار كمقروء وتحديث القائمة محلياً فوراً
-  const markAsRead = async (notificationId) => {
-    try {
-      await markNotificationAsRead(notificationId)
-      // إزالة الإشعار من القائمة مباشرة (تحديث محلي سريع)
-      setNotifications(prev => prev.filter(n => n.id !== notificationId))
-    } catch (err) {
-      console.error('خطأ في تحديث الإشعار:', err)
+  // CHANGED: إضافة دالة لتحديد مسار التوجيه بناءً على نوع الإشعار و related_id
+  const getNotificationPath = (notif) => {
+    const relatedId = notif.related_id
+    const type = notif.type
+
+    switch (type) {
+      case 'message':
+        if (relatedId) return `/chat/c/${relatedId}`
+        return '/inbox'
+      case 'order_status':
+      case 'payment':
+        if (relatedId) return `/orders`
+        return '/orders'
+      case 'return':
+        if (relatedId) return `/seller-orders`
+        return '/seller-orders'
+      case 'info':
+      default:
+        if (notif.title?.includes('منتج') && relatedId) return `/product/${relatedId}`
+        return '/'
     }
   }
 
-  // CHANGED: تعليم الكل كمقروء وتحديث القائمة محلياً
+  // CHANGED: تعديل markAsRead لتنتقل إلى الصفحة المناسبة قبل تعليم الإشعار كمقروء
+  const markAsReadAndNavigate = async (notif) => {
+    try {
+      // تعليم الإشعار كمقروء في الخلفية (لا ننتظر النتيجة لإعطاء تجربة أسرع)
+      markNotificationAsRead(notif.id).catch(err => console.error(err))
+      // إزالة الإشعار من القائمة محلياً فوراً
+      setNotifications(prev => prev.filter(n => n.id !== notif.id))
+      // إغلاق القائمة المنسدلة
+      setIsOpen(false)
+      // التوجيه إلى الصفحة المناسبة
+      const path = getNotificationPath(notif)
+      navigate(path)
+    } catch (err) {
+      console.error('خطأ في معالجة الإشعار:', err)
+    }
+  }
+
   const markAllAsRead = async () => {
     if (notifications.length === 0) return
     try {
-      // تحديث كل الإشعارات في قاعدة البيانات
       const ids = notifications.map(n => n.id)
       await supabase
         .from('notifications')
         .update({ is_read: true })
         .in('id', ids)
-      // إفراغ القائمة محلياً
       setNotifications([])
     } catch (err) {
       console.error('خطأ في تعليم الكل كمقروء:', err)
@@ -63,9 +89,7 @@ export const NotificationBell = () => {
         table: 'notifications',
         filter: `user_id=eq.${user.id}`
       }, async (payload) => {
-        // فقط إذا كان الإشعار الجديد غير مقروء نضيفه
         if (payload.new && !payload.new.is_read) {
-          // نضيفه إلى القائمة محلياً (مع تجنب التكرار)
           setNotifications(prev => {
             if (prev.some(n => n.id === payload.new.id)) return prev
             return [payload.new, ...prev]
@@ -75,7 +99,6 @@ export const NotificationBell = () => {
             new Notification(payload.new.title, { body: payload.new.message, icon: '/logo192.png' })
           }
         } else {
-          // إذا كان مقروءاً، نعيد الجلب للتأكد من المزامنة
           await loadNotifications()
         }
       })
@@ -137,7 +160,7 @@ export const NotificationBell = () => {
                 <div
                   key={notif.id}
                   className="p-3 border-b border-gold/20 hover:bg-secondary-blue transition cursor-pointer"
-                  onClick={() => markAsRead(notif.id)}
+                  onClick={() => markAsReadAndNavigate(notif)}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
