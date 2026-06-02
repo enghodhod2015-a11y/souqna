@@ -1,3 +1,4 @@
+// الملف: src/services/authService.js (كامل من أول سطر لآخر سطر)
 import { supabase } from './supabase'
 
 // ─── التسجيل مع رقم الهاتف ───
@@ -65,11 +66,14 @@ export const signOut = async () => {
   if (error) throw error
 }
 
-// ─── إعادة تعيين كلمة المرور (نسيت كلمة المرور) ───
+// CHANGED: استخدام BASE_URL ديناميكياً بدلاً من '/souqna/' الثابت
 export const resetPassword = async (email) => {
   if (!email) throw new Error('البريد الإلكتروني مطلوب')
-  // استخدام المسار الكامل مع /souqna/ ليتوافق مع basename
-  const redirectUrl = `${window.location.origin}/souqna/reset-password`
+  // الحصول على المسار الأساسي من متغير البيئة BASE_URL (يأتي من vite.config.js)
+  const baseUrl = import.meta.env.BASE_URL || '/'
+  // إزالة الشرطة المائلة الزائدة إذا وجدت
+  const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
+  const redirectUrl = `${window.location.origin}${cleanBase}/reset-password`
   console.log('🔐 إرسال رابط إعادة التعيين إلى:', redirectUrl)
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: redirectUrl,
