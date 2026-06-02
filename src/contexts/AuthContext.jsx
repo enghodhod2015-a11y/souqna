@@ -30,7 +30,6 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null)
     setLoading(true)
     try {
-      // CHANGED: التحقق من وجود جلسة في sessionStorage مباشرة، ثم محاولة استعادتها من Supabase
       const { data: { session } } = await supabase.auth.getSession()
       if (!isMounted.current) return
       const currentUser = session?.user ?? null
@@ -67,7 +66,6 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     isMounted.current = true
-    // تنظيف الجلسات القديمة
     if (typeof window !== 'undefined') {
       const oldSession = localStorage.getItem('supabase.auth.token')
       if (oldSession) {
@@ -77,18 +75,26 @@ export const AuthProvider = ({ children }) => {
     }
     loadAuth()
 
+    // CHANGED: إزالة أي استدعاء غير متزامن من onAuthStateChange لتجنب تعليق updateUser
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted.current) return
       const currentUser = session?.user ?? null
       setUser(currentUser)
+      
+      // CHANGED: عدم استدعاء fetchProfile هنا لأنها تسبب deadlock مع updateUser
+      // بدلاً من ذلك، يتم تحميل الملف الشخصي عبر loadAuth() أو تحديثه بشكل منفصل
       if (currentUser) {
-        const profileData = await fetchProfile(currentUser.id)
-        if (!isMounted.current) return
-        setProfile(profileData || {
-          id: currentUser.id,
-          full_name: currentUser.user_metadata?.full_name || currentUser.email,
-          account_type: currentUser.user_metadata?.account_type || 'buyer'
-        })
+        // CHANGED: استخدام setTimeout لتجنب deadlock
+        setTimeout(async () => {
+          if (!isMounted.current) return
+          const profileData = await fetchProfile(currentUser.id)
+          if (!isMounted.current) return
+          setProfile(profileData || {
+            id: currentUser.id,
+            full_name: currentUser.user_metadata?.full_name || currentUser.email,
+            account_type: currentUser.user_metadata?.account_type || 'buyer'
+          })
+        }, 0)
       } else {
         setProfile(null)
       }
