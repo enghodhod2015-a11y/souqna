@@ -2,37 +2,33 @@ import { supabase } from './supabase'
 
 // الحصول على الإحصائيات العامة
 export const getAdminStats = async () => {
-  // عدد المستخدمين
   const { count: usersCount, error: usersError } = await supabase
     .from('profiles')
     .select('*', { count: 'exact', head: true })
   if (usersError) throw usersError
 
-  // عدد المنتجات
   const { count: productsCount, error: productsError } = await supabase
     .from('products')
     .select('*', { count: 'exact', head: true })
   if (productsError) throw productsError
 
-  // عدد الطلبات
   const { count: ordersCount, error: ordersError } = await supabase
     .from('orders')
     .select('*', { count: 'exact', head: true })
   if (ordersError) throw ordersError
 
-  // إجمالي المبيعات (الطلبات المكتملة)
   const { data: salesData, error: salesError } = await supabase
     .from('orders')
     .select('total_price')
-    .eq('order_status', 'completed')
+    .eq('status', 'completed')
   if (salesError) throw salesError
-  const totalSales = salesData.reduce((sum, o) => sum + o.total_price, 0)
+  const totalSales = salesData.reduce((sum, o) => sum + (o.total_price || 0), 0)
 
-  // الطلبات المعلقة للمراجعة
   const { count: pendingReceipts, error: pendingError } = await supabase
     .from('orders')
     .select('*', { count: 'exact', head: true })
     .eq('payment_status', 'pending')
+    .not('receipt_image', 'is', null)
   if (pendingError) throw pendingError
 
   return { usersCount, productsCount, ordersCount, totalSales, pendingReceipts }
@@ -41,7 +37,7 @@ export const getAdminStats = async () => {
 // جلب قائمة المستخدمين مع إمكانية البحث
 export const getUsers = async (filters = {}) => {
   let query = supabase.from('profiles').select('*').order('created_at', { ascending: false })
-  if (filters.search) query = query.ilike('email', `%${filters.search}%`)
+  if (filters.search) query = query.or(`email.ilike.%${filters.search}%,full_name.ilike.%${filters.search}%`)
   const { data, error } = await query
   if (error) throw error
   return data
@@ -59,21 +55,26 @@ export const updateUser = async (userId, updates) => {
   return data
 }
 
-// جلب قائمة المنتجات (للمراقبة)
+// جلب قائمة المنتجات (للمراقبة) مع دعم الفلتر حسب الحالة
 export const getProductsForAdmin = async (filters = {}) => {
-  let query = supabase.from('products').select('*, seller:profiles(full_name, email)').order('created_at', { ascending: false })
+  let query = supabase
+    .from('products')
+    .select('*, seller:profiles(full_name, email)')
+    .order('created_at', { ascending: false })
   if (filters.status === 'pending') query = query.eq('is_approved', false)
   if (filters.status === 'hidden') query = query.eq('is_hidden', true)
   const { data, error } = await query
   if (error) throw error
-  return data
+  return data.map(p => ({ ...p, title: p.name }))
 }
 
-// تحديث حالة الموافقة على المنتج
-export const approveProduct = async (productId, approve) => {
+// تحديث حالة الموافقة على المنتج (مع إمكانية إخفاء/إظهار)
+export const approveProduct = async (productId, approve, is_hidden = null) => {
+  const updates = { is_approved: approve }
+  if (is_hidden !== null) updates.is_hidden = is_hidden
   const { data, error } = await supabase
     .from('products')
-    .update({ is_approved: approve, is_hidden: !approve })
+    .update(updates)
     .eq('id', productId)
     .select()
     .single()
@@ -85,7 +86,7 @@ export const approveProduct = async (productId, approve) => {
 export const getOrdersForAdmin = async () => {
   const { data, error } = await supabase
     .from('orders')
-    .select('*, product:products(title), buyer:profiles!orders_buyer_id_fkey(full_name, email), seller:profiles!orders_seller_id_fkey(full_name)')
+    .select('*, product:products(title), buyer:profiles!orders_buyer_id_fkey(full_name, email)')
     .order('created_at', { ascending: false })
   if (error) throw error
   return data
@@ -97,7 +98,7 @@ export const reviewReceipt = async (orderId, approved, notes = '') => {
   const orderStatus = approved ? 'payment_approved' : 'cancelled'
   const { data, error } = await supabase
     .from('orders')
-    .update({ payment_status: paymentStatus, order_status: orderStatus, receipt_notes: notes })
+    .update({ payment_status: paymentStatus, status: orderStatus, receipt_notes: notes })
     .eq('id', orderId)
     .select()
     .single()
@@ -107,9 +108,11 @@ export const reviewReceipt = async (orderId, approved, notes = '') => {
 
 // تسجيل عملية في Audit Log
 export const addAuditLog = async (action, targetType, targetId, details) => {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
   const { error } = await supabase
     .from('audit_logs')
-    .insert({ admin_id: (await supabase.auth.getUser()).data.user?.id, action, target_type: targetType, target_id: targetId, details })
+    .insert({ admin_id: user.id, action, target_type: targetType, target_id: targetId, details })
   if (error) console.error('Audit log error:', error)
 }
 
@@ -123,3 +126,30 @@ export const getAuditLogs = async () => {
   if (error) throw error
   return data
 }
+
+// CHANGED: دالة جلب المبيعات الشهرية لآخر 6 أشهر (لجميع البائعين)
+export const getMonthlySalesAll = async () => {
+  const now = new Date()
+  const months = []
+  for (let i = 5; i >= 0; i--) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push({
+      start: date,
+      name: date.toLocaleString('ar', { month: 'long' }),
+      end: new Date(date.getFullYear(), date.getMonth() + 1, 0)
+    })
+  }
+  const promises = months.map(async (month) => {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('total_price')
+      .eq('status', 'completed')
+      .gte('created_at', month.start.toISOString())
+      .lte('created_at', month.end.toISOString())
+    if (error) return { name: month.name, sales: 0 }
+    const sales = data.reduce((sum, o) => sum + (o.total_price || 0), 0)
+    return { name: month.name, sales }
+  })
+  return Promise.all(promises)
+}
+
