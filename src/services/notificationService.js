@@ -16,7 +16,6 @@ export const playNotificationSound = () => {
     const audio = new Audio('/notification.mp3')
     audio.volume = 0.5
     audio.play().catch(() => {
-      // بديل في حال عدم وجود ملف
       const audioContext = new (window.AudioContext || window.webkitAudioContext)()
       const oscillator = audioContext.createOscillator()
       const gain = audioContext.createGain()
@@ -32,17 +31,31 @@ export const playNotificationSound = () => {
   } catch (err) { console.log('خطأ في تشغيل الصوت:', err) }
 }
 
-// CHANGED: دالة addNotification مُبسطة وتتعامل مع related_id بشكل صحيح
+// CHANGED: تحويل type إلى القيم المسموحة: info, success, warning, error
+const mapType = (type) => {
+  switch (type) {
+    case 'message':
+    case 'inquiry':
+      return 'info'
+    case 'payment':
+    case 'order_status':
+    case 'return':
+      return 'success'
+    default:
+      return 'info'
+  }
+}
+
 export const addNotification = async (userId, type, title, message, relatedId = null) => {
+  const mappedType = mapType(type)
   const insertData = {
     user_id: userId,
-    type,
+    type: mappedType,
     title,
     message,
     is_read: false,
     created_at: new Date().toISOString()
   }
-  // فقط إذا كان relatedId رقماً (عددياً) نضيفه لأن العمود من نوع integer
   if (relatedId !== null && !isNaN(Number(relatedId))) {
     insertData.related_id = Number(relatedId)
   }
@@ -73,4 +86,5 @@ export const markNotificationAsRead = async (notificationId) => {
     .eq('id', notificationId)
   if (error) throw error
 }
+
 
