@@ -13,11 +13,26 @@ export default function ResetPasswordPage() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    // 1. الاستماع لحدث استرداد كلمة المرور من Supabase
+    // CHANGED: التحقق المباشر من وجود access_token في الهاش حتى لو لم يصدر حدث PASSWORD_RECOVERY
+    const checkHash = () => {
+      const hash = window.location.hash
+      console.log('🔐 ResetPasswordPage: hash =', hash)
+      if (hash && hash.includes('access_token')) {
+        setIsRecovery(true)
+        return true
+      }
+      return false
+    }
+
+    // 1. التحقق فوراً من الهاش
+    let recoveryFound = checkHash()
+
+    // 2. الاستماع لحدث استرداد كلمة المرور من Supabase (قد لا يحدث في بعض البيئات)
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔐 onAuthStateChange event:', event)
       if (event === 'PASSWORD_RECOVERY') {
         setIsRecovery(true)
+        recoveryFound = true
         toast.success('يرجى إدخال كلمة المرور الجديدة')
       } else if (event === 'USER_UPDATED') {
         toast.success('تم تغيير كلمة المرور بنجاح')
@@ -25,13 +40,8 @@ export default function ResetPasswordPage() {
       }
     })
 
-    // 2. التحقق من وجود access_token في URL hash
-    const hash = window.location.hash
-    console.log('🔐 hash:', hash)
-    if (hash && hash.includes('access_token')) {
-      setIsRecovery(true)
-    } else {
-      // 3. التحقق من وجود جلسة نشطة (في حالة الوصول المباشر)
+    // 3. إذا لم يتم العثور على هاش، نحاول الحصول على الجلسة من URL (طريقة بديلة)
+    if (!recoveryFound) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user?.aud === 'authenticated') {
           setIsRecovery(true)
@@ -58,10 +68,10 @@ export default function ResetPasswordPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
-      // الانتظار قليلاً حتى يتم تحديث الجلسة
-      setTimeout(() => {
-        navigate('/login')
-      }, 1500)
+      toast.success('تم تغيير كلمة المرور بنجاح')
+      // إزالة الهاش من URL لتجنب إعادة استخدامه
+      window.history.replaceState(null, '', window.location.pathname)
+      navigate('/login')
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -69,13 +79,29 @@ export default function ResetPasswordPage() {
     }
   }
 
+  // CHANGED: إذا لم يكن isRecovery، نعرض رسالة خطأ مع زر لمحاولة إرسال رابط جديد بدلاً من توجيه المستخدم تلقائياً للصفحة الرئيسية
   if (!isRecovery) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="bg-primary-card p-8 rounded-2xl w-full max-w-md border border-gold/30 text-center">
-          <p className="text-text-secondary">هذه الصفحة مخصصة لإعادة تعيين كلمة المرور فقط.</p>
-          <p className="text-text-secondary text-sm mt-2">لم يتم العثور على رمز إعادة التعيين.</p>
-          <button onClick={() => navigate('/login')} className="text-gold underline mt-4">العودة لتسجيل الدخول</button>
+          <h2 className="text-xl font-bold text-gold mb-4">رابط غير صالح أو منتهي الصلاحية</h2>
+          <p className="text-text-secondary mb-6">
+            يرجى طلب رابط جديد لإعادة تعيين كلمة المرور من خلال صفحة "نسيت كلمة المرور".
+          </p>
+          <button 
+            onClick={() => navigate('/forgot-password')} 
+            className="text-gold underline hover:text-gold/80"
+          >
+            طلب رابط جديد
+          </button>
+          <div className="mt-4">
+            <button 
+              onClick={() => navigate('/login')} 
+              className="px-4 py-2 bg-gold text-primary-blue rounded-lg font-bold hover:bg-gold/90"
+            >
+              العودة لتسجيل الدخول
+            </button>
+          </div>
         </div>
       </div>
     )
