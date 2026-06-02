@@ -16,18 +16,7 @@ function App() {
     }
   }, [user])
 
-  // CHANGED: إعادة توجيه الروابط التي تحتوي على #access_token إلى /souqna/reset-password
-  useEffect(() => {
-    const hash = window.location.hash
-    const path = window.location.pathname
-    console.log('🔐 App: path =', path, 'hash =', hash)
-    
-    // إذا كان هناك access_token في الهاش ولم تكن الصفحة الحالية هي reset-password
-    if (hash && hash.includes('access_token') && !path.includes('reset-password')) {
-      console.log('🔐 إعادة توجيه إلى /souqna/reset-password مع الاحتفاظ بالهاش')
-      window.location.href = `/souqna/reset-password${hash}`
-    }
-  }, [])
+  // CHANGED: تم إزالة إعادة التوجيه التلقائي للهاش لأن ResetPasswordPage يتعامل معه مباشرة
 
   return (
     <div className="min-h-screen flex flex-col">
