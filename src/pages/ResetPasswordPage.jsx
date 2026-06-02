@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { supabase } from '../services/supabase'
@@ -11,27 +11,17 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [isRecovery, setIsRecovery] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
-    // CHANGED: حفظ الهاش ثم إزالته من الرابط قبل أي تفاعل مع Supabase
-    const hash = window.location.hash
-    if (!hash || !hash.includes('access_token')) {
-      setIsRecovery(false)
-      return
-    }
-
-    // إزالة الهاش من الرابط نهائياً قبل محاولة تعيين الجلسة
-    window.history.replaceState(null, '', window.location.pathname)
-
-    const params = new URLSearchParams(hash.substring(1))
-    const accessToken = params.get('access_token')
-    const refreshToken = params.get('refresh_token')
+    const params = new URLSearchParams(location.search)
+    const tokenHash = params.get('token_hash')
     const type = params.get('type')
 
-    if (accessToken && type === 'recovery') {
-      supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken || '',
+    if (tokenHash && type === 'recovery') {
+      supabase.auth.verifyOtp({
+        type: 'recovery',
+        token_hash: tokenHash,
       }).then(({ error }) => {
         if (error) {
           console.error(error)
@@ -41,14 +31,11 @@ export default function ResetPasswordPage() {
           setIsRecovery(true)
           toast.success('الرابط صالح، يرجى إدخال كلمة المرور الجديدة')
         }
-      }).catch(() => {
-        toast.error('حدث خطأ في التحقق من الرابط')
-        setIsRecovery(false)
       })
     } else {
       setIsRecovery(false)
     }
-  }, [])
+  }, [location.search])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
