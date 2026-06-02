@@ -9,50 +9,51 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [isRecovery, setIsRecovery] = useState(false)
+  const [ready, setReady] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
-    // CHANGED: التحقق المباشر من وجود access_token في الهاش حتى لو لم يصدر حدث PASSWORD_RECOVERY
-    const checkHash = () => {
-      const hash = window.location.hash
-      console.log('🔐 ResetPasswordPage: hash =', hash)
-      if (hash && hash.includes('access_token')) {
-        setIsRecovery(true)
-        return true
-      }
-      return false
+    // CHANGED: طريقة مختلفة تماماً - استخراج access_token من الهاش وتعيين الجلسة يدوياً
+    const hash = window.location.hash
+    console.log('🔐 ResetPasswordPage - hash:', hash)
+    
+    if (!hash || !hash.includes('access_token')) {
+      // لا يوجد رمز، نعرض رسالة خطأ
+      setReady(false)
+      return
     }
 
-    // 1. التحقق فوراً من الهاش
-    let recoveryFound = checkHash()
-
-    // 2. الاستماع لحدث استرداد كلمة المرور من Supabase (قد لا يحدث في بعض البيئات)
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔐 onAuthStateChange event:', event)
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsRecovery(true)
-        recoveryFound = true
-        toast.success('يرجى إدخال كلمة المرور الجديدة')
-      } else if (event === 'USER_UPDATED') {
-        toast.success('تم تغيير كلمة المرور بنجاح')
-        navigate('/login')
-      }
-    })
-
-    // 3. إذا لم يتم العثور على هاش، نحاول الحصول على الجلسة من URL (طريقة بديلة)
-    if (!recoveryFound) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user?.aud === 'authenticated') {
-          setIsRecovery(true)
+    // استخراج parameters من الهاش
+    const params = new URLSearchParams(hash.substring(1))
+    const accessToken = params.get('access_token')
+    const refreshToken = params.get('refresh_token')
+    const expiresAt = params.get('expires_at')
+    const type = params.get('type')
+    
+    if (accessToken && type === 'recovery') {
+      // تعيين الجلسة يدوياً لتجاوز مشكلة clock skew
+      supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken || '',
+      }).then(({ data, error }) => {
+        if (error) {
+          console.error('خطأ في تعيين الجلسة:', error)
+          toast.error('الرابط غير صالح أو منتهي الصلاحية')
+          setReady(false)
+        } else {
+          console.log('تم تعيين الجلسة بنجاح')
+          setReady(true)
+          toast.success('الرابط صالح، يرجى إدخال كلمة المرور الجديدة')
         }
+      }).catch(err => {
+        console.error(err)
+        toast.error('حدث خطأ في التحقق من الرابط')
+        setReady(false)
       })
+    } else {
+      setReady(false)
     }
-
-    return () => {
-      listener?.subscription.unsubscribe()
-    }
-  }, [navigate])
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -66,10 +67,11 @@ export default function ResetPasswordPage() {
     }
     setLoading(true)
     try {
+      // تحديث كلمة المرور باستخدام الجلسة الحالية (التي تم تعيينها يدوياً)
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
       toast.success('تم تغيير كلمة المرور بنجاح')
-      // إزالة الهاش من URL لتجنب إعادة استخدامه
+      // مسح الهاش من الرابط
       window.history.replaceState(null, '', window.location.pathname)
       navigate('/login')
     } catch (err) {
@@ -79,14 +81,14 @@ export default function ResetPasswordPage() {
     }
   }
 
-  // CHANGED: إذا لم يكن isRecovery، نعرض رسالة خطأ مع زر لمحاولة إرسال رابط جديد بدلاً من توجيه المستخدم تلقائياً للصفحة الرئيسية
-  if (!isRecovery) {
+  // إذا لم يكن ready بعد ولم نجد access_token، نعرض رسالة انتظار أو رابط فاشل
+  if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="bg-primary-card p-8 rounded-2xl w-full max-w-md border border-gold/30 text-center">
-          <h2 className="text-xl font-bold text-gold mb-4">رابط غير صالح أو منتهي الصلاحية</h2>
+          <h2 className="text-xl font-bold text-gold mb-4">رابط إعادة التعيين</h2>
           <p className="text-text-secondary mb-6">
-            يرجى طلب رابط جديد لإعادة تعيين كلمة المرور من خلال صفحة "نسيت كلمة المرور".
+            جاري التحقق من الرابط...
           </p>
           <button 
             onClick={() => navigate('/forgot-password')} 
@@ -94,14 +96,6 @@ export default function ResetPasswordPage() {
           >
             طلب رابط جديد
           </button>
-          <div className="mt-4">
-            <button 
-              onClick={() => navigate('/login')} 
-              className="px-4 py-2 bg-gold text-primary-blue rounded-lg font-bold hover:bg-gold/90"
-            >
-              العودة لتسجيل الدخول
-            </button>
-          </div>
         </div>
       </div>
     )
@@ -134,4 +128,5 @@ export default function ResetPasswordPage() {
     </div>
   )
 }
+
 
