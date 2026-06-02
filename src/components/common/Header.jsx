@@ -4,7 +4,8 @@ import {
   User, 
   LogOut, 
   ChevronDown,
-  MessageCircle
+  MessageCircle,
+  Search // CHANGED: إضافة أيقونة البحث
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
@@ -69,6 +70,15 @@ export const Header = () => {
         <Link to="/" className="text-2xl font-bold text-gold">سوقنا</Link>
 
         <div className="flex items-center gap-3">
+          {/* CHANGED: زر البحث الجديد */}
+          <Link 
+            to="/search" 
+            className="flex items-center gap-2 bg-gold/10 border border-gold text-gold px-4 py-2 rounded-lg font-bold hover:bg-gold hover:text-primary-blue transition text-sm"
+          >
+            <Search size={16} />
+            بحث
+          </Link>
+
           {user ? (
             <>
               <Link 
@@ -169,5 +179,4 @@ export const Header = () => {
     </header>
   )
 }
-
 
