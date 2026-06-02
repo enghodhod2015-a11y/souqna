@@ -17,14 +17,13 @@ export const ProductCard = ({ product }) => {
         <img 
           src={imageUrl}
           alt={title} 
-          // CHANGED: إضافة lazy loading لتحسين أداء تحميل الصور
+          // CHANGED: إضافة lazy loading لتحسين تحميل الصفحة
           loading="lazy"
           className="w-full h-48 object-cover hover:scale-105 transition duration-300"
           onError={(e) => { e.target.src = 'https://placehold.co/400x200/06264D/D4AF37?text=صورة' }}
         />
       </Link>
       <div className="p-4">
-        {/* اسم المنتج على اليمين والسعر على اليسار */}
         <div className="flex justify-between items-start gap-2 mb-2">
           <Link to={`/product/${product.id}`} className="flex-1 text-right">
             <h3 className="text-lg font-bold line-clamp-1 text-white">{title}</h3>
@@ -37,7 +36,6 @@ export const ProductCard = ({ product }) => {
           </div>
         </div>
         
-        {/* التقييمات */}
         <div className="flex items-center gap-1 mb-3">
           {[...Array(5)].map((_, i) => (
             <Star key={i} size={16} className={i < Math.floor(product.average_rating || 0) ? 'text-gold fill-gold' : 'text-gray-400'} />
@@ -45,7 +43,6 @@ export const ProductCard = ({ product }) => {
           <span className="text-text-secondary text-sm ml-2">({product.total_reviews || 0})</span>
         </div>
         
-        {/* أزرار الشراء والاستعلام */}
         <div className="flex gap-2">
           <Link to={`/checkout`} state={{ product, quantity: 1 }} className="flex-1">
             <Button className="w-full text-sm py-1.5">
