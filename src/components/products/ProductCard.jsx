@@ -17,6 +17,8 @@ export const ProductCard = ({ product }) => {
         <img 
           src={imageUrl}
           alt={title} 
+          // CHANGED: إضافة lazy loading لتحسين أداء تحميل الصور
+          loading="lazy"
           className="w-full h-48 object-cover hover:scale-105 transition duration-300"
           onError={(e) => { e.target.src = 'https://placehold.co/400x200/06264D/D4AF37?text=صورة' }}
         />
@@ -60,5 +62,4 @@ export const ProductCard = ({ product }) => {
     </div>
   )
 }
-
 
