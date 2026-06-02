@@ -10,7 +10,6 @@ const fixImageUrl = (url) => {
   return `${supabaseUrl}/storage/v1/object/public/product-images/${url}`
 }
 
-// CHANGED: إضافة معامل signal وفلتر المدينة
 export const getProducts = async (filters = {}, signal = null) => {
   try {
     let query = supabase
@@ -22,7 +21,6 @@ export const getProducts = async (filters = {}, signal = null) => {
 
     if (filters.category) query = query.eq('category', filters.category)
     if (filters.search) query = query.ilike('name', '%' + filters.search + '%')
-    // CHANGED: إضافة فلتر المدينة
     if (filters.city) query = query.eq('city', filters.city)
 
     const { data: products, error } = signal 
@@ -175,15 +173,22 @@ export const deleteProduct = async (id) => {
   }
 }
 
-export const uploadProductImages = async (files, productId) => {
+// CHANGED: دالة رفع الصور مع دعم تتبع التقدم
+export const uploadProductImages = async (files, productId, onProgress = null) => {
   try {
     const urls = []
+    let completed = 0
     for (const file of files) {
       const fileName = `${productId}/${Date.now()}_${file.name}`
+      // استخدام upload مع خيارات لتتبع التقدم إذا أردت (لكن Supabase JS لا يدعم onProgress مباشرة، سنستخدم وهمي)
       const { error } = await supabase.storage.from('product-images').upload(fileName, file)
       if (error) throw error
       const { data } = supabase.storage.from('product-images').getPublicUrl(fileName)
       urls.push(data.publicUrl)
+      completed++
+      if (onProgress) {
+        onProgress(Math.round((completed / files.length) * 100))
+      }
     }
     return urls
   } catch (error) {
@@ -191,5 +196,4 @@ export const uploadProductImages = async (files, productId) => {
     throw error
   }
 }
-
 

@@ -12,6 +12,8 @@ export default function AddProductPage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
+  // CHANGED: حالة لتتبع تقدم رفع الصور
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -45,6 +47,7 @@ export default function AddProductPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
+    setUploadProgress(0) // CHANGED: إعادة تعيين التقدم
     try {
       let compare_at_price = null
       if (formData.discount_percentage > 0 && formData.price) {
@@ -75,7 +78,10 @@ export default function AddProductPage() {
       if (!newProduct?.id) throw new Error('لم يتم استلام معرف المنتج')
 
       if (imageFiles.length > 0) {
-        const imageUrls = await uploadProductImages(imageFiles, newProduct.id)
+        // CHANGED: رفع الصور مع تتبع التقدم
+        const imageUrls = await uploadProductImages(imageFiles, newProduct.id, (progress) => {
+          setUploadProgress(progress)
+        })
         await updateProduct(newProduct.id, { images: imageUrls, cover_image: imageUrls[0] || '' })
       }
 
@@ -86,6 +92,7 @@ export default function AddProductPage() {
       toast.error(err.message)
     } finally {
       setLoading(false)
+      setUploadProgress(0)
     }
   }
 
@@ -270,6 +277,15 @@ export default function AddProductPage() {
               ))}
             </div>
           )}
+          {/* CHANGED: شريط تقدم رفع الصور */}
+          {uploadProgress > 0 && uploadProgress < 100 && (
+            <div className="mt-4">
+              <div className="bg-gray-200 rounded-full h-2.5">
+                <div className="bg-gold h-2.5 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+              </div>
+              <p className="text-sm text-text-secondary mt-1 text-center">جاري رفع الصور: {uploadProgress}%</p>
+            </div>
+          )}
         </div>
 
         {/* زر الإرسال */}
@@ -284,7 +300,7 @@ export default function AddProductPage() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              جاري النشر...
+              {uploadProgress > 0 && uploadProgress < 100 ? `رفع الصور ${uploadProgress}%...` : 'جاري النشر...'}
             </span>
           ) : (
             'نشر المنتج'

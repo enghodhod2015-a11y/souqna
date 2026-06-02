@@ -14,6 +14,8 @@ export default function PaymentPage() {
   const [file, setFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [fetchingOrder, setFetchingOrder] = useState(true)
+  // CHANGED: حالة تتبع تقدم رفع الإيصال
+  const [uploadProgress, setUploadProgress] = useState(0)
   
   const [transferNumber, setTransferNumber] = useState('')
   const [transferName, setTransferName] = useState('')
@@ -35,7 +37,6 @@ export default function PaymentPage() {
       if (orderError) throw orderError
       if (!orderData) throw new Error('الطلب غير موجود')
 
-      // جلب اسم المنتج (طريقة بديلة)
       const { data: items, error: itemsError } = await supabase
         .from('order_items')
         .select('product_name')
@@ -84,21 +85,28 @@ export default function PaymentPage() {
     }
 
     setLoading(true)
+    setUploadProgress(0)
     try {
+      // CHANGED: محاكاة تقدم رفع الملف (نظراً لأن uploadReceipt لا يدعم onProgress حالياً، نستخدم وهمي)
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => (prev >= 90 ? 90 : prev + 10))
+      }, 200)
+      
       await uploadReceipt(orderId, file, {
         transfer_number: transferNumber.trim(),
         transfer_name: transferName.trim(),
         buyer_phone: buyerPhone.trim()
       })
       
-      // ✅ إضافة إشعار للبائع
+      clearInterval(progressInterval)
+      setUploadProgress(100)
+      
       const { data: orderData } = await supabase
         .from('orders')
         .select('user_id, seller:products(seller_id)')
         .eq('id', orderId)
         .single()
       
-      // جلب seller_id من المنتج (الطريقة تعتمد على هيكلك، قد تحتاج تعديل)
       const { data: orderItems } = await supabase
         .from('order_items')
         .select('product:products(seller_id)')
@@ -116,6 +124,7 @@ export default function PaymentPage() {
       toast.error(err.message || 'حدث خطأ أثناء رفع الإيصال')
     } finally {
       setLoading(false)
+      setUploadProgress(0)
     }
   }
 
@@ -185,11 +194,20 @@ export default function PaymentPage() {
             className="w-full text-sm text-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gold file:text-primary-blue hover:file:bg-gold-light cursor-pointer"
             required 
           />
+          {/* CHANGED: شريط تقدم رفع الإيصال */}
+          {uploadProgress > 0 && uploadProgress < 100 && (
+            <div className="mt-2">
+              <div className="bg-gray-200 rounded-full h-2.5">
+                <div className="bg-gold h-2.5 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+              </div>
+              <p className="text-xs text-text-secondary mt-1 text-center">جاري رفع الإيصال: {uploadProgress}%</p>
+            </div>
+          )}
         </div>
 
         <div className="pt-2">
           <Button type="submit" disabled={loading} className="w-full">
-            {loading ? 'جاري رفع الملف...' : 'تأكيد ورفع الإيصال'}
+            {loading ? (uploadProgress > 0 && uploadProgress < 100 ? `رفع الإيصال ${uploadProgress}%...` : 'جاري رفع الملف...') : 'تأكيد ورفع الإيصال'}
           </Button>
         </div>
       </form>
