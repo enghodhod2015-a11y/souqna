@@ -17,6 +17,7 @@ export default function ResetPasswordPage() {
     const params = new URLSearchParams(location.search)
     const tokenHash = params.get('token_hash')
     const type = params.get('type')
+    console.log('🔍 tokenHash:', tokenHash, 'type:', type)
 
     if (tokenHash && type === 'recovery') {
       supabase.auth.verifyOtp({
@@ -24,21 +25,24 @@ export default function ResetPasswordPage() {
         token_hash: tokenHash,
       }).then(({ error }) => {
         if (error) {
-          console.error(error)
+          console.error('❌ verifyOtp error:', error)
           toast.error('رابط غير صالح أو منتهي الصلاحية')
           setIsRecovery(false)
         } else {
+          console.log('✅ verifyOtp success')
           setIsRecovery(true)
           toast.success('الرابط صالح، يرجى إدخال كلمة المرور الجديدة')
         }
       })
     } else {
+      console.warn('⚠️ لا يوجد token_hash أو type ليس recovery')
       setIsRecovery(false)
     }
   }, [location.search])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    console.log('🚀 تم الضغط على زر التحديث')
     if (password !== confirmPassword) {
       toast.error('كلمة المرور غير متطابقة')
       return
@@ -49,11 +53,14 @@ export default function ResetPasswordPage() {
     }
     setLoading(true)
     try {
+      console.log('📤 محاولة تحديث كلمة المرور...')
       const { error } = await supabase.auth.updateUser({ password })
+      console.log('📦 error after updateUser:', error)
       if (error) throw error
       toast.success('تم تغيير كلمة المرور بنجاح')
       navigate('/login')
     } catch (err) {
+      console.error('🔥 catch error:', err)
       toast.error(err.message)
     } finally {
       setLoading(false)
