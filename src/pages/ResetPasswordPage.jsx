@@ -23,13 +23,19 @@ export default function ResetPasswordPage() {
       supabase.auth.verifyOtp({
         type: 'recovery',
         token_hash: tokenHash,
-      }).then(({ error }) => {
+      }).then(({ data, error }) => {
         if (error) {
           console.error('❌ verifyOtp error:', error)
           toast.error('رابط غير صالح أو منتهي الصلاحية')
           setIsRecovery(false)
         } else {
-          console.log('✅ verifyOtp success')
+          console.log('✅ verifyOtp success', data)
+          // CHANGED: تعيين الجلسة يدوياً من بيانات التحقق
+          if (data?.session) {
+            supabase.auth.setSession(data.session)
+              .then(() => console.log('✅ Session set manually'))
+              .catch(err => console.error('setSession error:', err))
+          }
           setIsRecovery(true)
           toast.success('الرابط صالح، يرجى إدخال كلمة المرور الجديدة')
         }
@@ -93,4 +99,5 @@ export default function ResetPasswordPage() {
     </div>
   )
 }
+
 
