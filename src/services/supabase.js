@@ -9,13 +9,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(errorMsg);
 }
 
+// CHANGED: تعطيل الكشف التلقائي عن الجلسة من URL لتجنب تداخل SDK مع معالجتنا اليدوية
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: sessionStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: false  // تم التغيير من true إلى false
   }
 });
-
 
