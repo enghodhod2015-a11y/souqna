@@ -230,10 +230,10 @@ export default function AdminDashboardPage() {
           <thead>
             <tr className="border-b border-gold/30 bg-primary-card/50">
               <th>اسم المنتج</th><th>البائع</th><th>السعر</th><th>تاريخ النشر</th><th>تاريخ الطلب</th><th>تاريخ الشحن</th><th>تاريخ الإيصال</th><th>الحالة</th>
-            </tr>
+            </table>
           </thead>
           <tbody>
-            {filtered.map(p => (
+            {filtered.map((p) => (
               <tr key={p.id} className="border-b border-gold/20 hover:bg-secondary-blue/30">
                 <td className="p-2">{p.name}</td>
                 <td className="p-2">{p.seller}</td>
@@ -249,7 +249,7 @@ export default function AdminDashboardPage() {
                   {p.status === 'no_receipt' && 'تم الشراء بدون إيصال'}
                   {p.status === 'not_purchased' && 'لم يتم شراؤه'}
                 </td>
-               </td>
+              </tr>
             ))}
           </tbody>
         </table>
@@ -425,7 +425,11 @@ export default function AdminDashboardPage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-right border-collapse">
-                  <thead><tr className="border-b border-gold/30 bg-primary-card/50"><th>الاسم</th><th>البريد</th><th>عدد الطلبات</th><th>إجمالي الإنفاق</th><th>آخر طلب</th><th>الحالة</th><th>إجراءات</th></table></thead>
+                  <thead>
+                    <tr className="border-b border-gold/30 bg-primary-card/50">
+                      <th>الاسم</th><th>البريد</th><th>عدد الطلبات</th><th>إجمالي الإنفاق</th><th>آخر طلب</th><th>الحالة</th><th>إجراءات</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {users?.filter(u => u.account_type === 'buyer').map(user => (
                       <tr key={user.id}>
@@ -439,10 +443,10 @@ export default function AdminDashboardPage() {
                           <button onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { is_banned: !user.is_banned } })} className={`px-2 py-1 rounded text-xs ${user.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{user.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
                           <button onClick={() => { setSelectedBuyer(user); setShowBuyerModal(true); }} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
                         </td>
-                       </tr>
+                      </tr>
                     ))}
                   </tbody>
-                 </table>
+                </table>
               </div>
             </div>
           )}
@@ -497,16 +501,16 @@ export default function AdminDashboardPage() {
                 <table className="w-full text-right border-collapse">
                   <thead><tr className="border-b border-gold/30 bg-primary-card/50"><th className="p-3">القسم</th><th className="p-3">التفاصيل</th></tr></thead>
                   <tbody>
-                    <tr><td className="p-3 font-bold">جميع المنتجات</td><td>{productStats.all}</td></tr>
-                    <tr><td className="p-3 font-bold">المنتجات المباعة</td><td>{productStats.sold}</td></tr>
-                    <tr><td className="p-3 font-bold">المنتجات قيد الشحن</td><td>{productStats.shipping}</td></tr>
-                    <tr><td className="p-3 font-bold">المنتجات التي لم تشحن (تم رفع الإيصال)</td><td>{productStats.not_shipped_receipt_uploaded}</td></tr>
-                    <tr><td className="p-3 font-bold">المنتجات المشتراة بدون إيصال</td><td>{productStats.no_receipt_purchased}</td></tr>
-                    <tr><td className="p-3 font-bold">المنتجات غير المشتراة</td><td>{productStats.not_purchased}</td></tr>
-                    <tr><td className="p-3 font-bold">المنتجات المكررة</td><td>{productStats.duplicate}</td></tr>
-                    <tr><td className="p-3 font-bold">المنتجات غير اللائقة</td><td>{productStats.inappropriate}</td></tr>
+                    <tr><td className="p-3 font-bold">جميع المنتجات</td><td className="p-3">{productStats.all}</td></tr>
+                    <tr><td className="p-3 font-bold">المنتجات المباعة</td><td className="p-3">{productStats.sold}</td></tr>
+                    <tr><td className="p-3 font-bold">المنتجات قيد الشحن</td><td className="p-3">{productStats.shipping}</td></tr>
+                    <tr><td className="p-3 font-bold">المنتجات التي لم تشحن (تم رفع الإيصال)</td><td className="p-3">{productStats.not_shipped_receipt_uploaded}</td></tr>
+                    <tr><td className="p-3 font-bold">المنتجات المشتراة بدون إيصال</td><td className="p-3">{productStats.no_receipt_purchased}</td></tr>
+                    <tr><td className="p-3 font-bold">المنتجات غير المشتراة</td><td className="p-3">{productStats.not_purchased}</td></tr>
+                    <tr><td className="p-3 font-bold">المنتجات المكررة</td><td className="p-3">{productStats.duplicate}</td></tr>
+                    <tr><td className="p-3 font-bold">المنتجات غير اللائقة</td><td className="p-3">{productStats.inappropriate}</td></tr>
                   </tbody>
-                 </table>
+                </table>
               </div>
             </div>
           )}
