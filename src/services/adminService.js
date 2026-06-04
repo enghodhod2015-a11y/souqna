@@ -221,7 +221,7 @@ export default function AdminDashboardPage() {
 
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || []
 
-  // Helper to render product list table (FIXED)
+  // Helper to render product list table - CORRECTED
   const renderProductTable = (filterStatus) => {
     const filtered = mockProductsList.filter(p => p.status === filterStatus)
     if (filtered.length === 0) {
@@ -240,10 +240,10 @@ export default function AdminDashboardPage() {
               <th>تاريخ الشحن</th>
               <th>تاريخ الإيصال</th>
               <th>الحالة</th>
-            </tr>
+            </table>
           </thead>
           <tbody>
-            {filtered.map(p => (
+            {filtered.map((p) => (
               <tr key={p.id} className="border-b border-gold/20 hover:bg-secondary-blue/30">
                 <td className="p-2">{p.name}</td>
                 <td className="p-2">{p.seller}</td>
@@ -294,7 +294,7 @@ export default function AdminDashboardPage() {
         <button onClick={() => setActiveMainTab('settings')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${activeMainTab === 'settings' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}><Settings size={18} /> الإعدادات</button>
       </div>
 
-      {/* Dashboard Tab */}
+      {/* Dashboard Tab (unchanged) */}
       {activeMainTab === 'dashboard' && (
         <div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
@@ -421,7 +421,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* Buyers sub-tab (FIXED) */}
+          {/* Buyers sub-tab - CORRECTED */}
           {activeSubTab === 'buyers' && (
             <div>
               <div className="flex gap-4 mb-4">
@@ -456,7 +456,9 @@ export default function AdminDashboardPage() {
                       </tr>
                     ))}
                     {(!users || users.filter(u => u.account_type === 'buyer').length === 0) && (
-                      <tr><td colSpan="7" className="text-center p-8">لا توجد نتائج</td></tr>
+                      <tr>
+                        <td colSpan="7" className="text-center p-8">لا توجد نتائج</td>
+                      </tr>
                     )}
                   </tbody>
                 </table>
