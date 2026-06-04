@@ -251,6 +251,7 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
+  // ✅ تم تعديل addTransferMutation لإزالة created_at
   const addTransferMutation = useMutation({
     mutationFn: async ({ sellerId, amount, receiptImage, note }) => {
       const { error } = await supabase.from('seller_wallets').insert({
@@ -258,8 +259,7 @@ export default function AdminDashboardPage() {
         amount: parseFloat(amount),
         type: 'transfer',
         receipt_image: receiptImage,
-        note: note,
-        created_at: new Date().toISOString()
+        note: note
       })
       if (error) throw error
     },
@@ -271,13 +271,14 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
+  // ✅ تم تعديل loadSellerReceipts لاستخدام id للترتيب
   const loadSellerReceipts = async (sellerId) => {
     if (!sellerId) return
     const { data, error } = await supabase
       .from('seller_wallets')
       .select('*')
       .eq('seller_id', sellerId)
-      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
     if (error) console.error(error)
     else setSellerReceipts(data || [])
   }
@@ -299,7 +300,7 @@ export default function AdminDashboardPage() {
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || []
   const buyerUsers = users?.filter(u => u.account_type === 'buyer') || []
 
-  // ✅ دالة عرض جدول المنتجات (تم تعديلها لاستخدام seller_name)
+  // دالة عرض جدول المنتجات
   const renderProductTable = (filterKey, productsList = products) => {
     if (!productsList || productsList.length === 0) {
       return <div className="text-center p-8 text-text-secondary">لا توجد منتجات</div>
@@ -339,11 +340,10 @@ export default function AdminDashboardPage() {
               <th>تاريخ الشحن</th>
               <th>تاريخ الإيصال</th>
               <th>الحالة</th>
-            </tr>
+            </table>
           </thead>
           <tbody>
             {filtered.map((product) => {
-              // ✅ استخدام seller_name الذي أصبح موجوداً بعد تعديل adminService
               const sellerName = product.seller_name || product.seller?.full_name || 'غير معروف'
               const orderDate = product.last_order_date ? formatDate(product.last_order_date) : '-'
               const shipDate = product.shipped_date ? formatDate(product.shipped_date) : '-'
@@ -368,7 +368,6 @@ export default function AdminDashboardPage() {
     )
   }
 
-  // دالة تغيير نوع الحساب
   const toggleAccountType = (user) => {
     const newType = user.account_type === 'seller' ? 'buyer' : 'seller'
     updateUserMutation.mutate({

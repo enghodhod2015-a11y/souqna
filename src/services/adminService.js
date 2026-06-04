@@ -173,7 +173,6 @@ export const approveSeller = async (sellerId, approved, notes = '') => {
 // دوال المنتجات (معدلة لضمان جلب اسم البائع)
 // ==========================================
 export const getProductsForAdmin = async (filters = {}) => {
-  // ✅ جلب المنتجات مع بيانات البائع باستخدام foreign key الصريح
   let query = supabase
     .from('products')
     .select(`
@@ -193,7 +192,6 @@ export const getProductsForAdmin = async (filters = {}) => {
   const { data, error } = await query
   if (error) throw error
   
-  // ✅ إضافة حقول إضافية لتسهيل الوصول للاسم
   return data.map(product => ({
     ...product,
     title: product.name,
@@ -251,10 +249,11 @@ export const reviewReceipt = async (orderId, approved, notes = '') => {
 // دوال المالية (محافظ البائعين، طلبات السحب، العمولات)
 // ==========================================
 export const getSellerWallet = async () => {
+  // ✅ استخدام id للترتيب بدلاً من created_at
   const { data, error } = await supabase
     .from('seller_wallets')
     .select('*, seller:profiles(full_name)')
-    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
   if (error) {
     console.warn('seller_wallets table not found, returning mock data')
     const { data: sellers } = await supabase.from('profiles').select('id, full_name').eq('account_type', 'seller')
