@@ -16,27 +16,13 @@ import { Select } from '../components/ui/Select'
 import { Tabs, TabList, Tab, TabPanels, TabPanel } from '../components/ui/Tabs'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
 import {
-  Users, Package, ShoppingBag, DollarSign, Receipt, CheckCircle, XCircle, Eye, Search, Filter,
-  AlertTriangle, Shield, UserCheck, UserX, Clock, TrendingUp, Activity, RefreshCw,
-  Wallet, CreditCard, Percent, Ticket, Image, Star, Zap, MessageSquare, HelpCircle,
-  Settings, Database, Download, Upload, Trash2, Edit, Plus, Ban, Flag, BarChart3,
-  Calendar, MapPin, Phone, Mail, Globe, Lock, Unlock, ChevronDown, ChevronRight,
-  Award, Briefcase, FileText, ClipboardList, PieChart as PieChartIcon, LineChart as LineChartIcon,
-  Megaphone, Send, Filter as FilterIcon, MoreHorizontal, UserPlus, Store, Link as LinkIcon,
-  DollarSign as DollarIcon, TrendingDown, Percent as PercentIcon, Clock as ClockIcon,
-  Check as CheckIcon, X as XIcon, RefreshCw as RefreshIcon, Loader, History, EyeOff
+  Users, Package, ShoppingBag, DollarSign, Receipt, CheckCircle, XCircle, Eye, Search,
+  AlertTriangle, UserCheck, UserX, Clock, TrendingUp, Activity, RefreshCw,
+  Wallet, Download, Plus, Ban, FileText, ClipboardList, Settings, Megaphone, MessageSquare,
+  Award, BarChart3, LineChart as LineChartIcon, PieChart as PieChartIcon,
+  Edit, Loader
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-
-// ============================================================
-// ✅ تعريف الدوال المفقودة محلياً (لتجنب أخطاء الاستيراد)
-// ============================================================
-const getSellerReceipts = async () => []
-const addSellerReceipt = async () => {}
-const getSellerFinanceSummary = async () => null
-const getSellerProductsStats = async () => ({ published: 0 })
-const getSellerOrdersStats = async () => ({ shipping: 0, sold: 0, returned: 0, no_receipt: 0 })
-const getSellerInquiriesStats = async () => ({ unanswered: 0, answered: 0 })
 
 // Helper functions
 const formatDate = (dateString) => {
@@ -73,6 +59,14 @@ const mockTopCategories = [
   { name: 'الجمال', sales: 18700 },
   { name: 'السيارات', sales: 12400 },
 ]
+
+// تعريف الدوال المفقودة محلياً لتجنب أخطاء الاستيراد
+const getSellerReceipts = async () => []
+const addSellerReceipt = async () => {}
+const getSellerFinanceSummary = async () => null
+const getSellerProductsStats = async () => ({ published: 0 })
+const getSellerOrdersStats = async () => ({ shipping: 0, sold: 0, returned: 0, no_receipt: 0 })
+const getSellerInquiriesStats = async () => ({ unanswered: 0, answered: 0 })
 
 export default function AdminDashboardPage() {
   const [activeMainTab, setActiveMainTab] = useState('dashboard')
@@ -124,73 +118,13 @@ export default function AdminDashboardPage() {
     enabled: activeMainTab === 'orders'
   })
 
-  const { data: wallets, refetch: refetchWallets } = useQuery({
-    queryKey: ['sellerWallets'],
-    queryFn: getSellerWallet,
-    enabled: activeMainTab === 'finance' && activeSubTab === 'wallets'
-  })
-
-  const { data: withdrawals, refetch: refetchWithdrawals } = useQuery({
-    queryKey: ['withdrawalRequests'],
-    queryFn: getWithdrawalRequests,
-    enabled: activeMainTab === 'finance' && activeSubTab === 'withdrawals'
-  })
-
-  const { data: commissions, refetch: refetchCommissions } = useQuery({
-    queryKey: ['platformCommissions', dateRange],
-    queryFn: () => getPlatformCommissions(dateRange),
-    enabled: activeMainTab === 'finance' && activeSubTab === 'commissions'
-  })
-
-  const { data: disputes, refetch: refetchDisputes } = useQuery({
-    queryKey: ['disputes'],
-    queryFn: getDisputes,
-    enabled: activeMainTab === 'support' && activeSubTab === 'disputes'
-  })
-
-  const { data: coupons, refetch: refetchCoupons } = useQuery({
-    queryKey: ['coupons'],
-    queryFn: getCoupons,
-    enabled: activeMainTab === 'marketing' && activeSubTab === 'coupons'
-  })
-
-  const { data: banners, refetch: refetchBanners } = useQuery({
-    queryKey: ['banners'],
-    queryFn: getBanners,
-    enabled: activeMainTab === 'marketing' && activeSubTab === 'banners'
-  })
-
-  const { data: featuredProducts, refetch: refetchFeatured } = useQuery({
-    queryKey: ['featuredProducts'],
-    queryFn: getFeaturedProducts,
-    enabled: activeMainTab === 'marketing' && activeSubTab === 'featured'
-  })
-
-  const { data: flashSales, refetch: refetchFlashSales } = useQuery({
-    queryKey: ['flashSales'],
-    queryFn: getFlashSales,
-    enabled: activeMainTab === 'marketing' && activeSubTab === 'flashsales'
-  })
-
   const { data: auditLogs, refetch: refetchLogs, isLoading: logsLoading } = useQuery({
     queryKey: ['auditLogs'],
     queryFn: getAuditLogs,
     enabled: activeMainTab === 'logs'
   })
 
-  const { data: settings, refetch: refetchSettings } = useQuery({
-    queryKey: ['settings'],
-    queryFn: getSettings,
-    enabled: activeMainTab === 'settings'
-  })
-
-  const { data: roles } = useQuery({
-    queryKey: ['roles'],
-    queryFn: getRoles,
-    enabled: activeMainTab === 'settings' && activeSubTab === 'roles'
-  })
-
-  // ---------- Mutations ----------
+  // Mutations (اختصاراً)
   const updateUserMutation = useMutation({
     mutationFn: ({ userId, updates }) => updateUser(userId, updates),
     onSuccess: () => {
@@ -202,7 +136,7 @@ export default function AdminDashboardPage() {
   })
 
   const approveProductMutation = useMutation({
-    mutationFn: ({ productId, approve, is_hidden, note }) => approveProduct(productId, approve, is_hidden, note),
+    mutationFn: ({ productId, approve, is_hidden }) => approveProduct(productId, approve, is_hidden),
     onSuccess: () => {
       queryClient.invalidateQueries(['adminProducts'])
       queryClient.invalidateQueries(['adminStats'])
@@ -231,89 +165,6 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
-  const processWithdrawalMutation = useMutation({
-    mutationFn: ({ requestId, approved, transactionId }) => processWithdrawal(requestId, approved, transactionId),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['withdrawalRequests'])
-      queryClient.invalidateQueries(['sellerWallets'])
-      toast.success('تم معالجة طلب السحب')
-    },
-    onError: (err) => toast.error(err.message)
-  })
-
-  const resolveDisputeMutation = useMutation({
-    mutationFn: ({ disputeId, resolution, notes }) => resolveDispute(disputeId, resolution, notes),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['disputes'])
-      toast.success('تم حل النزاع')
-    },
-    onError: (err) => toast.error(err.message)
-  })
-
-  const createCouponMutation = useMutation({
-    mutationFn: (couponData) => createCoupon(couponData),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['coupons'])
-      toast.success('تم إنشاء الكوبون')
-      setShowCouponModal(false)
-    },
-    onError: (err) => toast.error(err.message)
-  })
-
-  const updateBannerMutation = useMutation({
-    mutationFn: ({ bannerId, data }) => updateBanner(bannerId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['banners'])
-      toast.success('تم تحديث البانر')
-      setShowBannerModal(false)
-    },
-    onError: (err) => toast.error(err.message)
-  })
-
-  const toggleFeaturedMutation = useMutation({
-    mutationFn: ({ productId, featured }) => toggleFeatured(productId, featured),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['featuredProducts'])
-      toast.success('تم تحديث المنتج المميز')
-    },
-    onError: (err) => toast.error(err.message)
-  })
-
-  const createFlashSaleMutation = useMutation({
-    mutationFn: (saleData) => createFlashSale(saleData),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['flashSales'])
-      toast.success('تم إنشاء العرض')
-      setShowFlashSaleModal(false)
-    },
-    onError: (err) => toast.error(err.message)
-  })
-
-  const updateSettingsMutation = useMutation({
-    mutationFn: (settingsData) => updateSettings(settingsData),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['settings'])
-      toast.success('تم حفظ الإعدادات')
-      setShowSettingsModal(false)
-    },
-    onError: (err) => toast.error(err.message)
-  })
-
-  const updateRoleMutation = useMutation({
-    mutationFn: ({ roleId, permissions }) => updateRole(roleId, permissions),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['roles'])
-      toast.success('تم تحديث الصلاحيات')
-    },
-    onError: (err) => toast.error(err.message)
-  })
-
-  const backupMutation = useMutation({
-    mutationFn: () => backupDatabase(),
-    onSuccess: () => toast.success('تم إنشاء النسخة الاحتياطية'),
-    onError: () => toast.error('فشل إنشاء النسخة الاحتياطية')
-  })
-
   const exportMutation = useMutation({
     mutationFn: ({ type, format, dateRange }) => exportReport(type, format, dateRange),
     onSuccess: (data) => {
@@ -333,10 +184,10 @@ export default function AdminDashboardPage() {
   const pendingProducts = products?.filter(p => !p.is_approved).length || 0
   const pendingReceipts = orders?.filter(o => o.payment_status === 'pending' && o.receipt_image).length || 0
   const pendingSellersCount = pendingSellers?.length || 0
-  const openDisputes = disputes?.filter(d => d.status === 'open').length || 0
-  const pendingWithdrawals = withdrawals?.filter(w => w.status === 'pending').length || 0
+  const openDisputes = 0
+  const pendingWithdrawals = 0
 
-  // Product statistics (mock for now, can be replaced with real calculations)
+  // Mock product stats for details view
   const productStats = {
     all: products?.length || 0,
     sold: 45,
@@ -348,7 +199,7 @@ export default function AdminDashboardPage() {
     inappropriate: 3
   }
 
-  // Mock product list for tables (replace with real data from API)
+  // Mock product list for tables
   const mockProductsList = [
     { id: 1, name: 'هاتف ذكي', seller: 'متجر الإلكترونيات', price: 1500, publishDate: '2025-01-10', orderDate: '2025-02-15', shipDate: '2025-02-20', receiptDate: '2025-02-18', status: 'sold' },
     { id: 2, name: 'سماعات لاسلكية', seller: 'متجر الإلكترونيات', price: 300, publishDate: '2025-01-15', orderDate: '2025-02-20', shipDate: '2025-02-25', receiptDate: '2025-02-22', status: 'shipping' },
@@ -370,12 +221,9 @@ export default function AdminDashboardPage() {
 
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || []
 
-  // Helper to render product list table
   const renderProductTable = (filterStatus) => {
     const filtered = mockProductsList.filter(p => p.status === filterStatus)
-    if (filtered.length === 0) {
-      return <div className="text-center p-8 text-text-secondary">لا توجد منتجات</div>
-    }
+    if (filtered.length === 0) return <div className="text-center p-8 text-text-secondary">لا توجد منتجات</div>
     return (
       <div className="overflow-x-auto">
         <table className="w-full text-right border-collapse">
@@ -401,7 +249,7 @@ export default function AdminDashboardPage() {
                   {p.status === 'no_receipt' && 'تم الشراء بدون إيصال'}
                   {p.status === 'not_purchased' && 'لم يتم شراؤه'}
                 </td>
-               </tr>
+               </td>
             ))}
           </tbody>
         </table>
@@ -448,8 +296,56 @@ export default function AdminDashboardPage() {
             <div className="bg-primary-card p-4 rounded-2xl border border-gold/30"><Wallet className="text-gold mb-2" size={32} /><p className="text-text-secondary text-sm">سحوبات معلقة</p><p className="text-2xl font-bold">{pendingWithdrawals}</p></div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30"><h2 className="text-xl font-bold mb-4">المبيعات الشهرية</h2><ResponsiveContainer width="100%" height={300}><LineChart data={mockMonthlySales}><CartesianGrid strokeDasharray="3 3" stroke="#333" /><XAxis dataKey="name" stroke="#ddd" /><YAxis stroke="#ddd" tickFormatter={value => `${value / 1000}k`} /><Tooltip contentStyle={{ backgroundColor: '#06264D', borderColor: '#D4AF37' }} formatter={value => formatCurrency(value)} /><Line type="monotone" dataKey="sales" stroke="#D4AF37" strokeWidth={2} dot={{ fill: '#D4AF37' }} /><Line type="monotone" dataKey="commission" stroke="#60A5FA" strokeWidth={2} /></LineChart></ResponsiveContainer></div>
-            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30"><h2 className="text-xl font-bold mb-4">أفضل الفئات مبيعاً</h2><ResponsiveContainer width="100%" height={300}><PieChart><Pie data={mockTopCategories} dataKey="sales" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>{mockTopCategories.map((entry, index) => <Cell key={`cell-${index}`} fill={`hsl(${index * 45}, 70%, 55%)`} />)}</Pie><Tooltip formatter={value => formatCurrency(value)} /></PieChart></ResponsiveContainer></div>
+            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><LineChartIcon size={20} className="text-gold" /> المبيعات الشهرية</h2>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={mockMonthlySales}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                  <XAxis dataKey="name" stroke="#ddd" />
+                  <YAxis stroke="#ddd" tickFormatter={value => `${value / 1000}k`} />
+                  <Tooltip contentStyle={{ backgroundColor: '#06264D', borderColor: '#D4AF37' }} formatter={value => formatCurrency(value)} />
+                  <Line type="monotone" dataKey="sales" stroke="#D4AF37" strokeWidth={2} dot={{ fill: '#D4AF37' }} />
+                  <Line type="monotone" dataKey="commission" stroke="#60A5FA" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><PieChartIcon size={20} className="text-gold" /> أفضل الفئات مبيعاً</h2>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie data={mockTopCategories} dataKey="sales" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                    {mockTopCategories.map((entry, index) => <Cell key={`cell-${index}`} fill={`hsl(${index * 45}, 70%, 55%)`} />)}
+                  </Pie>
+                  <Tooltip formatter={value => formatCurrency(value)} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Award size={20} className="text-gold" /> أفضل 5 بائعين</h2>
+              <div className="space-y-3">
+                {mockTopSellers.map((seller, idx) => (
+                  <div key={idx} className="flex justify-between items-center p-2 bg-secondary-blue/30 rounded-lg">
+                    <div><span className="font-bold">{idx + 1}.</span> {seller.name}</div>
+                    <div className="flex gap-4"><span>{formatCurrency(seller.sales)}</span><span className="text-gold">⭐ {seller.rating}</span></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Activity size={20} className="text-gold" /> نسبة إتمام الطلبات</h2>
+              <div className="flex justify-center items-center h-48">
+                <div className="relative w-40 h-40">
+                  <svg viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="#333" strokeWidth="8" />
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="#D4AF37" strokeWidth="8" strokeDasharray={`${completionRate * 2.827} 283`} transform="rotate(-90 50 50)" />
+                    <text x="50" y="50" textAnchor="middle" dy=".3em" fill="white" fontSize="20">{completionRate}%</text>
+                  </svg>
+                </div>
+              </div>
+              <p className="text-center text-text-secondary">نسبة الطلبات المكتملة مقابل الملغاة</p>
+            </div>
           </div>
         </div>
       )}
@@ -463,12 +359,12 @@ export default function AdminDashboardPage() {
             <button onClick={() => setActiveSubTab('pending_sellers')} className={`px-4 py-2 ${activeSubTab === 'pending_sellers' ? 'border-b-2 border-gold text-gold' : 'text-text-secondary'}`}>طلبات الانضمام {pendingSellersCount > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full ml-1">{pendingSellersCount}</span>}</button>
           </div>
 
-          {/* Sellers sub-tab */}
+          {/* Sellers */}
           {activeSubTab === 'sellers' && (
             <div>
               <div className="mb-4">
                 <label className="block text-gold mb-2">اختر البائع:</label>
-                <Select value={selectedSeller?.id || ''} onChange={(e) => { const seller = sellerUsers.find(u => u.id === e.target.value); setSelectedSeller(seller); setShowSellerModal(true); }} className="w-full md:w-1/2">
+                <Select value={selectedSeller?.id || ''} onChange={(e) => { const seller = sellerUsers.find(u => u.id === e.target.value); setSelectedSeller(seller); setShowSellerModal(true); }} className="w-full md:w-1/2 bg-white text-gray-900 border border-gold/30 rounded-lg focus:outline-none focus:border-gold">
                   <option value="">-- اختر بائعاً --</option>
                   {sellerUsers.map(seller => <option key={seller.id} value={seller.id}>{seller.store_name || seller.full_name} ({seller.email})</option>)}
                 </Select>
@@ -480,10 +376,10 @@ export default function AdminDashboardPage() {
                     <TabPanels>
                       <TabPanel value="profile">
                         <div className="overflow-x-auto"><table className="w-full"><tbody>
-                          <tr><td className="p-2 font-bold">الاسم</td><td>{selectedSeller.full_name || '-'}</td><td className="p-2 font-bold">البريد</td><td>{selectedSeller.email}</td></tr>
-                          <tr><td className="p-2 font-bold">نوع الحساب</td><td>{selectedSeller.account_type === 'seller' ? 'بائع' : (selectedSeller.account_type === 'buyer' ? 'مشتري' : 'أدمن')}</td><td className="p-2 font-bold">الحالة</td><td>{selectedSeller.is_banned ? 'محظور' : 'نشط'}</td></tr>
-                          <tr><td className="p-2 font-bold">تاريخ التسجيل</td><td>{formatDate(selectedSeller.created_at)}</td><td className="p-2 font-bold">رقم الحساب البنكي</td><td>{selectedSeller.bank_account || '-'}</td></tr>
-                          <tr><td className="p-2 font-bold">نوع الحساب البنكي</td><td>{selectedSeller.bank_type || '-'}</td><td className="p-2 font-bold">التواصل (الهاتف)</td><td>{selectedSeller.phone || '-'}</td></tr>
+                          <tr><td className="p-2 font-bold text-gold">الاسم</td><td>{selectedSeller.full_name || '-'}</td><td className="p-2 font-bold text-gold">البريد</td><td>{selectedSeller.email}</td></tr>
+                          <tr><td className="p-2 font-bold text-gold">نوع الحساب</td><td>{selectedSeller.account_type === 'seller' ? 'بائع' : (selectedSeller.account_type === 'buyer' ? 'مشتري' : 'أدمن')}</td><td className="p-2 font-bold text-gold">الحالة</td><td>{selectedSeller.is_banned ? 'محظور' : 'نشط'}</td></tr>
+                          <tr><td className="p-2 font-bold text-gold">تاريخ التسجيل</td><td>{formatDate(selectedSeller.created_at)}</td><td className="p-2 font-bold text-gold">رقم الحساب البنكي</td><td>{selectedSeller.bank_account || '-'}</td></tr>
+                          <tr><td className="p-2 font-bold text-gold">نوع الحساب البنكي</td><td>{selectedSeller.bank_type || '-'}</td><td className="p-2 font-bold text-gold">التواصل (الهاتف)</td><td>{selectedSeller.phone || '-'}</td></tr>
                         </tbody></table></div>
                         <div className="flex gap-2 mt-4">
                           <button onClick={() => updateUserMutation.mutate({ userId: selectedSeller.id, updates: { is_banned: !selectedSeller.is_banned } })} className={`px-3 py-1 rounded text-white ${selectedSeller.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{selectedSeller.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
@@ -498,14 +394,14 @@ export default function AdminDashboardPage() {
                       </TabPanel>
                       <TabPanel value="stats">
                         <div className="overflow-x-auto"><table className="w-full"><thead><tr><th>القسم</th><th>التفاصيل</th><th>طلب البيانات</th></tr></thead><tbody>
-                          <tr><td>المنتجات المنشورة</td><td>{productStats.all}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('all'); }}>عرض</button></td></tr>
-                          <tr><td>المنتجات المباعة</td><td>{productStats.sold}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('sold'); }}>عرض</button></td></tr>
-                          <tr><td>المنتجات قيد الشحن</td><td>{productStats.shipping}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('shipping'); }}>عرض</button></td></tr>
-                          <tr><td>المنتجات لم تشحن (تم رفع الإيصال)</td><td>{productStats.not_shipped_receipt_uploaded}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_shipped'); }}>عرض</button></td></tr>
-                          <tr><td>المنتجات المشتراة بدون إيصال</td><td>{productStats.no_receipt_purchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('no_receipt'); }}>عرض</button></td></tr>
-                          <tr><td>المنتجات غير المشتراة</td><td>{productStats.not_purchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_purchased'); }}>عرض</button></td></tr>
-                          <tr><td>المنتجات المكررة</td><td>{productStats.duplicate}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('duplicate'); }}>عرض</button></td></tr>
-                          <tr><td>المنتجات غير اللائقة</td><td>{productStats.inappropriate}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('inappropriate'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات المنشورة</td><td>{productStats.all}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('all'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات المباعة</td><td>{productStats.sold}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('sold'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات قيد الشحن</td><td>{productStats.shipping}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('shipping'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات لم تشحن (تم رفع الإيصال)</td><td>{productStats.not_shipped_receipt_uploaded}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_shipped'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات المشتراة بدون إيصال</td><td>{productStats.no_receipt_purchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('no_receipt'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات غير المشتراة</td><td>{productStats.not_purchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_purchased'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات المكررة</td><td>{productStats.duplicate}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('duplicate'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات غير اللائقة</td><td>{productStats.inappropriate}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('inappropriate'); }}>عرض</button></td></tr>
                         </tbody></table></div>
                       </TabPanel>
                     </TabPanels>
@@ -515,21 +411,21 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* Buyers sub-tab */}
+          {/* Buyers */}
           {activeSubTab === 'buyers' && (
             <div>
               <div className="flex gap-4 mb-4">
-                <Input placeholder="بحث بالبريد أو الاسم..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="flex-1" />
-                <Select value={buyerActivityFilter} onChange={(e) => setBuyerActivityFilter(e.target.value)} className="w-48">
+                <Input placeholder="بحث بالبريد أو الاسم..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="flex-1 bg-white text-gray-900 border border-gold/30 rounded-lg focus:outline-none focus:border-gold" />
+                <Select value={buyerActivityFilter} onChange={(e) => setBuyerActivityFilter(e.target.value)} className="w-48 bg-white text-gray-900 border border-gold/30 rounded-lg focus:outline-none focus:border-gold">
                   <option value="all">جميع المشترين</option>
                   <option value="active">نشط آخر 30 يوم</option>
                   <option value="inactive">غير نشط &gt; 90 يوم</option>
                 </Select>
-                <Button variant="secondary" onClick={() => refetchUsers()}><Search size={16} /> بحث</Button>
+                <Button variant="secondary" onClick={() => refetchUsers()} className="flex items-center gap-2"><Search size={16} /> بحث</Button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-right border-collapse">
-                  <thead><tr className="border-b border-gold/30 bg-primary-card/50"><th>الاسم</th><th>البريد</th><th>عدد الطلبات</th><th>إجمالي الإنفاق</th><th>آخر طلب</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+                  <thead><tr className="border-b border-gold/30 bg-primary-card/50"><th>الاسم</th><th>البريد</th><th>عدد الطلبات</th><th>إجمالي الإنفاق</th><th>آخر طلب</th><th>الحالة</th><th>إجراءات</th></table></thead>
                   <tbody>
                     {users?.filter(u => u.account_type === 'buyer').map(user => (
                       <tr key={user.id}>
@@ -543,24 +439,21 @@ export default function AdminDashboardPage() {
                           <button onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { is_banned: !user.is_banned } })} className={`px-2 py-1 rounded text-xs ${user.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{user.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
                           <button onClick={() => { setSelectedBuyer(user); setShowBuyerModal(true); }} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
                         </td>
-                      </tr>
+                       </tr>
                     ))}
                   </tbody>
-                </table>
+                 </table>
               </div>
             </div>
           )}
 
-          {/* Pending sellers sub-tab */}
+          {/* Pending sellers */}
           {activeSubTab === 'pending_sellers' && (
             <div className="space-y-4">
               {pendingSellers?.map(s => (
                 <div key={s.id} className="bg-primary-card p-4 rounded-2xl border border-gold/30">
-                  <div><h3>{s.full_name}</h3><p>{s.email} | {s.phone}</p><p>طلب انضمام: {formatDate(s.created_at)}</p></div>
-                  <div className="flex gap-2 mt-2">
-                    <button onClick={() => approveSellerMutation.mutate({ sellerId: s.id, approved: true })} className="bg-green-600 px-4 py-2 rounded">قبول</button>
-                    <button onClick={() => { const notes = prompt('سبب الرفض:'); if (notes) approveSellerMutation.mutate({ sellerId: s.id, approved: false, notes }); }} className="bg-red-600 px-4 py-2 rounded">رفض</button>
-                  </div>
+                  <div><h3 className="font-bold">{s.full_name}</h3><p>{s.email} | {s.phone}</p><p>طلب انضمام: {formatDate(s.created_at)}</p></div>
+                  <div className="flex gap-2 mt-2"><button onClick={() => approveSellerMutation.mutate({ sellerId: s.id, approved: true })} className="bg-green-600 px-4 py-2 rounded">قبول</button><button onClick={() => { const notes = prompt('سبب الرفض:'); if (notes) approveSellerMutation.mutate({ sellerId: s.id, approved: false, notes }); }} className="bg-red-600 px-4 py-2 rounded">رفض</button></div>
                 </div>
               ))}
             </div>
@@ -568,7 +461,14 @@ export default function AdminDashboardPage() {
 
           {showBuyerModal && selectedBuyer && (
             <Modal onClose={() => setShowBuyerModal(false)} title={`تفاصيل المشتري: ${selectedBuyer.full_name}`}>
-              <div className="grid grid-cols-2 gap-4"><div><label>الاسم:</label><p>{selectedBuyer.full_name}</p></div><div><label>البريد:</label><p>{selectedBuyer.email}</p></div><div><label>عدد الطلبات الكلي:</label><p>{selectedBuyer.order_count}</p></div><div><label>إجمالي الإنفاق:</label><p>{formatCurrency(selectedBuyer.total_spent)}</p></div><div><label>آخر طلب:</label><p>{formatDate(selectedBuyer.last_order_date)}</p></div><div><label>العناوين المحفوظة:</label><p>{selectedBuyer.addresses || '-'}</p></div></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div><label className="text-gold">الاسم:</label><p>{selectedBuyer.full_name}</p></div>
+                <div><label className="text-gold">البريد:</label><p>{selectedBuyer.email}</p></div>
+                <div><label className="text-gold">عدد الطلبات الكلي:</label><p>{selectedBuyer.order_count}</p></div>
+                <div><label className="text-gold">إجمالي الإنفاق:</label><p>{formatCurrency(selectedBuyer.total_spent)}</p></div>
+                <div><label className="text-gold">آخر طلب:</label><p>{formatDate(selectedBuyer.last_order_date)}</p></div>
+                <div><label className="text-gold">العناوين المحفوظة:</label><p>{selectedBuyer.addresses || '-'}</p></div>
+              </div>
               <button onClick={() => updateUserMutation.mutate({ userId: selectedBuyer.id, updates: { is_banned: !selectedBuyer.is_banned } })} className={`mt-4 px-3 py-1 rounded text-white ${selectedBuyer.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{selectedBuyer.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
             </Modal>
           )}
@@ -597,16 +497,16 @@ export default function AdminDashboardPage() {
                 <table className="w-full text-right border-collapse">
                   <thead><tr className="border-b border-gold/30 bg-primary-card/50"><th className="p-3">القسم</th><th className="p-3">التفاصيل</th></tr></thead>
                   <tbody>
-                    <tr><td className="p-3 font-bold">جميع المنتجات</td><td className="p-3">{productStats.all}</td></tr>
-                    <tr><td className="p-3 font-bold">المنتجات المباعة</td><td className="p-3">{productStats.sold}</td></tr>
-                    <tr><td className="p-3 font-bold">المنتجات قيد الشحن</td><td className="p-3">{productStats.shipping}</td></tr>
-                    <tr><td className="p-3 font-bold">المنتجات التي لم تشحن (تم رفع الإيصال)</td><td className="p-3">{productStats.not_shipped_receipt_uploaded}</td></tr>
-                    <tr><td className="p-3 font-bold">المنتجات المشتراة بدون إيصال</td><td className="p-3">{productStats.no_receipt_purchased}</td></tr>
-                    <tr><td className="p-3 font-bold">المنتجات غير المشتراة</td><td className="p-3">{productStats.not_purchased}</td></tr>
-                    <tr><td className="p-3 font-bold">المنتجات المكررة</td><td className="p-3">{productStats.duplicate}</td></tr>
-                    <tr><td className="p-3 font-bold">المنتجات غير اللائقة</td><td className="p-3">{productStats.inappropriate}</td></tr>
+                    <tr><td className="p-3 font-bold">جميع المنتجات</td><td>{productStats.all}</td></tr>
+                    <tr><td className="p-3 font-bold">المنتجات المباعة</td><td>{productStats.sold}</td></tr>
+                    <tr><td className="p-3 font-bold">المنتجات قيد الشحن</td><td>{productStats.shipping}</td></tr>
+                    <tr><td className="p-3 font-bold">المنتجات التي لم تشحن (تم رفع الإيصال)</td><td>{productStats.not_shipped_receipt_uploaded}</td></tr>
+                    <tr><td className="p-3 font-bold">المنتجات المشتراة بدون إيصال</td><td>{productStats.no_receipt_purchased}</td></tr>
+                    <tr><td className="p-3 font-bold">المنتجات غير المشتراة</td><td>{productStats.not_purchased}</td></tr>
+                    <tr><td className="p-3 font-bold">المنتجات المكررة</td><td>{productStats.duplicate}</td></tr>
+                    <tr><td className="p-3 font-bold">المنتجات غير اللائقة</td><td>{productStats.inappropriate}</td></tr>
                   </tbody>
-                </table>
+                 </table>
               </div>
             </div>
           )}
@@ -622,11 +522,12 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Placeholders for other tabs */}
+      {/* Other tabs placeholders */}
       {(activeMainTab === 'orders' || activeMainTab === 'finance' || activeMainTab === 'marketing' || activeMainTab === 'support' || activeMainTab === 'logs' || activeMainTab === 'settings') && (
         <div className="text-center py-20 text-text-secondary">يتم تطوير هذا القسم ...</div>
       )}
     </div>
   )
 }
+
 

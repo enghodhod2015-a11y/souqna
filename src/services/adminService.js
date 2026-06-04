@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 
 // ==========================================
-// دوال الإحصائيات العامة (موجودة)
+// دوال الإحصائيات العامة (معدلة)
 // ==========================================
 export const getAdminStats = async () => {
   const { count: usersCount, error: usersError } = await supabase
@@ -19,12 +19,13 @@ export const getAdminStats = async () => {
     .select('*', { count: 'exact', head: true })
   if (ordersError) throw ordersError
 
+  // ✅ استخدام total_amount بدلاً من total_price
   const { data: salesData, error: salesError } = await supabase
     .from('orders')
-    .select('total_price')
+    .select('total_amount')
     .eq('status', 'completed')
   if (salesError) throw salesError
-  const totalSales = salesData.reduce((sum, o) => sum + (o.total_price || 0), 0)
+  const totalSales = salesData.reduce((sum, o) => sum + (o.total_amount || 0), 0)
 
   const { count: pendingReceipts, error: pendingError } = await supabase
     .from('orders')
@@ -33,28 +34,36 @@ export const getAdminStats = async () => {
     .not('receipt_image', 'is', null)
   if (pendingError) throw pendingError
 
-  // إحصائيات إضافية مطلوبة في لوحة التحكم
+  // ✅ تعريف stats ككائن فارغ أولاً
+  let stats = {}
+
   // مبيعات اليوم
   const today = new Date()
-  today.setHours(0,0,0,0)
+  today.setHours(0, 0, 0, 0)
   const { data: todaySales, error: todayError } = await supabase
     .from('orders')
-    .select('total_price')
+    .select('total_amount')
     .eq('status', 'completed')
     .gte('created_at', today.toISOString())
   if (!todayError) {
-    const dailySales = todaySales.reduce((sum, o) => sum + (o.total_price || 0), 0)
+    const dailySales = todaySales.reduce((sum, o) => sum + (o.total_amount || 0), 0)
     stats.dailySales = dailySales
-    stats.dailyCommission = dailySales * 0.1 // افتراض 10% عمولة
+    stats.dailyCommission = dailySales * 0.1
+  } else {
+    stats.dailySales = 0
+    stats.dailyCommission = 0
   }
+
   // عدد الطلبات الجديدة (اليوم)
   const { count: newOrders, error: newOrdersError } = await supabase
     .from('orders')
     .select('*', { count: 'exact', head: true })
     .gte('created_at', today.toISOString())
-  if (!newOrdersError) stats.newOrders = newOrders
+  stats.newOrders = newOrdersError ? 0 : newOrders
+
   // عدد النزاعات المفتوحة (جدول افتراضي)
-  stats.openDisputes = 0 // سيتم جلبها لاحقاً من جدول disputes إذا وجد
+  stats.openDisputes = 0
+
   // نسبة إتمام الطلبات
   const { count: completedOrders, error: completedError } = await supabase
     .from('orders')
@@ -69,18 +78,29 @@ export const getAdminStats = async () => {
     stats.completionRate = 0
   }
 
-  return { usersCount, productsCount, ordersCount, totalSales, pendingReceipts, dailySales: stats.dailySales, dailyCommission: stats.dailyCommission, newOrders: stats.newOrders, openDisputes: stats.openDisputes, completionRate: stats.completionRate }
+  return {
+    usersCount,
+    productsCount,
+    ordersCount,
+    totalSales,
+    pendingReceipts,
+    dailySales: stats.dailySales,
+    dailyCommission: stats.dailyCommission,
+    newOrders: stats.newOrders,
+    openDisputes: stats.openDisputes,
+    completionRate: stats.completionRate
+  }
 }
 
 // ==========================================
-// دوال المستخدمين (موجودة ومطورة)
+// دوال المستخدمين (مطورة)
 // ==========================================
 export const getUsers = async (filters = {}) => {
   let query = supabase.from('profiles').select('*').order('created_at', { ascending: false })
   if (filters.search) query = query.or(`email.ilike.%${filters.search}%,full_name.ilike.%${filters.search}%`)
   const { data, error } = await query
   if (error) throw error
-  // إضافة بيانات إحصائية للمستخدمين (عدد الطلبات، إجمالي الإنفاق، إلخ) – يمكن جلبها من جداول أخرى
+
   for (const user of data) {
     // عدد طلبات المشتري
     const { count: orderCount, error: orderErr } = await supabase
@@ -88,13 +108,15 @@ export const getUsers = async (filters = {}) => {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
     if (!orderErr) user.order_count = orderCount
-    // إجمالي الإنفاق
+
+    // ✅ إجمالي الإنفاق (استخدام total_amount)
     const { data: spentData, error: spentErr } = await supabase
       .from('orders')
-      .select('total_price')
+      .select('total_amount')
       .eq('user_id', user.id)
       .eq('status', 'completed')
-    if (!spentErr) user.total_spent = spentData.reduce((s, o) => s + (o.total_price || 0), 0)
+    if (!spentErr) user.total_spent = spentData.reduce((s, o) => s + (o.total_amount || 0), 0)
+
     // آخر طلب
     const { data: lastOrder, error: lastErr } = await supabase
       .from('orders')
@@ -103,6 +125,7 @@ export const getUsers = async (filters = {}) => {
       .order('created_at', { ascending: false })
       .limit(1)
     if (!lastErr && lastOrder.length) user.last_order_date = lastOrder[0].created_at
+
     // بيانات البائع الإضافية
     if (user.account_type === 'seller') {
       const { data: productsData, error: productsErr } = await supabase
@@ -111,8 +134,8 @@ export const getUsers = async (filters = {}) => {
         .eq('seller_id', user.id)
         .eq('is_approved', true)
       if (!productsErr) user.total_sales = productsData.reduce((s, p) => s + (p.price || 0), 0)
-      user.completion_rate = 0 // يمكن حسابه من الطلبات
-      user.rating = 0 // يمكن جلب من جدول reviews
+      user.completion_rate = 0
+      user.rating = 0
       user.is_verified = user.is_verified || false
     }
   }
@@ -130,24 +153,20 @@ export const updateUser = async (userId, updates) => {
   return data
 }
 
-// جلب طلبات انضمام البائعين الجدد (بافتراض وجود حقل is_verified أو is_approved في profiles)
 export const getPendingSellers = async () => {
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('account_type', 'seller')
-    .eq('is_verified', false) // افتراض وجود عمود is_verified
+    .eq('is_verified', false)
     .order('created_at', { ascending: false })
   if (error) {
-    // إذا لم يكن العمود موجوداً، نعيد مصفوفة فارغة
     console.warn('Column is_verified might not exist in profiles table')
     return []
   }
-  // إضافة حقل وثائق (افتراضي)
   return data.map(seller => ({ ...seller, license_document: null }))
 }
 
-// قبول أو رفض بائع جديد
 export const approveSeller = async (sellerId, approved, notes = '') => {
   const { data, error } = await supabase
     .from('profiles')
@@ -156,13 +175,12 @@ export const approveSeller = async (sellerId, approved, notes = '') => {
     .select()
     .single()
   if (error) throw error
-  // تسجيل في سجل العمليات
   await addAuditLog(approved ? 'approve_seller' : 'reject_seller', 'profile', sellerId, { notes })
   return data
 }
 
 // ==========================================
-// دوال المنتجات (موجودة ومطورة)
+// دوال المنتجات
 // ==========================================
 export const getProductsForAdmin = async (filters = {}) => {
   let query = supabase
@@ -191,7 +209,7 @@ export const approveProduct = async (productId, approve, is_hidden = null) => {
 }
 
 // ==========================================
-// دوال الطلبات (موجودة ومطورة)
+// دوال الطلبات (معدلة)
 // ==========================================
 export const getOrdersForAdmin = async () => {
   const { data, error } = await supabase
@@ -199,10 +217,10 @@ export const getOrdersForAdmin = async () => {
     .select('*, product:products(title, name), buyer:profiles!orders_user_id_fkey(full_name, email)')
     .order('created_at', { ascending: false })
   if (error) throw error
-  // إضافة عمولة المنصة (افتراض 10%)
+  // ✅ استخدام total_amount
   return data.map(order => ({
     ...order,
-    commission: order.total_price * 0.1,
+    commission: (order.total_amount || 0) * 0.1,
     product: order.product ? { ...order.product, title: order.product.name || order.product.title } : null
   }))
 }
@@ -224,16 +242,13 @@ export const reviewReceipt = async (orderId, approved, notes = '') => {
 // ==========================================
 // دوال المالية (محافظ البائعين، طلبات السحب، العمولات)
 // ==========================================
-// محافظ البائعين (من جدول seller_wallets المفترض)
 export const getSellerWallet = async () => {
-  // نفترض وجود جدول seller_wallets
   const { data, error } = await supabase
     .from('seller_wallets')
     .select('*, seller:profiles(full_name)')
     .order('created_at', { ascending: false })
   if (error) {
     console.warn('seller_wallets table not found, returning mock data')
-    // بيانات وهمية
     const { data: sellers } = await supabase.from('profiles').select('id, full_name').eq('account_type', 'seller')
     return (sellers || []).map(s => ({
       seller_id: s.id,
@@ -246,7 +261,6 @@ export const getSellerWallet = async () => {
   return data
 }
 
-// طلبات السحب (جدول withdrawal_requests)
 export const getWithdrawalRequests = async () => {
   const { data, error } = await supabase
     .from('withdrawal_requests')
@@ -259,7 +273,6 @@ export const getWithdrawalRequests = async () => {
   return data
 }
 
-// معالجة طلب سحب (موافقة أو رفض)
 export const processWithdrawal = async (requestId, approved, transactionId = null) => {
   const updates = { status: approved ? 'completed' : 'rejected' }
   if (transactionId) updates.transaction_id = transactionId
@@ -274,7 +287,6 @@ export const processWithdrawal = async (requestId, approved, transactionId = nul
   return data
 }
 
-// تقرير العمولات (حسب الفترة)
 export const getPlatformCommissions = async ({ start, end } = {}) => {
   let query = supabase
     .from('orders')
@@ -284,7 +296,7 @@ export const getPlatformCommissions = async ({ start, end } = {}) => {
   if (end) query = query.lte('created_at', new Date(end).toISOString())
   const { data, error } = await query
   if (error) throw error
-  // تجميع حسب البائع
+
   const sellerMap = new Map()
   for (const order of data) {
     const sellerId = order.seller_id
@@ -294,18 +306,18 @@ export const getPlatformCommissions = async ({ start, end } = {}) => {
         seller_name: order.seller?.full_name || 'غير معروف',
         total_sales: 0,
         commission_amount: 0,
-        commission_rate: 10 // نسبة ثابتة 10%
+        commission_rate: 10
       })
     }
     const seller = sellerMap.get(sellerId)
-    seller.total_sales += order.total_price
-    seller.commission_amount += order.total_price * 0.1
+    seller.total_sales += order.total_amount || 0
+    seller.commission_amount += (order.total_amount || 0) * 0.1
   }
   return Array.from(sellerMap.values())
 }
 
 // ==========================================
-// دوال النزاعات (جدول disputes)
+// دوال النزاعات
 // ==========================================
 export const getDisputes = async () => {
   const { data, error } = await supabase
@@ -332,9 +344,8 @@ export const resolveDispute = async (disputeId, resolution, notes = '') => {
 }
 
 // ==========================================
-// دوال التسويق (كوبونات، بانرات، منتجات مميزة، عروض فلاش)
+// دوال التسويق
 // ==========================================
-// كوبونات الخصم
 export const getCoupons = async () => {
   const { data, error } = await supabase
     .from('coupons')
@@ -343,8 +354,8 @@ export const getCoupons = async () => {
   if (error) {
     console.warn('coupons table not found, returning mock data')
     return [
-      { id: 1, code: 'WELCOME10', discount_type: 'percentage', discount_value: 10, expiry_date: new Date(Date.now() + 30*86400000), is_active: true },
-      { id: 2, code: 'SAVE50', discount_type: 'fixed', discount_value: 50, expiry_date: new Date(Date.now() + 15*86400000), is_active: true }
+      { id: 1, code: 'WELCOME10', discount_type: 'percentage', discount_value: 10, expiry_date: new Date(Date.now() + 30 * 86400000), is_active: true },
+      { id: 2, code: 'SAVE50', discount_type: 'fixed', discount_value: 50, expiry_date: new Date(Date.now() + 15 * 86400000), is_active: true }
     ]
   }
   return data
@@ -361,14 +372,13 @@ export const createCoupon = async (couponData) => {
   return data
 }
 
-// البانرات
 export const getBanners = async () => {
   const { data, error } = await supabase
     .from('banners')
     .select('*')
     .order('order', { ascending: true })
   if (error) {
-    console.warn('banners table not found, returning mock data')
+    console.warn('banners table not found, returning empty array')
     return []
   }
   return data
@@ -386,7 +396,6 @@ export const updateBanner = async (bannerId, data) => {
   return updated
 }
 
-// المنتجات المميزة
 export const getFeaturedProducts = async () => {
   const { data, error } = await supabase
     .from('products')
@@ -409,14 +418,13 @@ export const toggleFeatured = async (productId, featured) => {
   return data
 }
 
-// عروض فلاش
 export const getFlashSales = async () => {
   const { data, error } = await supabase
     .from('flash_sales')
     .select('*')
     .order('created_at', { ascending: false })
   if (error) {
-    console.warn('flash_sales table not found, returning mock data')
+    console.warn('flash_sales table not found, returning empty array')
     return []
   }
   return data
@@ -459,7 +467,6 @@ export const updateSettings = async (settingsData) => {
   return data
 }
 
-// الصلاحيات (roles)
 export const getRoles = async () => {
   const { data, error } = await supabase
     .from('roles')
@@ -477,8 +484,6 @@ export const getRoles = async () => {
 }
 
 export const updateRole = async (roleId, permissions) => {
-  // تحديث الصلاحيات في جدول role_permissions
-  // حذف القديمة وإضافة الجديدة
   const { error: deleteError } = await supabase
     .from('role_permissions')
     .delete()
@@ -499,15 +504,12 @@ export const updateRole = async (roleId, permissions) => {
 // دوال النسخ الاحتياطي وتصدير التقارير
 // ==========================================
 export const backupDatabase = async () => {
-  // في بيئة حقيقية، يمكن استداء API خارجي أو استخدام supabase.rpc
   console.log('Database backup requested')
-  // محاكاة تأخير
   await new Promise(resolve => setTimeout(resolve, 1000))
   return { success: true, url: null }
 }
 
 export const exportReport = async (type, format, dateRange) => {
-  // تصدير البيانات بتنسيق CSV أو JSON
   let data = []
   if (type === 'commissions') {
     data = await getPlatformCommissions(dateRange)
@@ -516,7 +518,6 @@ export const exportReport = async (type, format, dateRange) => {
   } else if (type === 'summary') {
     data = [await getAdminStats()]
   }
-  // تحويل إلى CSV
   let csv = ''
   if (format === 'csv' && data.length) {
     const headers = Object.keys(data[0])
@@ -529,7 +530,7 @@ export const exportReport = async (type, format, dateRange) => {
 }
 
 // ==========================================
-// دوال سجل العمليات (موجودة سابقاً)
+// دوال سجل العمليات
 // ==========================================
 export const addAuditLog = async (action, targetType, targetId, details) => {
   const { data: { user } } = await supabase.auth.getUser()
@@ -551,7 +552,7 @@ export const getAuditLogs = async () => {
 }
 
 // ==========================================
-// دوال المبيعات الشهرية
+// دوال المبيعات الشهرية (معدلة)
 // ==========================================
 export const getMonthlySalesAll = async () => {
   const now = new Date()
@@ -568,11 +569,11 @@ export const getMonthlySalesAll = async () => {
   for (const month of months) {
     const { data, error } = await supabase
       .from('orders')
-      .select('total_price')
+      .select('total_amount')
       .eq('status', 'completed')
       .gte('created_at', month.start.toISOString())
       .lte('created_at', month.end.toISOString())
-    const sales = error ? 0 : data.reduce((sum, o) => sum + (o.total_price || 0), 0)
+    const sales = error ? 0 : data.reduce((sum, o) => sum + (o.total_amount || 0), 0)
     results.push({ name: month.name, sales })
   }
   return results
