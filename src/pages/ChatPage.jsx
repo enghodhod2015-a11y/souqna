@@ -5,7 +5,7 @@ import { getOrCreateConversation, sendMessage, getMessages, markMessagesAsRead }
 import { getProductById } from '../services/productService'
 import { supabase } from '../services/supabase' 
 import { Button } from '../components/ui/Button'
-import { Send } from 'lucide-react'
+import { Send, CheckCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function ChatPage() {
@@ -25,7 +25,7 @@ export default function ChatPage() {
     if (user) initChat()
     return () => {
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)  // ✅ إلغاء الاشتراك عند مغادرة الصفحة
+        supabase.removeChannel(channelRef.current)
       }
     }
   }, [productId, conversationId, user])
@@ -43,7 +43,6 @@ export default function ChatPage() {
           .eq('id', conversationId)
           .single()
         if (convErr) throw convErr
-
         currentConv = convData
         if (currentConv.product_id) {
           currentProduct = await getProductById(currentConv.product_id)
@@ -52,16 +51,13 @@ export default function ChatPage() {
       else if (productId) {
         currentProduct = await getProductById(productId)
         if (!currentProduct) throw new Error('المنتج غير موجود')
-
         const buyerId = user.id
         const sellerId = currentProduct.seller_id
-
         if (buyerId === sellerId) {
           toast.error('لا يمكنك مراسلة نفسك!')
           navigate('/')
           return
         }
-
         currentConv = await getOrCreateConversation(productId, buyerId, sellerId)
       }
 
@@ -71,7 +67,11 @@ export default function ChatPage() {
       if (currentConv) {
         const msgs = await getMessages(currentConv.id)
         setMessages(msgs || [])
+        // تحديث حالة القراءة للمشاهد الحالي
         await markMessagesAsRead(currentConv.id, user.id)
+        // إعادة تحميل الرسائل لتحديث is_read (اختياري)
+        const updatedMsgs = await getMessages(currentConv.id)
+        setMessages(updatedMsgs || [])
       }
     } catch (err) {
       console.error(err)
@@ -84,7 +84,6 @@ export default function ChatPage() {
   useEffect(() => {
     if (!conversation?.id || !user?.id) return
 
-    // إلغاء الاشتراك السابق إن وجد
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current)
     }
@@ -103,8 +102,30 @@ export default function ChatPage() {
             return [...prev, payload.new]
           })
           if (payload.new.receiver_id === user.id) {
-            markMessagesAsRead(conversation.id, user.id)
+            markMessagesAsRead(conversation.id, user.id).then(() => {
+              // تحديث حالة القراءة في الواجهة
+              setMessages(prev => prev.map(m => 
+                m.id === payload.new.id ? { ...m, is_read: true } : m
+              ))
+            })
           }
+        }
+      })
+      .subscribe()
+
+    // استماع لتحديثات حالة القراءة (عندما يقرأ الطرف الآخر الرسائل)
+    const readChannel = supabase
+      .channel(`read:${conversation.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+        filter: `conversation_id=eq.${conversation.id}`
+      }, (payload) => {
+        if (payload.new && payload.new.is_read === true) {
+          setMessages(prev => prev.map(m => 
+            m.id === payload.new.id ? { ...m, is_read: true } : m
+          ))
         }
       })
       .subscribe()
@@ -112,10 +133,9 @@ export default function ChatPage() {
     channelRef.current = channel
 
     return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
-        channelRef.current = null
-      }
+      supabase.removeChannel(channel)
+      supabase.removeChannel(readChannel)
+      channelRef.current = null
     }
   }, [conversation?.id, user?.id])
 
@@ -182,8 +202,10 @@ export default function ChatPage() {
                   }`}
                 >
                   <p className="text-base break-words leading-relaxed">{msg.message}</p>
-                  <div className={`text-xs mt-1 ${isOwn ? 'text-gray-700/70' : 'text-gray-500'} text-left`}>
-                    {new Date(msg.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
+                  <div className={`flex items-center justify-end gap-1 text-xs mt-1 ${isOwn ? 'text-gray-700/70' : 'text-gray-500'}`}>
+                    <span>{new Date(msg.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}</span>
+                    {isOwn && msg.is_read && <CheckCheck size={14} className="text-blue-500" />}
+                    {isOwn && !msg.is_read && <span className="text-gray-400">✓</span>}
                   </div>
                 </div>
               </div>

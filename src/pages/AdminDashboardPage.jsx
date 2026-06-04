@@ -274,7 +274,7 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
-  // التعديل الجوهري: sendNotificationMutation الآن تنشئ محادثة بين الإدارة والمستخدم وتضع related_id في الإشعار
+  // ================= التعديل الوحيد في هذا الملف =================
   const sendNotificationMutation = useMutation({
     mutationFn: async ({ userId, title, message }) => {
       // 1. الحصول على معرف الإدارة الحالي
@@ -293,7 +293,7 @@ export default function AdminDashboardPage() {
       if (existingConv) {
         conversationId = existingConv.id
       } else {
-        // إنشاء محادثة جديدة (الإدارة كمشتري، المستخدم كبائع - أو العكس)
+        // إنشاء محادثة جديدة (الإدارة كمشتري، المستخدم كبائع)
         const { data: newConv, error: convError } = await supabase
           .from('conversations')
           .insert({
@@ -310,19 +310,19 @@ export default function AdminDashboardPage() {
         conversationId = newConv.id
       }
 
-      // 3. إدراج الإشعار مع related_id = conversationId
+      // 3. إدراج الإشعار مع related_id كنص (string) - يجب أن يكون عمود related_id من نوع TEXT
       const { error: notifError } = await supabase.from('notifications').insert({
         user_id: userId,
-        type: 'message',  // تغيير النوع إلى message حتى تفتح صفحة الشات
+        type: 'message',
         title,
         message,
-        related_id: conversationId,
+        related_id: conversationId.toString(), // تحويل UUID إلى نص
         is_read: false,
         created_at: new Date().toISOString()
       })
       if (notifError) throw notifError
 
-      // 4. إدراج رسالة في المحادثة (اختياري لتظهر مباشرة)
+      // 4. إدراج رسالة في المحادثة (لتظهر مباشرة في شاشة المستخدم)
       await supabase.from('messages').insert({
         conversation_id: conversationId,
         sender_id: adminId,
@@ -335,6 +335,7 @@ export default function AdminDashboardPage() {
     onSuccess: () => toast.success('تم إرسال الإشعار وفتح محادثة مع الإدارة'),
     onError: (err) => toast.error(err.message)
   })
+  // ================= نهاية التعديل =================
 
   const addTransferMutation = useMutation({
     mutationFn: async ({ sellerId, amount, receiptImage, note }) => {
