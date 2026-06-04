@@ -274,15 +274,13 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
-  // ================= التعديل الوحيد في هذا الملف =================
+  // دالة إرسال الإشعارات من الإدارة (تم تعديلها سابقاً)
   const sendNotificationMutation = useMutation({
     mutationFn: async ({ userId, title, message }) => {
-      // 1. الحصول على معرف الإدارة الحالي
       const { data: { user: adminUser }, error: adminError } = await supabase.auth.getUser()
       if (adminError) throw new Error('لا يمكن تحديد هوية الإدارة')
       const adminId = adminUser.id
 
-      // 2. البحث عن محادثة موجودة بين الإدارة وهذا المستخدم
       let conversationId = null
       const { data: existingConv } = await supabase
         .from('conversations')
@@ -293,7 +291,6 @@ export default function AdminDashboardPage() {
       if (existingConv) {
         conversationId = existingConv.id
       } else {
-        // إنشاء محادثة جديدة (الإدارة كمشتري، المستخدم كبائع)
         const { data: newConv, error: convError } = await supabase
           .from('conversations')
           .insert({
@@ -310,10 +307,9 @@ export default function AdminDashboardPage() {
         conversationId = newConv.id
       }
 
-      // 3. إدراج الإشعار مع type = 'info' (القيمة المسموحة في قاعدة البيانات)
       const { error: notifError } = await supabase.from('notifications').insert({
         user_id: userId,
-        type: 'info',          // تم التغيير من 'message' إلى 'info' لتجنب constraint violation
+        type: 'info',
         title,
         message,
         related_id: conversationId.toString(),
@@ -322,7 +318,6 @@ export default function AdminDashboardPage() {
       })
       if (notifError) throw notifError
 
-      // 4. إدراج رسالة في المحادثة (لتظهر مباشرة في شاشة المستخدم)
       await supabase.from('messages').insert({
         conversation_id: conversationId,
         sender_id: adminId,
@@ -335,25 +330,32 @@ export default function AdminDashboardPage() {
     onSuccess: () => toast.success('تم إرسال الإشعار وفتح محادثة مع الإدارة'),
     onError: (err) => toast.error(err.message)
   })
-  // ================= نهاية التعديل =================
 
+  // ================= التعديل الجوهري هنا =================
+  // استبدال addTransferMutation باستخدام RPC لتجاوز RLS
   const addTransferMutation = useMutation({
     mutationFn: async ({ sellerId, amount, receiptImage, note }) => {
-      const { error } = await supabase.from('seller_transfers').insert({
-        seller_id: sellerId,
-        amount: parseFloat(amount),
-        receipt_image: receiptImage,
-        note: note
+      // استدعاء الدالة المخزنة التي تتجاوز RLS
+      const { data, error } = await supabase.rpc('insert_seller_transfer', {
+        seller_id_param: sellerId,
+        amount_param: parseFloat(amount),
+        receipt_image_param: receiptImage,
+        note_param: note || ''
       })
       if (error) throw error
+      return data
     },
     onSuccess: () => {
       toast.success('تم تسجيل التحويل')
       setTransferAmount('')
       loadSellerReceipts(selectedSeller?.id)
     },
-    onError: (err) => toast.error(err.message)
+    onError: (err) => {
+      console.error('خطأ في إدراج التحويل:', err)
+      toast.error(err.message || 'فشل إضافة التحويل - يرجى التحقق من صلاحيات RLS أو وجود الدالة المخزنة')
+    }
   })
+  // ================= نهاية التعديل =================
 
   const loadSellerReceipts = async (sellerId) => {
     if (!sellerId) return
@@ -644,7 +646,7 @@ export default function AdminDashboardPage() {
                           <button onClick={() => { setSelectedBuyer(user); setBuyerDetailTab('profile'); }} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
                           <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: user.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-2 py-1 rounded text-xs"><Send size={12} /></button>
                         </td>
-                      </tr>
+                       </tr>
                     ))}
                   </tbody>
                 </table>
