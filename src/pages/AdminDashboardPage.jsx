@@ -77,7 +77,102 @@ export default function AdminDashboardPage() {
   const [productsView, setProductsView] = useState('details')
   const [sellerDetailTab, setSellerDetailTab] = useState('profile')
   const [buyerDetailTab, setBuyerDetailTab] = useState('profile')
+  const [sellerStats, setSellerStats] = useState({
+    totalProducts: 0,
+    soldProducts: 0,
+    shippingProducts: 0,
+    notShippedWithReceipt: 0,
+    noReceiptPurchased: 0,
+    notPurchased: 0,
+    duplicateProducts: 0,
+    inappropriateProducts: 0,
+    unansweredInquiries: 0,
+    answeredInquiries: 0
+  })
   const queryClient = useQueryClient()
+
+  // جلب إحصائيات البائع المحدد
+  useEffect(() => {
+    if (!selectedSeller?.id) return
+    const fetchSellerStats = async () => {
+      try {
+        const sellerId = selectedSeller.id
+
+        // 1. عدد المنتجات المنشورة
+        const { count: totalProducts } = await supabase
+          .from('products')
+          .select('*', { count: 'exact', head: true })
+          .eq('seller_id', sellerId)
+
+        // 2. عدد المنتجات المباعة (لها طلبات بحالة مكتملة أو shipped)
+        const { data: soldData } = await supabase
+          .from('order_items')
+          .select('product_id')
+          .eq('order.status', 'completed')
+          .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
+        const soldProducts = soldData?.length || 0
+
+        // 3. المنتجات قيد الشحن (حالة الطلب shipped)
+        const { data: shippingData } = await supabase
+          .from('order_items')
+          .select('product_id')
+          .eq('order.status', 'shipped')
+          .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
+        const shippingProducts = shippingData?.length || 0
+
+        // 4. المنتجات التي لم تشحن مع رفع الإيصال (status = payment_approved)
+        const { data: notShippedData } = await supabase
+          .from('order_items')
+          .select('product_id')
+          .eq('order.status', 'payment_approved')
+          .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
+        const notShippedWithReceipt = notShippedData?.length || 0
+
+        // 5. المنتجات المشتراة بدون إيصال (status = pending_payment_review)
+        const { data: noReceiptData } = await supabase
+          .from('order_items')
+          .select('product_id')
+          .eq('order.status', 'pending_payment_review')
+          .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
+        const noReceiptPurchased = noReceiptData?.length || 0
+
+        // 6. المنتجات غير المشتراة (لا توجد order_items)
+        const { data: allProducts } = await supabase
+          .from('products')
+          .select('id')
+          .eq('seller_id', sellerId)
+        const productIds = allProducts?.map(p => p.id) || []
+        const { data: orderedProductIds } = await supabase
+          .from('order_items')
+          .select('product_id')
+          .in('product_id', productIds)
+        const orderedSet = new Set(orderedProductIds?.map(o => o.product_id))
+        const notPurchased = productIds.filter(id => !orderedSet.has(id)).length
+
+        // 7. المنتجات المكررة (حسب admin)
+        // 8. المنتجات غير اللائقة
+        // 9. الاستفسارات التي لم يرد عليها / تم الرد عليها
+        // هذه الإحصائيات يمكن إضافتها لاحقاً حسب هيكل قاعدة البيانات
+
+        setSellerStats({
+          totalProducts: totalProducts || 0,
+          soldProducts: soldProducts,
+          shippingProducts: shippingProducts,
+          notShippedWithReceipt: notShippedWithReceipt,
+          noReceiptPurchased: noReceiptPurchased,
+          notPurchased: notPurchased,
+          duplicateProducts: 0,
+          inappropriateProducts: 0,
+          unansweredInquiries: 0,
+          answeredInquiries: 0
+        })
+      } catch (err) {
+        console.error('Error fetching seller stats:', err)
+        toast.error('فشل تحميل إحصائيات البائع')
+      }
+    }
+    fetchSellerStats()
+  }, [selectedSeller])
 
   // Queries
   const { data: stats, refetch: refetchStats, isLoading: statsLoading } = useQuery({
@@ -168,13 +263,12 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
-  // ✅ تعديل: استخدام جدول seller_wallets بدلاً من seller_transfers
   const addTransferMutation = useMutation({
     mutationFn: async ({ sellerId, amount, receiptImage, note }) => {
       const { error } = await supabase.from('seller_wallets').insert({
         seller_id: sellerId,
         amount: parseFloat(amount),
-        type: 'transfer',            // نوع العملية
+        type: 'transfer',
         receipt_image: receiptImage,
         note: note,
         created_at: new Date().toISOString()
@@ -217,22 +311,6 @@ export default function AdminDashboardPage() {
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || []
   const buyerUsers = users?.filter(u => u.account_type === 'buyer') || []
 
-  const getSellerStatsData = (sellerId) => {
-    // هذه الأرقام يجب جلبها من API حقيقية
-    return {
-      totalProducts: 25,
-      soldProducts: 12,
-      shippingProducts: 3,
-      notShippedWithReceipt: 2,
-      noReceiptPurchased: 5,
-      notPurchased: 3,
-      duplicateProducts: 1,
-      inappropriateProducts: 0,
-      unansweredInquiries: 2,
-      answeredInquiries: 8
-    }
-  }
-
   // دالة عرض جدول المنتجات باستخدام البيانات الحقيقية
   const renderProductTable = (filterKey, productsList = products) => {
     if (!productsList || productsList.length === 0) {
@@ -273,7 +351,7 @@ export default function AdminDashboardPage() {
               <th>تاريخ الشحن</th>
               <th>تاريخ الإيصال</th>
               <th>الحالة</th>
-            </tr>
+            </table>
           </thead>
           <tbody>
             {filtered.map((product) => {
@@ -292,7 +370,7 @@ export default function AdminDashboardPage() {
                   <td className="p-2">{shipDate}</td>
                   <td className="p-2">{receiptDate}</td>
                   <td className="p-2">{status}</td>
-                </tr>
+                </td>
               )
             })}
           </tbody>
@@ -301,7 +379,7 @@ export default function AdminDashboardPage() {
     )
   }
 
-  // دالة تغيير نوع الحساب (بائع <-> مشتري)
+  // دالة تغيير نوع الحساب
   const toggleAccountType = (user) => {
     const newType = user.account_type === 'seller' ? 'buyer' : 'seller'
     updateUserMutation.mutate({
@@ -432,16 +510,16 @@ export default function AdminDashboardPage() {
                       <table className="w-full text-right border-collapse">
                         <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th><th>طلب البيانات</th></tr></thead>
                         <tbody>
-                          <tr><td className="p-2">جميع المنتجات المنشورة</td><td>{getSellerStatsData(selectedSeller.id).totalProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('all'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">المنتجات المباعة</td><td>{getSellerStatsData(selectedSeller.id).soldProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('sold'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">المنتجات قيد الشحن</td><td>{getSellerStatsData(selectedSeller.id).shippingProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('shipping'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">المنتجات التي لم تشحن (تم رفع الإيصال)</td><td>{getSellerStatsData(selectedSeller.id).notShippedWithReceipt}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_shipped'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">المنتجات المشتراة بدون إيصال</td><td>{getSellerStatsData(selectedSeller.id).noReceiptPurchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('no_receipt'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">المنتجات غير المشتراة</td><td>{getSellerStatsData(selectedSeller.id).notPurchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_purchased'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">المنتجات المكررة</td><td>{getSellerStatsData(selectedSeller.id).duplicateProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('duplicate'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">المنتجات غير اللائقة</td><td>{getSellerStatsData(selectedSeller.id).inappropriateProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('inappropriate'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">الاستفسارات التي لم يرد عليها</td><td>{getSellerStatsData(selectedSeller.id).unansweredInquiries}</td><td><button className="text-gold underline">عرض</button></td></tr>
-                          <tr><td className="p-2">الاستفسارات التي تم الرد عليها</td><td>{getSellerStatsData(selectedSeller.id).answeredInquiries}</td><td><button className="text-gold underline">عرض</button></td></tr>
+                          <tr><td className="p-2">جميع المنتجات المنشورة</td><td>{sellerStats.totalProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('all'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات المباعة</td><td>{sellerStats.soldProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('sold'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات قيد الشحن</td><td>{sellerStats.shippingProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('shipping'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات التي لم تشحن (تم رفع الإيصال)</td><td>{sellerStats.notShippedWithReceipt}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_shipped'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات المشتراة بدون إيصال</td><td>{sellerStats.noReceiptPurchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('no_receipt'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات غير المشتراة</td><td>{sellerStats.notPurchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_purchased'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات المكررة</td><td>{sellerStats.duplicateProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('duplicate'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات غير اللائقة</td><td>{sellerStats.inappropriateProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('inappropriate'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">الاستفسارات التي لم يرد عليها</td><td>{sellerStats.unansweredInquiries}</td><td><button className="text-gold underline">عرض</button></td></tr>
+                          <tr><td className="p-2">الاستفسارات التي تم الرد عليها</td><td>{sellerStats.answeredInquiries}</td><td><button className="text-gold underline">عرض</button></td></tr>
                         </tbody>
                       </table>
                     </div>
@@ -468,7 +546,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* المشترين */}
+          {/* المشترين (مختصر) */}
           {activeSubTab === 'buyers' && (
             <div>
               <div className="flex gap-4 mb-4">
