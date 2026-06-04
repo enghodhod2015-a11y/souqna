@@ -149,11 +149,6 @@ export default function AdminDashboardPage() {
         const orderedSet = new Set(orderedProductIds?.map(o => o.product_id))
         const notPurchased = productIds.filter(id => !orderedSet.has(id)).length
 
-        // 7. المنتجات المكررة (حسب admin)
-        // 8. المنتجات غير اللائقة
-        // 9. الاستفسارات التي لم يرد عليها / تم الرد عليها
-        // هذه الإحصائيات يمكن إضافتها لاحقاً حسب هيكل قاعدة البيانات
-
         setSellerStats({
           totalProducts: totalProducts || 0,
           soldProducts: soldProducts,
@@ -311,7 +306,7 @@ export default function AdminDashboardPage() {
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || []
   const buyerUsers = users?.filter(u => u.account_type === 'buyer') || []
 
-  // دالة عرض جدول المنتجات باستخدام البيانات الحقيقية
+  // ✅ دالة عرض جدول المنتجات (تم إصلاح أخطاء JSX)
   const renderProductTable = (filterKey, productsList = products) => {
     if (!productsList || productsList.length === 0) {
       return <div className="text-center p-8 text-text-secondary">لا توجد منتجات</div>
@@ -351,7 +346,7 @@ export default function AdminDashboardPage() {
               <th>تاريخ الشحن</th>
               <th>تاريخ الإيصال</th>
               <th>الحالة</th>
-            </table>
+            </tr>   {/* ✅ تم التصحيح: </tr> بدلاً من </table> */}
           </thead>
           <tbody>
             {filtered.map((product) => {
@@ -370,7 +365,7 @@ export default function AdminDashboardPage() {
                   <td className="p-2">{shipDate}</td>
                   <td className="p-2">{receiptDate}</td>
                   <td className="p-2">{status}</td>
-                </td>
+                </tr>
               )
             })}
           </tbody>
@@ -546,7 +541,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* المشترين (مختصر) */}
+          {/* المشترين */}
           {activeSubTab === 'buyers' && (
             <div>
               <div className="flex gap-4 mb-4">
@@ -562,9 +557,12 @@ export default function AdminDashboardPage() {
                   <tbody>
                     {buyerUsers.map(user => (
                       <tr key={user.id}>
-                        <td className="p-2">{user.full_name}</td><td className="p-2">{user.email}</td>
-                        <td className="p-2">{user.order_count || 0}</td><td className="p-2">{formatCurrency(user.total_spent || 0)}</td>
-                        <td className="p-2">{formatDate(user.last_order_date)}</td><td className="p-2">{user.is_banned ? 'محظور' : 'نشط'}</td>
+                        <td className="p-2">{user.full_name}</td>
+                        <td className="p-2">{user.email}</td>
+                        <td className="p-2">{user.order_count || 0}</td>
+                        <td className="p-2">{formatCurrency(user.total_spent || 0)}</td>
+                        <td className="p-2">{formatDate(user.last_order_date)}</td>
+                        <td className="p-2">{user.is_banned ? 'محظور' : 'نشط'}</td>
                         <td className="flex gap-2">
                           <button onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { is_banned: !user.is_banned } })} className={`px-2 py-1 rounded text-xs ${user.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{user.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
                           <button onClick={() => { setSelectedBuyer(user); setBuyerDetailTab('profile'); }} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
