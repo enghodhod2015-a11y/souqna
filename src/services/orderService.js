@@ -1,32 +1,50 @@
 import { supabase } from './supabase'
 
 // ─────────────────────────────────────────────────────────────
-// استخدام RPC لإنشاء الطلب وعناصره دفعة واحدة (تجاوز RLS والأعمدة المحسوبة)
+// إنشاء طلب جديد (بدون RPC، باستخدام إدراج مباشر)
 // ─────────────────────────────────────────────────────────────
 export const createOrder = async (orderData) => {
   const { buyer_id, total_amount, shipping_address, shipping_city, payment_method, notes, items } = orderData
 
-  const rpcItems = items.map(item => ({
+  // 1. إنشاء الطلب في جدول orders
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .insert({
+      user_id: buyer_id,
+      total_amount: total_amount,
+      shipping_address: shipping_address,
+      shipping_city: shipping_city,
+      payment_method: payment_method,
+      notes: notes,
+      status: 'pending',
+      payment_status: 'pending',
+      created_at: new Date().toISOString()
+    })
+    .select()
+    .single()
+
+  if (orderError) throw orderError
+
+  // 2. إدراج عناصر الطلب في order_items
+  const orderItems = items.map(item => ({
+    order_id: order.id,
     product_id: item.product_id,
-    quantity: item.quantity
+    quantity: item.quantity,
+    unit_price: item.unit_price,
+    product_name: null  // سيتم تعبئتها تلقائياً عبر trigger في قاعدة البيانات
   }))
 
-  const { data, error } = await supabase.rpc('create_order_with_items', {
-    p_user_id: buyer_id,
-    p_total_amount: total_amount,
-    p_shipping_address: shipping_address,
-    p_shipping_city: shipping_city,
-    p_payment_method: payment_method,
-    p_notes: notes,
-    p_items: rpcItems
-  })
+  const { error: itemsError } = await supabase
+    .from('order_items')
+    .insert(orderItems)
 
-  if (error) {
-    console.error('RPC Error:', error)
-    throw new Error(error.message)
+  if (itemsError) {
+    // حذف الطلب إذا فشلت إضافة العناصر (للحفاظ على التكامل)
+    await supabase.from('orders').delete().eq('id', order.id)
+    throw itemsError
   }
 
-  return { id: data.id }
+  return { id: order.id }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -61,10 +79,9 @@ export const getBuyerOrders = async (buyerId) => {
 }
 
 // ─────────────────────────────────────────────────────────────
-// جلب طلبات البائع (بدون RPC، باستعلام مباشر)
+// جلب طلبات البائع
 // ─────────────────────────────────────────────────────────────
 export const getSellerOrders = async (sellerId) => {
-  // جلب منتجات البائع أولاً
   const { data: products, error: productsError } = await supabase
     .from('products')
     .select('id')
@@ -73,7 +90,6 @@ export const getSellerOrders = async (sellerId) => {
   if (!products || products.length === 0) return []
 
   const productIds = products.map(p => p.id)
-  // جلب order_items لهذه المنتجات
   const { data: items, error: itemsError } = await supabase
     .from('order_items')
     .select('*, order:orders(*), product:products(name, cover_image)')
@@ -82,7 +98,6 @@ export const getSellerOrders = async (sellerId) => {
   if (itemsError) throw itemsError
   if (!items || items.length === 0) return []
 
-  // جلب بيانات المشترين بشكل منفصل لتجنب مشاكل العلاقات
   const buyerIds = [...new Set(items.map(i => i.order?.user_id).filter(Boolean))]
   let buyersMap = new Map()
   if (buyerIds.length) {
@@ -95,7 +110,6 @@ export const getSellerOrders = async (sellerId) => {
     }
   }
 
-  // تجميع النتائج
   const ordersMap = new Map()
   items.forEach(item => {
     if (!item.order) return
@@ -142,7 +156,7 @@ export const updateOrderStatus = async (orderId, status) => {
 }
 
 // ─────────────────────────────────────────────────────────────
-// تأكيد الاستلام مع تسجيل تاريخ الإكمال
+// تأكيد الاستلام
 // ─────────────────────────────────────────────────────────────
 export const confirmDelivery = async (orderId) => {
   const { data, error } = await supabase
@@ -160,7 +174,7 @@ export const confirmDelivery = async (orderId) => {
 }
 
 // ─────────────────────────────────────────────────────────────
-// طلب استرجاع المنتج (مع التحقق من مهلة 3 أيام)
+// طلب استرجاع
 // ─────────────────────────────────────────────────────────────
 export const requestReturn = async (orderId, reason) => {
   const { data: order, error: fetchError } = await supabase
@@ -197,7 +211,7 @@ export const requestReturn = async (orderId, reason) => {
 }
 
 // ─────────────────────────────────────────────────────────────
-// الموافقة على الاسترجاع (للبائع أو الأدمن)
+// الموافقة على الاسترجاع
 // ─────────────────────────────────────────────────────────────
 export const approveReturn = async (orderId, approve, adminNotes = '') => {
   const newStatus = approve ? 'return_approved' : 'return_rejected'
@@ -216,7 +230,7 @@ export const approveReturn = async (orderId, approve, adminNotes = '') => {
 }
 
 // ─────────────────────────────────────────────────────────────
-// رفع إيصال الدفع مع بيانات التحويل (تعديل: إزالة الحقول غير الموجودة)
+// رفع إيصال الدفع
 // ─────────────────────────────────────────────────────────────
 export const uploadReceipt = async (orderId, file, transferData = {}) => {
   const { transfer_number, transfer_name, buyer_phone } = transferData
@@ -231,13 +245,11 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
     .from('receipts')
     .getPublicUrl(fileName)
 
-  // تحديث فقط الحقول الموجودة في جدول orders
   const updates = {
     receipt_image: publicUrl,
     payment_status: 'paid',
     status: 'processing'
   }
-  // إضافة بيانات التحويل فقط إذا كانت الأعمدة موجودة (قد لا تكون موجودة في الجدول)
   if (transfer_number) updates.transfer_number = transfer_number
   if (transfer_name) updates.transfer_name = transfer_name
   if (buyer_phone) updates.buyer_phone = buyer_phone
@@ -267,7 +279,6 @@ export const getSellerStats = async (sellerId) => {
     .eq('seller_id', sellerId)
   if (convCountErr) throw convCountErr
 
-  // يمكن حساب المبيعات والإحصائيات الأخرى إذا لزم الأمر
   return {
     totalSales: 0,
     productsCount: productsCount || 0,
@@ -279,11 +290,9 @@ export const getSellerStats = async (sellerId) => {
 }
 
 // ─────────────────────────────────────────────────────────────
-// المبيعات الشهرية (للبائع)
+// المبيعات الشهرية للبائع
 // ─────────────────────────────────────────────────────────────
 export const getMonthlySales = async (sellerId) => {
-  // تنفيذ لاحق إذا احتجت
   return []
 }
-
 
