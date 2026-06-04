@@ -310,13 +310,13 @@ export default function AdminDashboardPage() {
         conversationId = newConv.id
       }
 
-      // 3. إدراج الإشعار مع related_id كنص (string) - يجب أن يكون عمود related_id من نوع TEXT
+      // 3. إدراج الإشعار مع type = 'info' (القيمة المسموحة في قاعدة البيانات)
       const { error: notifError } = await supabase.from('notifications').insert({
         user_id: userId,
-        type: 'message',
+        type: 'info',          // تم التغيير من 'message' إلى 'info' لتجنب constraint violation
         title,
         message,
-        related_id: conversationId.toString(), // تحويل UUID إلى نص
+        related_id: conversationId.toString(),
         is_read: false,
         created_at: new Date().toISOString()
       })
