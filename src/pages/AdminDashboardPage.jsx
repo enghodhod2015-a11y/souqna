@@ -17,7 +17,8 @@ import {
   Users, Package, ShoppingBag, DollarSign, Receipt, CheckCircle, XCircle, Eye, Search,
   AlertTriangle, UserCheck, UserX, Clock, TrendingUp, Activity, RefreshCw,
   Wallet, Download, Plus, Ban, FileText, ClipboardList, Settings, Megaphone, MessageSquare,
-  Award, BarChart3, LineChart as LineChartIcon, PieChart as PieChartIcon
+  Award, BarChart3, LineChart as LineChartIcon, PieChart as PieChartIcon,
+  Edit  // ✅ أضف هذا السطر
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -517,4 +518,6 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
+
+
 
