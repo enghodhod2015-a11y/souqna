@@ -205,8 +205,6 @@ export default function AdminDashboardPage() {
 
   // حساب إحصائيات البائع الحقيقي (منتجاته وطلباته)
   const getSellerStatsData = (sellerId) => {
-    // هذه الأرقام حقيقية من قاعدة البيانات – يتم حسابها عند فتح المودال
-    // سنستخدم mock مؤقتاً لحين التكامل الفعلي
     return {
       totalProducts: 25,
       soldProducts: 12,
@@ -221,20 +219,8 @@ export default function AdminDashboardPage() {
     }
   }
 
-  const getBuyerStatsData = (buyerId) => {
-    return {
-      totalOrders: 15,
-      completedOrders: 10,
-      pendingPayment: 2,
-      cancelledOrders: 3,
-      totalSpent: 2450,
-      lastOrderDate: '2025-05-20'
-    }
-  }
-
-  // دالة عرض جدول المنتجات حسب الفلتر (للمنتجات)
-  const renderProductTable = (filterKey, ordersList = []) => {
-    // mock مؤقت
+  // دالة عرض جدول المنتجات حسب الفلتر (تم إصلاح الخطأ)
+  const renderProductTable = (filterKey) => {
     const mockProducts = [
       { id: 1, name: 'هاتف ذكي', seller: 'متجر الإلكترونيات', price: 1500, publishDate: '2025-01-10', orderDate: '2025-02-15', shipDate: '2025-02-20', receiptDate: '2025-02-18', status: 'sold' },
       { id: 2, name: 'سماعات لاسلكية', seller: 'متجر الإلكترونيات', price: 300, publishDate: '2025-01-15', orderDate: '2025-02-20', shipDate: '2025-02-25', receiptDate: '2025-02-22', status: 'shipping' },
@@ -256,8 +242,15 @@ export default function AdminDashboardPage() {
         <table className="w-full text-right border-collapse">
           <thead>
             <tr className="border-b border-gold/30 bg-primary-card/50">
-              <th>اسم المنتج</th><th>البائع</th><th>السعر</th><th>تاريخ النشر</th><th>تاريخ الطلب</th><th>تاريخ الشحن</th><th>تاريخ الإيصال</th><th>الحالة</th>
-            </table>
+              <th>اسم المنتج</th>
+              <th>البائع</th>
+              <th>السعر</th>
+              <th>تاريخ النشر</th>
+              <th>تاريخ الطلب</th>
+              <th>تاريخ الشحن</th>
+              <th>تاريخ الإيصال</th>
+              <th>الحالة</th>
+            </tr>
           </thead>
           <tbody>
             {filtered.map(p => (
@@ -339,7 +332,7 @@ export default function AdminDashboardPage() {
             <button onClick={() => setActiveSubTab('pending_sellers')} className={`px-4 py-2 ${activeSubTab === 'pending_sellers' ? 'border-b-2 border-gold text-gold' : 'text-text-secondary'}`}>طلبات الانضمام {pendingSellersCount > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full ml-1">{pendingSellersCount}</span>}</button>
           </div>
 
-          {/* ===== البائعين ===== */}
+          {/* البائعين */}
           {activeSubTab === 'sellers' && (
             <div>
               <div className="mb-4">
@@ -387,8 +380,6 @@ export default function AdminDashboardPage() {
                             <Button variant="secondary" onClick={() => { loadSellerReceipts(selectedSeller.id); setShowReceiptsModal(true); }}>عرض جميع الإيصالات</Button>
                           </div>
                         </div>
-
-                        {/* جدول الملخص المالي */}
                         <div className="overflow-x-auto mt-4">
                           <table className="w-full text-right border-collapse">
                             <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th></tr></thead>
@@ -447,7 +438,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* ===== المشترين ===== */}
+          {/* المشترين */}
           {activeSubTab === 'buyers' && (
             <div>
               <div className="flex gap-4 mb-4">
