@@ -338,7 +338,7 @@ export default function AdminDashboardPage() {
               <th>تاريخ الشحن</th>
               <th>تاريخ الإيصال</th>
               <th>الحالة</th>
-            </tr>   {/* ✅ تم التصحيح: </td> بدلاً من </table> */}
+            </tr>
           </thead>
           <tbody>
             {filtered.map((product) => {
@@ -357,7 +357,7 @@ export default function AdminDashboardPage() {
                   <td className="p-2">{shipDate}</td>
                   <td className="p-2">{receiptDate}</td>
                   <td className="p-2">{status}</td>
-                </td>
+                </tr>
               )
             })}
           </tbody>
@@ -674,5 +674,4 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
-
 
