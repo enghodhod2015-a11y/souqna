@@ -4,6 +4,7 @@ import { Bell, CheckCircle } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../services/supabase'
 import { getUserNotifications, markNotificationAsRead, playNotificationSound } from '../../services/notificationService'
+import toast from 'react-hot-toast'
 
 export const NotificationBell = () => {
   const { user } = useAuth()
@@ -23,31 +24,44 @@ export const NotificationBell = () => {
     }
   }
 
-  // CHANGED: دالة تحديد المسار بناءً على نوع الإشعار و related_id
+  // دالة تحديد المسار بناءً على نوع الإشعار و related_id
   const getNotificationPath = (notif) => {
     const relatedId = notif.related_id
-    const type = notif.type
-
-    // حل مؤقت: إذا كان relatedId موجود نذهب إلى صفحة المنتج (لتجربة التوجيه)
     if (relatedId) {
       return `/product/${relatedId}`
     }
-    // إذا لم يكن هناك relatedId نذهب إلى صفحة الإشعارات العامة
-    return '/inbox'
+    return null  // لا يوجد مسار محدد للإشعارات الإدارية
   }
 
-  // CHANGED: تعديل دالة markAsRead لتشمل التوجيه
+  // ✅ تعديل دالة معالجة النقر
   const markAsReadAndNavigate = async (notif) => {
     try {
       // تعليم الإشعار كمقروء في الخلفية
       markNotificationAsRead(notif.id).catch(err => console.error(err))
+      
       // إزالة الإشعار من القائمة محلياً
       setNotifications(prev => prev.filter(n => n.id !== notif.id))
-      // إغلاق القائمة المنسدلة
       setIsOpen(false)
-      // التوجيه إلى المسار المناسب
+
+      // إذا كان الإشعار يحتوي على related_id (مرتبط بمنتج أو محادثة) ننتقل إليه
       const path = getNotificationPath(notif)
-      navigate(path)
+      if (path) {
+        navigate(path)
+      } else {
+        // للإشعارات الإدارية (بدون related_id) نعرض محتوى الإشعار في نافذة منبثقة
+        toast.custom((t) => (
+          <div className="bg-primary-card rounded-2xl border border-gold/30 p-4 shadow-xl max-w-sm mx-4">
+            <h3 className="font-bold text-gold text-lg mb-2">{notif.title}</h3>
+            <p className="text-text-secondary text-sm">{notif.message}</p>
+            <button
+              onClick={() => toast.dismiss(t.id)}
+              className="mt-3 text-xs text-gold underline"
+            >
+              إغلاق
+            </button>
+          </div>
+        ), { duration: 5000 })
+      }
     } catch (err) {
       console.error('خطأ في معالجة الإشعار:', err)
     }
