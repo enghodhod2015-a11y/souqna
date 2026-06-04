@@ -298,7 +298,7 @@ export default function AdminDashboardPage() {
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || []
   const buyerUsers = users?.filter(u => u.account_type === 'buyer') || []
 
-  // ✅ دالة عرض جدول المنتجات (تم إصلاح الخطأ في إغلاق الصف)
+  // ✅ دالة عرض جدول المنتجات (تم إصلاح الخطأ)
   const renderProductTable = (filterKey, productsList = products) => {
     if (!productsList || productsList.length === 0) {
       return <div className="text-center p-8 text-text-secondary">لا توجد منتجات</div>
@@ -338,7 +338,7 @@ export default function AdminDashboardPage() {
               <th>تاريخ الشحن</th>
               <th>تاريخ الإيصال</th>
               <th>الحالة</th>
-            </tr>   {/* ✅ تم التصحيح: </tr> بدلاً من <td> */}
+            </tr>   {/* ✅ تم التصحيح: </td> بدلاً من </table> */}
           </thead>
           <tbody>
             {filtered.map((product) => {
@@ -549,9 +549,12 @@ export default function AdminDashboardPage() {
                   <tbody>
                     {buyerUsers.map(user => (
                       <tr key={user.id}>
-                        <td className="p-2">{user.full_name}</td><td className="p-2">{user.email}</td>
-                        <td className="p-2">{user.order_count || 0}</td><td className="p-2">{formatCurrency(user.total_spent || 0)}</td>
-                        <td className="p-2">{formatDate(user.last_order_date)}</td><td className="p-2">{user.is_banned ? 'محظور' : 'نشط'}</td>
+                        <td className="p-2">{user.full_name}</td>
+                        <td className="p-2">{user.email}</td>
+                        <td className="p-2">{user.order_count || 0}</td>
+                        <td className="p-2">{formatCurrency(user.total_spent || 0)}</td>
+                        <td className="p-2">{formatDate(user.last_order_date)}</td>
+                        <td className="p-2">{user.is_banned ? 'محظور' : 'نشط'}</td>
                         <td className="flex gap-2">
                           <button onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { is_banned: !user.is_banned } })} className={`px-2 py-1 rounded text-xs ${user.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{user.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
                           <button onClick={() => { setSelectedBuyer(user); setBuyerDetailTab('profile'); }} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
@@ -671,4 +674,5 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
+
 
