@@ -67,8 +67,6 @@ export default function AdminDashboardPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedSeller, setSelectedSeller] = useState(null)
   const [selectedBuyer, setSelectedBuyer] = useState(null)
-  const [showSellerModal, setShowSellerModal] = useState(false)
-  const [showBuyerModal, setShowBuyerModal] = useState(false)
   const [showReceiptsModal, setShowReceiptsModal] = useState(false)
   const [sellerReceipts, setSellerReceipts] = useState([])
   const [transferAmount, setTransferAmount] = useState('')
@@ -77,6 +75,8 @@ export default function AdminDashboardPage() {
   const [buyerActivityFilter, setBuyerActivityFilter] = useState('all')
   const [productFilter, setProductFilter] = useState('all')
   const [productsView, setProductsView] = useState('details')
+  const [sellerDetailTab, setSellerDetailTab] = useState('profile') // profile, finance, stats
+  const [buyerDetailTab, setBuyerDetailTab] = useState('profile')
   const queryClient = useQueryClient()
 
   // Queries
@@ -203,7 +203,6 @@ export default function AdminDashboardPage() {
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || []
   const buyerUsers = users?.filter(u => u.account_type === 'buyer') || []
 
-  // حساب إحصائيات البائع الحقيقي (منتجاته وطلباته)
   const getSellerStatsData = (sellerId) => {
     return {
       totalProducts: 25,
@@ -219,7 +218,6 @@ export default function AdminDashboardPage() {
     }
   }
 
-  // دالة عرض جدول المنتجات حسب الفلتر (تم إصلاح الخطأ)
   const renderProductTable = (filterKey) => {
     const mockProducts = [
       { id: 1, name: 'هاتف ذكي', seller: 'متجر الإلكترونيات', price: 1500, publishDate: '2025-01-10', orderDate: '2025-02-15', shipDate: '2025-02-20', receiptDate: '2025-02-18', status: 'sold' },
@@ -242,14 +240,7 @@ export default function AdminDashboardPage() {
         <table className="w-full text-right border-collapse">
           <thead>
             <tr className="border-b border-gold/30 bg-primary-card/50">
-              <th>اسم المنتج</th>
-              <th>البائع</th>
-              <th>السعر</th>
-              <th>تاريخ النشر</th>
-              <th>تاريخ الطلب</th>
-              <th>تاريخ الشحن</th>
-              <th>تاريخ الإيصال</th>
-              <th>الحالة</th>
+              <th>اسم المنتج</th><th>البائع</th><th>السعر</th><th>تاريخ النشر</th><th>تاريخ الطلب</th><th>تاريخ الشحن</th><th>تاريخ الإيصال</th><th>الحالة</th>
             </tr>
           </thead>
           <tbody>
@@ -269,7 +260,7 @@ export default function AdminDashboardPage() {
                   {p.status === 'no_receipt' && 'تم الشراء بدون إيصال'}
                   {p.status === 'not_purchased' && 'لم يتم شراؤه'}
                 </td>
-              </tr>
+              </td>
             ))}
           </tbody>
         </table>
@@ -332,93 +323,98 @@ export default function AdminDashboardPage() {
             <button onClick={() => setActiveSubTab('pending_sellers')} className={`px-4 py-2 ${activeSubTab === 'pending_sellers' ? 'border-b-2 border-gold text-gold' : 'text-text-secondary'}`}>طلبات الانضمام {pendingSellersCount > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full ml-1">{pendingSellersCount}</span>}</button>
           </div>
 
-          {/* البائعين */}
+          {/* ========== البائعين (بدون مودال) ========== */}
           {activeSubTab === 'sellers' && (
             <div>
               <div className="mb-4">
                 <label className="block text-gold mb-2">اختر البائع:</label>
-                <Select value={selectedSeller?.id || ''} onChange={(e) => { const seller = sellerUsers.find(u => u.id === e.target.value); setSelectedSeller(seller); setShowSellerModal(true); loadSellerReceipts(seller?.id); }} className="w-full md:w-1/2 bg-white text-gray-900 border border-gold/30 rounded-lg focus:outline-none focus:border-gold">
+                <Select value={selectedSeller?.id || ''} onChange={(e) => { const seller = sellerUsers.find(u => u.id === e.target.value); setSelectedSeller(seller); loadSellerReceipts(seller?.id); setSellerDetailTab('profile'); }} className="w-full md:w-1/2 bg-white text-gray-900 border border-gold/30 rounded-lg focus:outline-none focus:border-gold">
                   <option value="">-- اختر بائعاً --</option>
                   {sellerUsers.map(seller => <option key={seller.id} value={seller.id}>{seller.store_name || seller.full_name} ({seller.email})</option>)}
                 </Select>
               </div>
 
-              {showSellerModal && selectedSeller && (
-                <Modal onClose={() => setShowSellerModal(false)} title={`تفاصيل البائع: ${selectedSeller.store_name || selectedSeller.full_name}`} size="lg">
-                  <Tabs>
-                    <TabList><Tab value="profile">الملف الشخصي</Tab><Tab value="finance">المالية</Tab><Tab value="stats">المتابعة والتقييم</Tab></TabList>
-                    <TabPanels>
-                      {/* الملف الشخصي */}
-                      <TabPanel value="profile">
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-right">
-                            <tbody>
-                              <tr><td className="p-2 font-bold text-gold">الاسم</td><td>{selectedSeller.full_name || '-'}</td><td className="p-2 font-bold text-gold">البريد</td><td>{selectedSeller.email}</td></tr>
-                              <tr><td className="p-2 font-bold text-gold">نوع الحساب</td><td>{selectedSeller.account_type === 'seller' ? 'بائع' : (selectedSeller.account_type === 'buyer' ? 'مشتري' : 'أدمن')}</td><td className="p-2 font-bold text-gold">الحالة</td><td>{selectedSeller.is_banned ? 'محظور' : 'نشط'}</td></tr>
-                              <tr><td className="p-2 font-bold text-gold">تاريخ التسجيل</td><td>{formatDate(selectedSeller.created_at)}</td><td className="p-2 font-bold text-gold">رقم الحساب البنكي</td><td>{selectedSeller.bank_account || '-'}</td></tr>
-                              <tr><td className="p-2 font-bold text-gold">نوع الحساب البنكي</td><td>{selectedSeller.bank_type || '-'}</td><td className="p-2 font-bold text-gold">التواصل (الهاتف)</td><td>{selectedSeller.phone || '-'}</td></tr>
-                            </tbody>
-                          </table>
-                        </div>
-                        <div className="flex gap-2 mt-4 flex-wrap">
-                          <button onClick={() => updateUserMutation.mutate({ userId: selectedSeller.id, updates: { is_banned: !selectedSeller.is_banned } })} className={`px-3 py-1 rounded text-white ${selectedSeller.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{selectedSeller.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
-                          <button onClick={() => window.open(`/store/${selectedSeller.id}`, '_blank')} className="bg-blue-600 px-3 py-1 rounded text-white">عرض المتجر</button>
-                          <button onClick={() => updateUserMutation.mutate({ userId: selectedSeller.id, updates: { account_type: selectedSeller.account_type === 'seller' ? 'buyer' : 'seller' } })} className="bg-gold text-primary-blue px-3 py-1 rounded">تغيير نوع الحساب</button>
-                          <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: selectedSeller.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-3 py-1 rounded text-white flex items-center gap-1"><Send size={14} /> إرسال إشعار</button>
-                        </div>
-                      </TabPanel>
+              {selectedSeller && (
+                <div className="bg-primary-card rounded-2xl border border-gold/30 p-4 mt-4">
+                  <div className="flex gap-2 mb-4 border-b border-gold/30 pb-2">
+                    <button onClick={() => setSellerDetailTab('profile')} className={`px-4 py-2 rounded-lg ${sellerDetailTab === 'profile' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}>الملف الشخصي</button>
+                    <button onClick={() => setSellerDetailTab('finance')} className={`px-4 py-2 rounded-lg ${sellerDetailTab === 'finance' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}>المالية</button>
+                    <button onClick={() => setSellerDetailTab('stats')} className={`px-4 py-2 rounded-lg ${sellerDetailTab === 'stats' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}>المتابعة والتقييم</button>
+                  </div>
 
-                      {/* المالية */}
-                      <TabPanel value="finance">
-                        <div className="bg-secondary-blue/30 p-4 rounded-xl mb-4">
-                          <label className="block text-gold mb-2">إضافة إيصال تحويل (المبلغ المرسل للبائع)</label>
-                          <div className="flex flex-wrap gap-2">
-                            <input type="number" placeholder="المبلغ" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className="bg-white rounded-lg px-3 py-2 text-gray-900 flex-1" />
-                            <input type="file" accept="image/*" id="receiptImage" className="hidden" />
-                            <Button onClick={() => { const fileInput = document.getElementById('receiptImage'); fileInput?.click(); }}>رفع صورة الإيصال</Button>
-                            <Button onClick={() => { if (transferAmount) addTransferMutation.mutate({ sellerId: selectedSeller.id, amount: transferAmount, receiptImage: '', note: '' }); else toast.error('أدخل المبلغ') }}>إدخال</Button>
-                            <Button variant="secondary" onClick={() => { loadSellerReceipts(selectedSeller.id); setShowReceiptsModal(true); }}>عرض جميع الإيصالات</Button>
-                          </div>
-                        </div>
-                        <div className="overflow-x-auto mt-4">
-                          <table className="w-full text-right border-collapse">
-                            <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th></tr></thead>
-                            <tbody>
-                              <tr><td className="p-2 font-bold">إجمالي المبيعات</td><td>{formatCurrency(12500)}</td></tr>
-                              <tr><td className="p-2 font-bold">إجمالي المرتجعات</td><td>{formatCurrency(500)}</td></tr>
-                              <tr><td className="p-2 font-bold">إجمالي الاستلامات (تحويلات للموقع)</td><td>{formatCurrency(11500)}</td></tr>
-                              <tr><td className="p-2 font-bold">المبلغ المتبقي (دائن)</td><td>{formatCurrency(500)}</td></tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </TabPanel>
+                  {/* الملف الشخصي */}
+                  {sellerDetailTab === 'profile' && (
+                    <>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-right">
+                          <tbody>
+                            <tr><td className="p-2 font-bold text-gold">الاسم</td><td>{selectedSeller.full_name || '-'}</td><td className="p-2 font-bold text-gold">البريد</td><td>{selectedSeller.email}</td></tr>
+                            <tr><td className="p-2 font-bold text-gold">نوع الحساب</td><td>{selectedSeller.account_type === 'seller' ? 'بائع' : (selectedSeller.account_type === 'buyer' ? 'مشتري' : 'أدمن')}</td><td className="p-2 font-bold text-gold">الحالة</td><td>{selectedSeller.is_banned ? 'محظور' : 'نشط'}</td></tr>
+                            <tr><td className="p-2 font-bold text-gold">تاريخ التسجيل</td><td>{formatDate(selectedSeller.created_at)}</td><td className="p-2 font-bold text-gold">رقم الحساب البنكي</td><td>{selectedSeller.bank_account || '-'}</td></tr>
+                            <tr><td className="p-2 font-bold text-gold">نوع الحساب البنكي</td><td>{selectedSeller.bank_type || '-'}</td><td className="p-2 font-bold text-gold">التواصل (الهاتف)</td><td>{selectedSeller.phone || '-'}</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex gap-2 mt-4 flex-wrap">
+                        <button onClick={() => updateUserMutation.mutate({ userId: selectedSeller.id, updates: { is_banned: !selectedSeller.is_banned } })} className={`px-3 py-1 rounded text-white ${selectedSeller.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{selectedSeller.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
+                        <button onClick={() => window.open(`/store/${selectedSeller.id}`, '_blank')} className="bg-blue-600 px-3 py-1 rounded text-white">عرض المتجر</button>
+                        <button onClick={() => updateUserMutation.mutate({ userId: selectedSeller.id, updates: { account_type: selectedSeller.account_type === 'seller' ? 'buyer' : 'seller' } })} className="bg-gold text-primary-blue px-3 py-1 rounded">تغيير نوع الحساب</button>
+                        <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: selectedSeller.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-3 py-1 rounded text-white flex items-center gap-1"><Send size={14} /> إرسال إشعار</button>
+                      </div>
+                    </>
+                  )}
 
-                      {/* المتابعة والتقييم */}
-                      <TabPanel value="stats">
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-right border-collapse">
-                            <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th><th>طلب البيانات</th></tr></thead>
-                            <tbody>
-                              <tr><td className="p-2">جميع المنتجات المنشورة</td><td>{getSellerStatsData(selectedSeller.id).totalProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('all'); }}>عرض</button></td></tr>
-                              <tr><td className="p-2">المنتجات المباعة</td><td>{getSellerStatsData(selectedSeller.id).soldProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('sold'); }}>عرض</button></td></tr>
-                              <tr><td className="p-2">المنتجات قيد الشحن</td><td>{getSellerStatsData(selectedSeller.id).shippingProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('shipping'); }}>عرض</button></td></tr>
-                              <tr><td className="p-2">المنتجات التي لم تشحن (تم رفع الإيصال)</td><td>{getSellerStatsData(selectedSeller.id).notShippedWithReceipt}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_shipped'); }}>عرض</button></td></tr>
-                              <tr><td className="p-2">المنتجات المشتراة بدون إيصال</td><td>{getSellerStatsData(selectedSeller.id).noReceiptPurchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('no_receipt'); }}>عرض</button></td></tr>
-                              <tr><td className="p-2">المنتجات غير المشتراة</td><td>{getSellerStatsData(selectedSeller.id).notPurchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_purchased'); }}>عرض</button></td></tr>
-                              <tr><td className="p-2">المنتجات المكررة</td><td>{getSellerStatsData(selectedSeller.id).duplicateProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('duplicate'); }}>عرض</button></td></tr>
-                              <tr><td className="p-2">المنتجات غير اللائقة</td><td>{getSellerStatsData(selectedSeller.id).inappropriateProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('inappropriate'); }}>عرض</button></td></tr>
-                              <tr><td className="p-2">الاستفسارات التي لم يرد عليها</td><td>{getSellerStatsData(selectedSeller.id).unansweredInquiries}</td><td><button className="text-gold underline">عرض</button></td></tr>
-                              <tr><td className="p-2">الاستفسارات التي تم الرد عليها</td><td>{getSellerStatsData(selectedSeller.id).answeredInquiries}</td><td><button className="text-gold underline">عرض</button></td></tr>
-                            </tbody>
-                          </table>
+                  {/* المالية */}
+                  {sellerDetailTab === 'finance' && (
+                    <>
+                      <div className="bg-secondary-blue/30 p-4 rounded-xl mb-4">
+                        <label className="block text-gold mb-2">إضافة إيصال تحويل (المبلغ المرسل للبائع)</label>
+                        <div className="flex flex-wrap gap-2">
+                          <input type="number" placeholder="المبلغ" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className="bg-white rounded-lg px-3 py-2 text-gray-900 flex-1" />
+                          <input type="file" accept="image/*" id="receiptImage" className="hidden" />
+                          <Button onClick={() => { const fileInput = document.getElementById('receiptImage'); fileInput?.click(); }}>رفع صورة الإيصال</Button>
+                          <Button onClick={() => { if (transferAmount) addTransferMutation.mutate({ sellerId: selectedSeller.id, amount: transferAmount, receiptImage: '', note: '' }); else toast.error('أدخل المبلغ') }}>إدخال</Button>
+                          <Button variant="secondary" onClick={() => { loadSellerReceipts(selectedSeller.id); setShowReceiptsModal(true); }}>عرض جميع الإيصالات</Button>
                         </div>
-                      </TabPanel>
-                    </TabPanels>
-                  </Tabs>
-                </Modal>
+                      </div>
+                      <div className="overflow-x-auto mt-4">
+                        <table className="w-full text-right border-collapse">
+                          <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th></table></thead>
+                          <tbody>
+                            <tr><td className="p-2 font-bold">إجمالي المبيعات</td><td>{formatCurrency(12500)}</td></tr>
+                            <tr><td className="p-2 font-bold">إجمالي المرتجعات</td><td>{formatCurrency(500)}</td></tr>
+                            <tr><td className="p-2 font-bold">إجمالي الاستلامات (تحويلات للموقع)</td><td>{formatCurrency(11500)}</td></tr>
+                            <tr><td className="p-2 font-bold">المبلغ المتبقي (دائن)</td><td>{formatCurrency(500)}</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+
+                  {/* المتابعة والتقييم */}
+                  {sellerDetailTab === 'stats' && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-right border-collapse">
+                        <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th><th>طلب البيانات</th></tr></thead>
+                        <tbody>
+                          <tr><td className="p-2">جميع المنتجات المنشورة</td><td>{getSellerStatsData(selectedSeller.id).totalProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('all'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات المباعة</td><td>{getSellerStatsData(selectedSeller.id).soldProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('sold'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات قيد الشحن</td><td>{getSellerStatsData(selectedSeller.id).shippingProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('shipping'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات التي لم تشحن (تم رفع الإيصال)</td><td>{getSellerStatsData(selectedSeller.id).notShippedWithReceipt}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_shipped'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات المشتراة بدون إيصال</td><td>{getSellerStatsData(selectedSeller.id).noReceiptPurchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('no_receipt'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات غير المشتراة</td><td>{getSellerStatsData(selectedSeller.id).notPurchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_purchased'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات المكررة</td><td>{getSellerStatsData(selectedSeller.id).duplicateProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('duplicate'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات غير اللائقة</td><td>{getSellerStatsData(selectedSeller.id).inappropriateProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('inappropriate'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">الاستفسارات التي لم يرد عليها</td><td>{getSellerStatsData(selectedSeller.id).unansweredInquiries}</td><td><button className="text-gold underline">عرض</button></td></tr>
+                          <tr><td className="p-2">الاستفسارات التي تم الرد عليها</td><td>{getSellerStatsData(selectedSeller.id).answeredInquiries}</td><td><button className="text-gold underline">عرض</button></td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               )}
 
-              {/* مودال عرض الإيصالات */}
+              {/* مودال عرض الإيصالات (يبقى منبثقاً لأنه نافذة منفصلة) */}
               {showReceiptsModal && (
                 <Modal onClose={() => setShowReceiptsModal(false)} title="إيصالات التحويل للبائع">
                   <div className="overflow-x-auto">
@@ -438,7 +434,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* المشترين */}
+          {/* ========== المشترين (بدون مودال) ========== */}
           {activeSubTab === 'buyers' && (
             <div>
               <div className="flex gap-4 mb-4">
@@ -459,7 +455,7 @@ export default function AdminDashboardPage() {
                         <td className="p-2">{formatDate(user.last_order_date)}</td><td className="p-2">{user.is_banned ? 'محظور' : 'نشط'}</td>
                         <td className="flex gap-2">
                           <button onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { is_banned: !user.is_banned } })} className={`px-2 py-1 rounded text-xs ${user.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{user.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
-                          <button onClick={() => { setSelectedBuyer(user); setShowBuyerModal(true); }} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
+                          <button onClick={() => { setSelectedBuyer(user); setBuyerDetailTab('profile'); }} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
                           <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: user.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-2 py-1 rounded text-xs"><Send size={12} /></button>
                         </td>
                       </tr>
@@ -467,25 +463,55 @@ export default function AdminDashboardPage() {
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
 
-          {/* مودال تفاصيل المشتري */}
-          {showBuyerModal && selectedBuyer && (
-            <Modal onClose={() => setShowBuyerModal(false)} title={`تفاصيل المشتري: ${selectedBuyer.full_name}`}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><label className="text-gold">الاسم:</label><p>{selectedBuyer.full_name}</p></div>
-                <div><label className="text-gold">البريد:</label><p>{selectedBuyer.email}</p></div>
-                <div><label className="text-gold">عدد الطلبات الكلي:</label><p>{selectedBuyer.order_count || 0}</p></div>
-                <div><label className="text-gold">إجمالي الإنفاق:</label><p>{formatCurrency(selectedBuyer.total_spent || 0)}</p></div>
-                <div><label className="text-gold">آخر طلب:</label><p>{formatDate(selectedBuyer.last_order_date)}</p></div>
-                <div><label className="text-gold">العناوين المحفوظة:</label><p>{selectedBuyer.addresses || '-'}</p></div>
-              </div>
-              <div className="mt-4 flex gap-2">
-                <button onClick={() => updateUserMutation.mutate({ userId: selectedBuyer.id, updates: { is_banned: !selectedBuyer.is_banned } })} className={`px-3 py-1 rounded text-white ${selectedBuyer.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{selectedBuyer.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
-                <button onClick={() => updateUserMutation.mutate({ userId: selectedBuyer.id, updates: { account_type: selectedBuyer.account_type === 'buyer' ? 'seller' : 'buyer' } })} className="bg-gold text-primary-blue px-3 py-1 rounded">تغيير إلى {selectedBuyer.account_type === 'buyer' ? 'بائع' : 'مشتري'}</button>
-              </div>
-            </Modal>
+              {selectedBuyer && (
+                <div className="mt-6 bg-primary-card rounded-2xl border border-gold/30 p-4">
+                  <div className="flex gap-2 mb-4 border-b border-gold/30 pb-2">
+                    <button onClick={() => setBuyerDetailTab('profile')} className={`px-4 py-2 rounded-lg ${buyerDetailTab === 'profile' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}>الملف الشخصي</button>
+                    <button onClick={() => setBuyerDetailTab('orders')} className={`px-4 py-2 rounded-lg ${buyerDetailTab === 'orders' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}>الطلبات</button>
+                    <button onClick={() => setBuyerDetailTab('stats')} className={`px-4 py-2 rounded-lg ${buyerDetailTab === 'stats' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}>الإحصائيات</button>
+                  </div>
+
+                  {buyerDetailTab === 'profile' && (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label className="text-gold">الاسم:</label><p>{selectedBuyer.full_name}</p></div>
+                        <div><label className="text-gold">البريد:</label><p>{selectedBuyer.email}</p></div>
+                        <div><label className="text-gold">عدد الطلبات الكلي:</label><p>{selectedBuyer.order_count || 0}</p></div>
+                        <div><label className="text-gold">إجمالي الإنفاق:</label><p>{formatCurrency(selectedBuyer.total_spent || 0)}</p></div>
+                        <div><label className="text-gold">آخر طلب:</label><p>{formatDate(selectedBuyer.last_order_date)}</p></div>
+                        <div><label className="text-gold">العناوين المحفوظة:</label><p>{selectedBuyer.addresses || '-'}</p></div>
+                      </div>
+                      <div className="mt-4 flex gap-2">
+                        <button onClick={() => updateUserMutation.mutate({ userId: selectedBuyer.id, updates: { is_banned: !selectedBuyer.is_banned } })} className={`px-3 py-1 rounded text-white ${selectedBuyer.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{selectedBuyer.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
+                        <button onClick={() => updateUserMutation.mutate({ userId: selectedBuyer.id, updates: { account_type: selectedBuyer.account_type === 'buyer' ? 'seller' : 'buyer' } })} className="bg-gold text-primary-blue px-3 py-1 rounded">تغيير إلى {selectedBuyer.account_type === 'buyer' ? 'بائع' : 'مشتري'}</button>
+                      </div>
+                    </>
+                  )}
+
+                  {buyerDetailTab === 'orders' && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-right border-collapse">
+                        <thead><tr><th>رقم الطلب</th><th>التاريخ</th><th>المبلغ</th><th>الحالة</th></tr></thead>
+                        <tbody>
+                          {/* يمكن جلب طلبات المشتري من قاعدة البيانات هنا */}
+                          <tr><td colSpan="4" className="text-center p-4">لا توجد طلبات حالياً</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {buyerDetailTab === 'stats' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-secondary-blue/30 p-3 rounded-lg"><p className="text-text-secondary">إجمالي الطلبات</p><p className="text-2xl font-bold text-gold">{selectedBuyer.order_count || 0}</p></div>
+                      <div className="bg-secondary-blue/30 p-3 rounded-lg"><p className="text-text-secondary">إجمالي المشتريات</p><p className="text-2xl font-bold text-gold">{formatCurrency(selectedBuyer.total_spent || 0)}</p></div>
+                      <div className="bg-secondary-blue/30 p-3 rounded-lg"><p className="text-text-secondary">متوسط قيمة الطلب</p><p className="text-2xl font-bold text-gold">{formatCurrency((selectedBuyer.total_spent || 0) / (selectedBuyer.order_count || 1))}</p></div>
+                      <div className="bg-secondary-blue/30 p-3 rounded-lg"><p className="text-text-secondary">آخر طلب</p><p className="text-2xl font-bold text-gold">{formatDate(selectedBuyer.last_order_date)}</p></div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* طلبات الانضمام */}
