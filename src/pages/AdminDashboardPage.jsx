@@ -169,7 +169,6 @@ export default function AdminDashboardPage() {
     if (!selectedSeller?.id) return
     const fetchFinanceSummary = async () => {
       try {
-        // إجمالي المبيعات من الطلبات المكتملة
         const { data: allProducts } = await supabase
           .from('products')
           .select('id')
@@ -186,7 +185,6 @@ export default function AdminDashboardPage() {
           totalSales = sales?.reduce((s, i) => s + (i.unit_price * i.quantity), 0) || 0
         }
 
-        // إجمالي المبالغ المحولة للبائع
         const { data: transfers } = await supabase
           .from('seller_transfers')
           .select('amount')
@@ -234,7 +232,6 @@ export default function AdminDashboardPage() {
     enabled: activeMainTab === 'orders'
   })
 
-  // دالة لتحديث جميع البيانات
   const refreshAllData = async () => {
     await Promise.all([
       refetchStats(),
@@ -322,7 +319,6 @@ export default function AdminDashboardPage() {
     else setSellerReceipts(data || [])
   }
 
-  // Helper values
   const pendingProducts = products?.filter(p => !p.is_approved).length || 0
   const pendingSellersCount = pendingSellers?.length || 0
   const openDisputes = 0
@@ -339,7 +335,7 @@ export default function AdminDashboardPage() {
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || []
   const buyerUsers = users?.filter(u => u.account_type === 'buyer') || []
 
-  // ✅ دالة عرض جدول المنتجات (تم إصلاح جميع أخطاء JSX)
+  // دالة عرض جدول المنتجات
   const renderProductTable = (filterKey, productsList = products) => {
     if (!productsList || productsList.length === 0) {
       return <div className="text-center p-8 text-text-secondary">لا توجد منتجات</div>
@@ -440,7 +436,7 @@ export default function AdminDashboardPage() {
         <button onClick={() => setActiveMainTab('settings')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${activeMainTab === 'settings' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}><Settings size={18} /> الإعدادات</button>
       </div>
 
-      {/* Dashboard Tab (مختصر) */}
+      {/* Dashboard Tab */}
       {activeMainTab === 'dashboard' && (
         <div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
@@ -521,7 +517,7 @@ export default function AdminDashboardPage() {
                       </div>
                       <div className="overflow-x-auto mt-4">
                         <table className="w-full text-right border-collapse">
-                          <thead><tr><th>القسم</th><th>التفاصيل</th></tr></thead>
+                          <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th></tr></thead>
                           <tbody>
                             <tr><td className="p-2 font-bold">إجمالي المبيعات</td><td>{formatCurrency(sellerFinance.totalSales)}</td></tr>
                             <tr><td className="p-2 font-bold">إجمالي المرتجعات</td><td>{formatCurrency(0)}</td></tr>
@@ -536,7 +532,7 @@ export default function AdminDashboardPage() {
                   {sellerDetailTab === 'stats' && (
                     <div className="overflow-x-auto">
                       <table className="w-full text-right border-collapse">
-                        <thead><tr><th>القسم</th><th>التفاصيل</th><th>طلب البيانات</th></tr></thead>
+                        <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th><th>طلب البيانات</th></tr></thead>
                         <tbody>
                           <tr><td className="p-2">جميع المنتجات المنشورة</td><td>{sellerStats.totalProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('all'); setSellerFilterId(selectedSeller.id); }}>عرض</button></td></tr>
                           <tr><td className="p-2">المنتجات المباعة</td><td>{sellerStats.soldProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('sold'); setSellerFilterId(selectedSeller.id); }}>عرض</button></td></tr>
