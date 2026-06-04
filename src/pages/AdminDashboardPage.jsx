@@ -170,12 +170,21 @@ export default function AdminDashboardPage() {
     const fetchFinanceSummary = async () => {
       try {
         // إجمالي المبيعات من الطلبات المكتملة
-        const { data: sales } = await supabase
-          .from('order_items')
-          .select('unit_price, quantity')
-          .eq('order.status', 'completed')
-          .in('product_id', (await supabase.from('products').select('id').eq('seller_id', selectedSeller.id)).data?.map(p => p.id) || [])
-        const totalSales = sales?.reduce((s, i) => s + (i.unit_price * i.quantity), 0) || 0
+        const { data: allProducts } = await supabase
+          .from('products')
+          .select('id')
+          .eq('seller_id', selectedSeller.id)
+        const productIds = allProducts?.map(p => p.id) || []
+        
+        let totalSales = 0
+        if (productIds.length > 0) {
+          const { data: sales } = await supabase
+            .from('order_items')
+            .select('unit_price, quantity')
+            .eq('order.status', 'completed')
+            .in('product_id', productIds)
+          totalSales = sales?.reduce((s, i) => s + (i.unit_price * i.quantity), 0) || 0
+        }
 
         // إجمالي المبالغ المحولة للبائع
         const { data: transfers } = await supabase
@@ -284,7 +293,6 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
-  // ✅ استخدام جدول seller_transfers بدلاً من seller_wallets
   const addTransferMutation = useMutation({
     mutationFn: async ({ sellerId, amount, receiptImage, note }) => {
       const { error } = await supabase.from('seller_transfers').insert({
@@ -331,6 +339,7 @@ export default function AdminDashboardPage() {
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || []
   const buyerUsers = users?.filter(u => u.account_type === 'buyer') || []
 
+  // ✅ دالة عرض جدول المنتجات (تم إصلاح جميع أخطاء JSX)
   const renderProductTable = (filterKey, productsList = products) => {
     if (!productsList || productsList.length === 0) {
       return <div className="text-center p-8 text-text-secondary">لا توجد منتجات</div>
@@ -370,7 +379,7 @@ export default function AdminDashboardPage() {
               <th>تاريخ الشحن</th>
               <th>تاريخ الإيصال</th>
               <th>الحالة</th>
-            <tr>
+            </tr>
           </thead>
           <tbody>
             {filtered.map((product) => {
@@ -398,6 +407,7 @@ export default function AdminDashboardPage() {
     )
   }
 
+  // دالة تغيير نوع الحساب
   const toggleAccountType = (user) => {
     const newType = user.account_type === 'seller' ? 'buyer' : 'seller'
     updateUserMutation.mutate({
@@ -511,7 +521,7 @@ export default function AdminDashboardPage() {
                       </div>
                       <div className="overflow-x-auto mt-4">
                         <table className="w-full text-right border-collapse">
-                          <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th></tr></thead>
+                          <thead><tr><th>القسم</th><th>التفاصيل</th></tr></thead>
                           <tbody>
                             <tr><td className="p-2 font-bold">إجمالي المبيعات</td><td>{formatCurrency(sellerFinance.totalSales)}</td></tr>
                             <tr><td className="p-2 font-bold">إجمالي المرتجعات</td><td>{formatCurrency(0)}</td></tr>
@@ -526,7 +536,7 @@ export default function AdminDashboardPage() {
                   {sellerDetailTab === 'stats' && (
                     <div className="overflow-x-auto">
                       <table className="w-full text-right border-collapse">
-                        <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th><th>طلب البيانات</th></tr></thead>
+                        <thead><tr><th>القسم</th><th>التفاصيل</th><th>طلب البيانات</th></tr></thead>
                         <tbody>
                           <tr><td className="p-2">جميع المنتجات المنشورة</td><td>{sellerStats.totalProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('all'); setSellerFilterId(selectedSeller.id); }}>عرض</button></td></tr>
                           <tr><td className="p-2">المنتجات المباعة</td><td>{sellerStats.soldProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('sold'); setSellerFilterId(selectedSeller.id); }}>عرض</button></td></tr>
