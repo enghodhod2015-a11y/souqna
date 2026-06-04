@@ -109,6 +109,18 @@ export default function AdminDashboardPage() {
     enabled: activeMainTab === 'orders'
   })
 
+  // دالة لتحديث جميع البيانات
+  const refreshAllData = async () => {
+    await Promise.all([
+      refetchStats(),
+      refetchUsers(),
+      refetchPendingSellers(),
+      refetchProducts(),
+      refetchOrders()
+    ])
+    toast.success('تم تحديث جميع البيانات')
+  }
+
   // Mutations
   const updateUserMutation = useMutation({
     mutationFn: ({ userId, updates }) => updateUser(userId, updates),
@@ -156,11 +168,13 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
+  // ✅ تعديل: استخدام جدول seller_wallets بدلاً من seller_transfers
   const addTransferMutation = useMutation({
     mutationFn: async ({ sellerId, amount, receiptImage, note }) => {
-      const { error } = await supabase.from('seller_transfers').insert({
+      const { error } = await supabase.from('seller_wallets').insert({
         seller_id: sellerId,
         amount: parseFloat(amount),
+        type: 'transfer',            // نوع العملية
         receipt_image: receiptImage,
         note: note,
         created_at: new Date().toISOString()
@@ -178,7 +192,7 @@ export default function AdminDashboardPage() {
   const loadSellerReceipts = async (sellerId) => {
     if (!sellerId) return
     const { data, error } = await supabase
-      .from('seller_transfers')
+      .from('seller_wallets')
       .select('*')
       .eq('seller_id', sellerId)
       .order('created_at', { ascending: false })
@@ -204,6 +218,7 @@ export default function AdminDashboardPage() {
   const buyerUsers = users?.filter(u => u.account_type === 'buyer') || []
 
   const getSellerStatsData = (sellerId) => {
+    // هذه الأرقام يجب جلبها من API حقيقية
     return {
       totalProducts: 25,
       soldProducts: 12,
@@ -218,55 +233,81 @@ export default function AdminDashboardPage() {
     }
   }
 
-  // ✅ الدالة المصححة (إزالة علامة td الخاطئة)
-  const renderProductTable = (filterKey) => {
-    const mockProducts = [
-      { id: 1, name: 'هاتف ذكي', seller: 'متجر الإلكترونيات', price: 1500, publishDate: '2025-01-10', orderDate: '2025-02-15', shipDate: '2025-02-20', receiptDate: '2025-02-18', status: 'sold' },
-      { id: 2, name: 'سماعات لاسلكية', seller: 'متجر الإلكترونيات', price: 300, publishDate: '2025-01-15', orderDate: '2025-02-20', shipDate: '2025-02-25', receiptDate: '2025-02-22', status: 'shipping' },
-      { id: 3, name: 'ساعة رياضية', seller: 'متجر اللياقة', price: 800, publishDate: '2025-02-01', orderDate: '2025-03-01', shipDate: null, receiptDate: '2025-03-02', status: 'not_shipped' },
-      { id: 4, name: 'حقيبة ظهر', seller: 'موضة الأزياء', price: 200, publishDate: '2025-02-10', orderDate: '2025-03-05', shipDate: null, receiptDate: null, status: 'no_receipt' },
-      { id: 5, name: 'شاحن سريع', seller: 'متجر الإلكترونيات', price: 100, publishDate: '2025-01-20', orderDate: null, shipDate: null, receiptDate: null, status: 'not_purchased' }
-    ]
-    let filtered = mockProducts
-    if (filterKey === 'sold') filtered = mockProducts.filter(p => p.status === 'sold')
-    else if (filterKey === 'shipping') filtered = mockProducts.filter(p => p.status === 'shipping')
-    else if (filterKey === 'not_shipped') filtered = mockProducts.filter(p => p.status === 'not_shipped')
-    else if (filterKey === 'no_receipt') filtered = mockProducts.filter(p => p.status === 'no_receipt')
-    else if (filterKey === 'not_purchased') filtered = mockProducts.filter(p => p.status === 'not_purchased')
-    else filtered = mockProducts
+  // دالة عرض جدول المنتجات باستخدام البيانات الحقيقية
+  const renderProductTable = (filterKey, productsList = products) => {
+    if (!productsList || productsList.length === 0) {
+      return <div className="text-center p-8 text-text-secondary">لا توجد منتجات</div>
+    }
 
-    if (filtered.length === 0) return <div className="text-center p-8 text-text-secondary">لا توجد منتجات</div>
+    let filtered = [...productsList]
+    if (filterKey === 'sold') {
+      filtered = productsList.filter(p => p.order_count > 0)
+    } else if (filterKey === 'shipping') {
+      filtered = productsList.filter(p => p.shipping_status === 'shipping')
+    } else if (filterKey === 'not_shipped') {
+      filtered = productsList.filter(p => p.payment_status === 'paid' && p.shipping_status !== 'shipped')
+    } else if (filterKey === 'no_receipt') {
+      filtered = productsList.filter(p => p.order_count > 0 && !p.receipt_uploaded)
+    } else if (filterKey === 'not_purchased') {
+      filtered = productsList.filter(p => p.order_count === 0)
+    } else if (filterKey === 'duplicate') {
+      filtered = []
+    } else if (filterKey === 'inappropriate') {
+      filtered = []
+    }
+
+    if (filtered.length === 0) {
+      return <div className="text-center p-8 text-text-secondary">لا توجد منتجات في هذا القسم</div>
+    }
+
     return (
       <div className="overflow-x-auto">
         <table className="w-full text-right border-collapse">
           <thead>
             <tr className="border-b border-gold/30 bg-primary-card/50">
-              <th>اسم المنتج</th><th>البائع</th><th>السعر</th><th>تاريخ النشر</th><th>تاريخ الطلب</th><th>تاريخ الشحن</th><th>تاريخ الإيصال</th><th>الحالة</th>
+              <th>اسم المنتج</th>
+              <th>البائع</th>
+              <th>السعر</th>
+              <th>تاريخ النشر</th>
+              <th>تاريخ الطلب</th>
+              <th>تاريخ الشحن</th>
+              <th>تاريخ الإيصال</th>
+              <th>الحالة</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map(p => (
-              <tr key={p.id} className="border-b border-gold/20 hover:bg-secondary-blue/30">
-                <td className="p-2">{p.name}</td>
-                <td className="p-2">{p.seller}</td>
-                <td className="p-2">{formatCurrency(p.price)}</td>
-                <td className="p-2">{formatDate(p.publishDate)}</td>
-                <td className="p-2">{formatDate(p.orderDate)}</td>
-                <td className="p-2">{formatDate(p.shipDate)}</td>
-                <td className="p-2">{formatDate(p.receiptDate)}</td>
-                <td className="p-2">
-                  {p.status === 'sold' && 'مباع'}
-                  {p.status === 'shipping' && 'قيد الشحن'}
-                  {p.status === 'not_shipped' && 'لم يشحن (تم رفع الإيصال)'}
-                  {p.status === 'no_receipt' && 'تم الشراء بدون إيصال'}
-                  {p.status === 'not_purchased' && 'لم يتم شراؤه'}
-                </td>
-              </tr>
-            ))}
+            {filtered.map((product) => {
+              const sellerName = product.seller?.full_name || product.seller_name || 'غير معروف'
+              const orderDate = product.last_order_date ? formatDate(product.last_order_date) : '-'
+              const shipDate = product.shipped_date ? formatDate(product.shipped_date) : '-'
+              const receiptDate = product.receipt_date ? formatDate(product.receipt_date) : '-'
+              const status = product.status || (product.order_count > 0 ? 'تم الطلب' : 'متاح')
+              return (
+                <tr key={product.id} className="border-b border-gold/20 hover:bg-secondary-blue/30">
+                  <td className="p-2">{product.name}</td>
+                  <td className="p-2">{sellerName}</td>
+                  <td className="p-2">{formatCurrency(product.price)}</td>
+                  <td className="p-2">{formatDate(product.created_at)}</td>
+                  <td className="p-2">{orderDate}</td>
+                  <td className="p-2">{shipDate}</td>
+                  <td className="p-2">{receiptDate}</td>
+                  <td className="p-2">{status}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
     )
+  }
+
+  // دالة تغيير نوع الحساب (بائع <-> مشتري)
+  const toggleAccountType = (user) => {
+    const newType = user.account_type === 'seller' ? 'buyer' : 'seller'
+    updateUserMutation.mutate({
+      userId: user.id,
+      updates: { account_type: newType }
+    })
   }
 
   return (
@@ -274,7 +315,7 @@ export default function AdminDashboardPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gold">لوحة تحكم الأدمن</h1>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => refetchStats()} className="flex items-center gap-2">
+          <Button variant="secondary" onClick={refreshAllData} className="flex items-center gap-2">
             <RefreshCw size={16} /> تحديث الكل
           </Button>
         </div>
@@ -354,7 +395,7 @@ export default function AdminDashboardPage() {
                       <div className="flex gap-2 mt-4 flex-wrap">
                         <button onClick={() => updateUserMutation.mutate({ userId: selectedSeller.id, updates: { is_banned: !selectedSeller.is_banned } })} className={`px-3 py-1 rounded text-white ${selectedSeller.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{selectedSeller.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
                         <button onClick={() => window.open(`/store/${selectedSeller.id}`, '_blank')} className="bg-blue-600 px-3 py-1 rounded text-white">عرض المتجر</button>
-                        <button onClick={() => updateUserMutation.mutate({ userId: selectedSeller.id, updates: { account_type: selectedSeller.account_type === 'seller' ? 'buyer' : 'seller' } })} className="bg-gold text-primary-blue px-3 py-1 rounded">تغيير نوع الحساب</button>
+                        <button onClick={() => toggleAccountType(selectedSeller)} className="bg-gold text-primary-blue px-3 py-1 rounded">تغيير نوع الحساب</button>
                         <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: selectedSeller.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-3 py-1 rounded text-white flex items-center gap-1"><Send size={14} /> إرسال إشعار</button>
                       </div>
                     </>
@@ -374,11 +415,7 @@ export default function AdminDashboardPage() {
                       </div>
                       <div className="overflow-x-auto mt-4">
                         <table className="w-full text-right border-collapse">
-                          <thead>
-                            <tr className="border-b border-gold/30">
-                              <th>القسم</th><th>التفاصيل</th>
-                            </tr>
-                          </thead>
+                          <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th></tr></thead>
                           <tbody>
                             <tr><td className="p-2 font-bold">إجمالي المبيعات</td><td>{formatCurrency(12500)}</td></tr>
                             <tr><td className="p-2 font-bold">إجمالي المرتجعات</td><td>{formatCurrency(500)}</td></tr>
@@ -416,7 +453,7 @@ export default function AdminDashboardPage() {
                 <Modal onClose={() => setShowReceiptsModal(false)} title="إيصالات التحويل للبائع">
                   <div className="overflow-x-auto">
                     <table className="w-full text-right border-collapse">
-                      <thead><tr><th>رقم الحوالة</th><th>تاريخ الإرسال</th><th>المبلغ</th><th>صورة الإيصال</th><th>ملاحظة</th></tr></thead>
+                      <thead><tr><th>رقم العملية</th><th>تاريخ الإرسال</th><th>المبلغ</th><th>صورة الإيصال</th><th>ملاحظة</th></tr></thead>
                       <tbody>
                         {sellerReceipts.length === 0 ? <tr><td colSpan="5" className="text-center p-4">لا توجد إيصالات</td></tr> :
                           sellerReceipts.map(rec => (
@@ -431,7 +468,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* المشترين (مختصر) */}
+          {/* المشترين */}
           {activeSubTab === 'buyers' && (
             <div>
               <div className="flex gap-4 mb-4">
@@ -481,7 +518,7 @@ export default function AdminDashboardPage() {
                       </div>
                       <div className="mt-4 flex gap-2">
                         <button onClick={() => updateUserMutation.mutate({ userId: selectedBuyer.id, updates: { is_banned: !selectedBuyer.is_banned } })} className={`px-3 py-1 rounded text-white ${selectedBuyer.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{selectedBuyer.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
-                        <button onClick={() => updateUserMutation.mutate({ userId: selectedBuyer.id, updates: { account_type: selectedBuyer.account_type === 'buyer' ? 'seller' : 'buyer' } })} className="bg-gold text-primary-blue px-3 py-1 rounded">تغيير إلى {selectedBuyer.account_type === 'buyer' ? 'بائع' : 'مشتري'}</button>
+                        <button onClick={() => toggleAccountType(selectedBuyer)} className="bg-gold text-primary-blue px-3 py-1 rounded">تغيير إلى {selectedBuyer.account_type === 'buyer' ? 'بائع' : 'مشتري'}</button>
                       </div>
                     </>
                   )}
@@ -522,7 +559,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* المنتجات */}
+      {/* ========== المنتجات ========== */}
       {activeMainTab === 'products' && (
         <div>
           <div className="flex flex-wrap gap-2 mb-6 border-b border-gold/30 pb-2">
@@ -558,7 +595,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {productsView !== 'details' && renderProductTable(productsView)}
+          {productsView !== 'details' && renderProductTable(productsView, products)}
         </div>
       )}
 
@@ -569,5 +606,4 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
-
 
