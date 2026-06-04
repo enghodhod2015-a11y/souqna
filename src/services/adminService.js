@@ -60,7 +60,7 @@ const mockTopCategories = [
   { name: 'السيارات', sales: 12400 },
 ]
 
-// تعريف الدوال المفقودة محلياً (لتجنب أخطاء الاستيراد)
+// Mock missing functions
 const getSellerReceipts = async () => []
 const addSellerReceipt = async () => {}
 const getSellerFinanceSummary = async () => null
@@ -187,7 +187,6 @@ export default function AdminDashboardPage() {
   const openDisputes = 0
   const pendingWithdrawals = 0
 
-  // Mock product stats for details view
   const productStats = {
     all: products?.length || 0,
     sold: 45,
@@ -199,7 +198,6 @@ export default function AdminDashboardPage() {
     inappropriate: 3
   }
 
-  // Mock product list for tables (replace with real data later)
   const mockProductsList = [
     { id: 1, name: 'هاتف ذكي', seller: 'متجر الإلكترونيات', price: 1500, publishDate: '2025-01-10', orderDate: '2025-02-15', shipDate: '2025-02-20', receiptDate: '2025-02-18', status: 'sold' },
     { id: 2, name: 'سماعات لاسلكية', seller: 'متجر الإلكترونيات', price: 300, publishDate: '2025-01-15', orderDate: '2025-02-20', shipDate: '2025-02-25', receiptDate: '2025-02-22', status: 'shipping' },
@@ -221,7 +219,7 @@ export default function AdminDashboardPage() {
 
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || []
 
-  // Helper to render product list table - CORRECTED
+  // ✅ FIXED: renderProductTable with correct JSX
   const renderProductTable = (filterStatus) => {
     const filtered = mockProductsList.filter(p => p.status === filterStatus)
     if (filtered.length === 0) {
@@ -240,7 +238,7 @@ export default function AdminDashboardPage() {
               <th>تاريخ الشحن</th>
               <th>تاريخ الإيصال</th>
               <th>الحالة</th>
-            </table>
+            </tr>
           </thead>
           <tbody>
             {filtered.map((p) => (
@@ -306,56 +304,12 @@ export default function AdminDashboardPage() {
             <div className="bg-primary-card p-4 rounded-2xl border border-gold/30"><Wallet className="text-gold mb-2" size={32} /><p className="text-text-secondary text-sm">سحوبات معلقة</p><p className="text-2xl font-bold">{pendingWithdrawals}</p></div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30">
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><LineChartIcon size={20} className="text-gold" /> المبيعات الشهرية</h2>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={mockMonthlySales}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                  <XAxis dataKey="name" stroke="#ddd" />
-                  <YAxis stroke="#ddd" tickFormatter={value => `${value / 1000}k`} />
-                  <Tooltip contentStyle={{ backgroundColor: '#06264D', borderColor: '#D4AF37' }} formatter={value => formatCurrency(value)} />
-                  <Line type="monotone" dataKey="sales" stroke="#D4AF37" strokeWidth={2} dot={{ fill: '#D4AF37' }} />
-                  <Line type="monotone" dataKey="commission" stroke="#60A5FA" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30">
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><PieChartIcon size={20} className="text-gold" /> أفضل الفئات مبيعاً</h2>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie data={mockTopCategories} dataKey="sales" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                    {mockTopCategories.map((entry, index) => <Cell key={`cell-${index}`} fill={`hsl(${index * 45}, 70%, 55%)`} />)}
-                  </Pie>
-                  <Tooltip formatter={value => formatCurrency(value)} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><LineChartIcon size={20} className="text-gold" /> المبيعات الشهرية</h2><ResponsiveContainer width="100%" height={300}><LineChart data={mockMonthlySales}><CartesianGrid strokeDasharray="3 3" stroke="#333" /><XAxis dataKey="name" stroke="#ddd" /><YAxis stroke="#ddd" tickFormatter={value => `${value / 1000}k`} /><Tooltip contentStyle={{ backgroundColor: '#06264D', borderColor: '#D4AF37' }} formatter={value => formatCurrency(value)} /><Line type="monotone" dataKey="sales" stroke="#D4AF37" strokeWidth={2} dot={{ fill: '#D4AF37' }} /><Line type="monotone" dataKey="commission" stroke="#60A5FA" strokeWidth={2} /></LineChart></ResponsiveContainer></div>
+            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><PieChartIcon size={20} className="text-gold" /> أفضل الفئات مبيعاً</h2><ResponsiveContainer width="100%" height={300}><PieChart><Pie data={mockTopCategories} dataKey="sales" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>{mockTopCategories.map((entry, index) => <Cell key={`cell-${index}`} fill={`hsl(${index * 45}, 70%, 55%)`} />)}</Pie><Tooltip formatter={value => formatCurrency(value)} /></PieChart></ResponsiveContainer></div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30">
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Award size={20} className="text-gold" /> أفضل 5 بائعين</h2>
-              <div className="space-y-3">
-                {mockTopSellers.map((seller, idx) => (
-                  <div key={idx} className="flex justify-between items-center p-2 bg-secondary-blue/30 rounded-lg">
-                    <div><span className="font-bold">{idx + 1}.</span> {seller.name}</div>
-                    <div className="flex gap-4"><span>{formatCurrency(seller.sales)}</span><span className="text-gold">⭐ {seller.rating}</span></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30">
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Activity size={20} className="text-gold" /> نسبة إتمام الطلبات</h2>
-              <div className="flex justify-center items-center h-48">
-                <div className="relative w-40 h-40">
-                  <svg viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="45" fill="none" stroke="#333" strokeWidth="8" />
-                    <circle cx="50" cy="50" r="45" fill="none" stroke="#D4AF37" strokeWidth="8" strokeDasharray={`${completionRate * 2.827} 283`} transform="rotate(-90 50 50)" />
-                    <text x="50" y="50" textAnchor="middle" dy=".3em" fill="white" fontSize="20">{completionRate}%</text>
-                  </svg>
-                </div>
-              </div>
-              <p className="text-center text-text-secondary">نسبة الطلبات المكتملة مقابل الملغاة</p>
-            </div>
+            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Award size={20} className="text-gold" /> أفضل 5 بائعين</h2><div className="space-y-3">{mockTopSellers.map((seller, idx) => (<div key={idx} className="flex justify-between items-center p-2 bg-secondary-blue/30 rounded-lg"><div><span className="font-bold">{idx + 1}.</span> {seller.name}</div><div className="flex gap-4"><span>{formatCurrency(seller.sales)}</span><span className="text-gold">⭐ {seller.rating}</span></div></div>))}</div></div>
+            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Activity size={20} className="text-gold" /> نسبة إتمام الطلبات</h2><div className="flex justify-center items-center h-48"><div className="relative w-40 h-40"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="#333" strokeWidth="8" /><circle cx="50" cy="50" r="45" fill="none" stroke="#D4AF37" strokeWidth="8" strokeDasharray={`${completionRate * 2.827} 283`} transform="rotate(-90 50 50)" /><text x="50" y="50" textAnchor="middle" dy=".3em" fill="white" fontSize="20">{completionRate}%</text></svg></div></div><p className="text-center text-text-secondary">نسبة الطلبات المكتملة مقابل الملغاة</p></div>
           </div>
         </div>
       )}
@@ -421,7 +375,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* Buyers sub-tab - CORRECTED */}
+          {/* Buyers sub-tab - FIXED */}
           {activeSubTab === 'buyers' && (
             <div>
               <div className="flex gap-4 mb-4">
@@ -550,5 +504,4 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
-
 
