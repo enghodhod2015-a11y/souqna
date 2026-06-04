@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import {
   getAdminStats, getUsers, updateUser, getProductsForAdmin, approveProduct,
   getOrdersForAdmin, reviewReceipt, getAuditLogs, getPendingSellers,
@@ -62,6 +63,7 @@ const mockTopCategories = [
 ]
 
 export default function AdminDashboardPage() {
+  const navigate = useNavigate()
   const [activeMainTab, setActiveMainTab] = useState('dashboard')
   const [activeSubTab, setActiveSubTab] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -274,7 +276,6 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
-  // دالة إرسال الإشعارات من الإدارة
   const sendNotificationMutation = useMutation({
     mutationFn: async ({ userId, title, message }) => {
       const { data: { user: adminUser }, error: adminError } = await supabase.auth.getUser()
@@ -331,7 +332,6 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
-  // دالة إضافة تحويل مالي للبائع (باستخدام RPC لتجاوز RLS)
   const addTransferMutation = useMutation({
     mutationFn: async ({ sellerId, amount, receiptImage, note }) => {
       const { data, error } = await supabase.rpc('insert_seller_transfer', {
@@ -346,13 +346,7 @@ export default function AdminDashboardPage() {
     onSuccess: () => {
       toast.success('تم تسجيل التحويل')
       setTransferAmount('')
-      loadSellerReceipts(selectedSeller?.id).then(() => {
-        if (showReceiptsModal) {
-          // إعادة فتح المودال لتحديث البيانات
-          setShowReceiptsModal(false)
-          setTimeout(() => setShowReceiptsModal(true), 100)
-        }
-      })
+      loadSellerReceipts(selectedSeller?.id)
     },
     onError: (err) => {
       console.error('خطأ في إدراج التحويل:', err)
@@ -370,63 +364,6 @@ export default function AdminDashboardPage() {
     if (error) console.error(error)
     else setSellerReceipts(data || [])
   }
-
-  // ========== دوال مساعدة جديدة للإيصالات ==========
-  // دالة طباعة الإيصال كـ PDF (تفتح الصورة في نافذة جديدة ثم تطبع)
-  const printReceiptAsPDF = (imageUrl, amount, date) => {
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) {
-      toast.error('الرجاء السماح للنوافذ المنبثقة')
-      return
-    }
-    printWindow.document.write(`
-      <html dir="rtl">
-        <head><title>إيصال تحويل - ${amount} ريال</title></head>
-        <body style="text-align:center; font-family:Arial;">
-          <h2>إيصال تحويل مالي</h2>
-          <p>المبلغ: ${amount} ريال</p>
-          <p>التاريخ: ${formatDate(date)}</p>
-          <img src="${imageUrl}" style="max-width:100%; border:1px solid #ccc;" />
-          <script>
-            window.onload = function() { window.print(); setTimeout(function(){ window.close(); }, 1000); }
-          </script>
-        </body>
-      </html>
-    `)
-    printWindow.document.close()
-  }
-
-  // دالة مشاركة الإيصال (Web Share API)
-  const shareReceipt = async (imageUrl, amount, date) => {
-    if (navigator.share) {
-      try {
-        const response = await fetch(imageUrl)
-        const blob = await response.blob()
-        const file = new File([blob], 'receipt.jpg', { type: blob.type })
-        await navigator.share({
-          title: 'إيصال تحويل',
-          text: `إيصال تحويل بمبلغ ${amount} ريال بتاريخ ${formatDate(date)}`,
-          files: [file]
-        })
-        toast.success('تمت المشاركة')
-      } catch (err) {
-        console.error(err)
-        try {
-          await navigator.share({
-            title: 'إيصال تحويل',
-            text: `إيصال تحويل بمبلغ ${amount} ريال - ${imageUrl}`
-          })
-          toast.success('تمت مشاركة الرابط')
-        } catch (e) {
-          toast.error('لا يمكن المشاركة حالياً')
-        }
-      }
-    } else {
-      navigator.clipboard.writeText(imageUrl)
-      toast.success('تم نسخ رابط الإيصال')
-    }
-  }
-  // ========== نهاية الدوال المساعدة ==========
 
   const pendingProducts = products?.filter(p => !p.is_approved).length || 0
   const pendingSellersCount = pendingSellers?.length || 0
@@ -621,7 +558,9 @@ export default function AdminDashboardPage() {
                           <input type="file" accept="image/*" id="receiptImage" className="hidden" />
                           <Button onClick={() => { const fileInput = document.getElementById('receiptImage'); fileInput?.click(); }}>رفع صورة الإيصال</Button>
                           <Button onClick={() => { if (transferAmount) addTransferMutation.mutate({ sellerId: selectedSeller.id, amount: transferAmount, receiptImage: '', note: '' }); else toast.error('أدخل المبلغ') }}>إدخال</Button>
-                          <Button variant="secondary" onClick={() => { loadSellerReceipts(selectedSeller.id); setShowReceiptsModal(true); }}>عرض جميع الإيصالات</Button>
+                          <Button variant="secondary" onClick={() => navigate(`/admin/seller-transfers/${selectedSeller.id}`)}>
+                            عرض جميع الإيصالات
+                          </Button>
                         </div>
                       </div>
                       <div className="overflow-x-auto mt-4">
@@ -659,68 +598,10 @@ export default function AdminDashboardPage() {
                   )}
                 </div>
               )}
-
-              {/* ========== مودال عرض الإيصالات المعدل ========== */}
-              {showReceiptsModal && (
-                <Modal onClose={() => setShowReceiptsModal(false)} title="إيصالات التحويل للبائع">
-                  <div className="overflow-x-auto max-h-96">
-                    <table className="w-full text-right border-collapse">
-                      <thead className="sticky top-0 bg-primary-card">
-                        <tr>
-                          <th>رقم العملية</th>
-                          <th>تاريخ الإرسال</th>
-                          <th>المبلغ</th>
-                          <th>صورة الإيصال</th>
-                          <th>ملاحظة</th>
-                          <th>الإجراءات</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sellerReceipts.length === 0 ? (
-                          <tr><td colSpan="6" className="text-center p-4">لا توجد إيصالات</td></tr>
-                        ) : (
-                          sellerReceipts.map(rec => (
-                            <tr key={rec.id}>
-                              <td className="p-2">{rec.id}</td>
-                              <td className="p-2">{formatDate(rec.created_at)}</td>
-                              <td className="p-2">{formatCurrency(rec.amount)}</td>
-                              <td className="p-2">
-                                {rec.receipt_image ? (
-                                  <a href={rec.receipt_image} target="_blank" className="text-gold underline" rel="noopener noreferrer">عرض الصورة</a>
-                                ) : '-'}
-                              </td>
-                              <td className="p-2">{rec.note || '-'}</td>
-                              <td className="p-2 flex gap-2 flex-wrap">
-                                {rec.receipt_image && (
-                                  <>
-                                    <button
-                                      onClick={() => printReceiptAsPDF(rec.receipt_image, rec.amount, rec.created_at)}
-                                      className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700"
-                                    >
-                                      📄 PDF
-                                    </button>
-                                    <button
-                                      onClick={() => shareReceipt(rec.receipt_image, rec.amount, rec.created_at)}
-                                      className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700"
-                                    >
-                                      🔗 مشاركة
-                                    </button>
-                                  </>
-                                )}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </Modal>
-              )}
-              {/* ========== نهاية المودال ========== */}
             </div>
           )}
 
-          {/* المشترين (مختصر) - نفس الكود الأصلي */}
+          {/* المشترين (مختصر) */}
           {activeSubTab === 'buyers' && (
             <div>
               <div className="flex gap-4 mb-4">

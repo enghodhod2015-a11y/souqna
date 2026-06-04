@@ -17,7 +17,7 @@ import InboxPage from '../pages/InboxPage'
 import ProfilePage from '../pages/ProfilePage'
 import CheckoutPage from '../pages/CheckoutPage'
 import PaymentPage from '../pages/PaymentPage'
-import NotificationsPage from '../pages/NotificationsPage'   // ✅ إضافة صفحة الإشعارات
+import NotificationsPage from '../pages/NotificationsPage'
 
 // ─── صفحات البائع ───
 import AddProductPage from '../pages/AddProductPage'
@@ -28,6 +28,7 @@ import SellerDashboardPage from '../pages/SellerDashboardPage'
 
 // ─── صفحات الأدمن ───
 import AdminDashboardPage from '../pages/AdminDashboardPage'
+import SellerTransfersPage from '../pages/SellerTransfersPage'   // صفحة إيصالات البائع
 
 // ─── صفحة المحادثة ───
 import ChatPage from '../pages/ChatPage'
@@ -108,6 +109,11 @@ export default function AppRoutes() {
       <Route path="/admin/dashboard" element={
         <ProtectedRoute allowedRoles={['admin']}>
           <AdminDashboardPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/seller-transfers/:sellerId" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <SellerTransfersPage />
         </ProtectedRoute>
       } />
 
