@@ -28,7 +28,6 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     loadNotifications()
-    // الاستماع للإشعارات الجديدة عبر Realtime
     const channel = supabase
       .channel(`notifications-page-${user?.id}`)
       .on('postgres_changes', {
@@ -48,25 +47,18 @@ export default function NotificationsPage() {
   }, [user])
 
   const handleNotificationClick = async (notif) => {
-    // تعليم كمقروء
     if (!notif.is_read) {
       await markNotificationAsRead(notif.id)
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n))
     }
 
-    // التوجيه بناءً على النوع و related_id
-    if (notif.type === 'message' || notif.type === 'info' && notif.related_id) {
-      // رسالة – ننتقل إلى صفحة المحادثة إذا كان related_id هو معرف المحادثة
+    if (notif.type === 'message' && notif.related_id) {
       navigate(`/chat/c/${notif.related_id}`)
+    } else if (notif.type === 'order_status' || notif.type === 'payment' || notif.type === 'return') {
+      navigate('/orders')
     } else if (notif.related_id) {
-      // طلب أو منتج – ننتقل إلى صفحة الطلب أو المنتج
-      if (notif.type === 'order_status' || notif.type === 'payment' || notif.type === 'return') {
-        navigate(`/orders`)  // أو `/order/${notif.related_id}`
-      } else {
-        navigate(`/product/${notif.related_id}`)
-      }
+      navigate(`/product/${notif.related_id}`)
     } else {
-      // إشعار إداري بدون related_id – نعرضه في نافذة منبثقة أو نبقى في الصفحة
       toast.custom((t) => (
         <div className="bg-primary-card rounded-2xl border border-gold/30 p-4 shadow-xl max-w-sm mx-4">
           <h3 className="font-bold text-gold text-lg mb-2">{notif.title}</h3>
