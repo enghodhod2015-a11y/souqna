@@ -221,6 +221,7 @@ export default function AdminDashboardPage() {
 
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || []
 
+  // الدالة المصححة – المشكلة كانت في علامة </table> الخاطئة
   const renderProductTable = (filterStatus) => {
     const filtered = mockProductsList.filter(p => p.status === filterStatus)
     if (filtered.length === 0) return <div className="text-center p-8 text-text-secondary">لا توجد منتجات</div>
@@ -229,8 +230,15 @@ export default function AdminDashboardPage() {
         <table className="w-full text-right border-collapse">
           <thead>
             <tr className="border-b border-gold/30 bg-primary-card/50">
-              <th>اسم المنتج</th><th>البائع</th><th>السعر</th><th>تاريخ النشر</th><th>تاريخ الطلب</th><th>تاريخ الشحن</th><th>تاريخ الإيصال</th><th>الحالة</th>
-            </table>
+              <th>اسم المنتج</th>
+              <th>البائع</th>
+              <th>السعر</th>
+              <th>تاريخ النشر</th>
+              <th>تاريخ الطلب</th>
+              <th>تاريخ الشحن</th>
+              <th>تاريخ الإيصال</th>
+              <th>الحالة</th>
+            </tr>
           </thead>
           <tbody>
             {filtered.map((p) => (
@@ -533,5 +541,4 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
-
 
