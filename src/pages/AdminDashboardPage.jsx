@@ -75,7 +75,7 @@ export default function AdminDashboardPage() {
   const [buyerActivityFilter, setBuyerActivityFilter] = useState('all')
   const [productFilter, setProductFilter] = useState('all')
   const [productsView, setProductsView] = useState('details')
-  const [sellerDetailTab, setSellerDetailTab] = useState('profile') // profile, finance, stats
+  const [sellerDetailTab, setSellerDetailTab] = useState('profile')
   const [buyerDetailTab, setBuyerDetailTab] = useState('profile')
   const queryClient = useQueryClient()
 
@@ -218,6 +218,7 @@ export default function AdminDashboardPage() {
     }
   }
 
+  // ✅ الدالة المصححة (إزالة علامة td الخاطئة)
   const renderProductTable = (filterKey) => {
     const mockProducts = [
       { id: 1, name: 'هاتف ذكي', seller: 'متجر الإلكترونيات', price: 1500, publishDate: '2025-01-10', orderDate: '2025-02-15', shipDate: '2025-02-20', receiptDate: '2025-02-18', status: 'sold' },
@@ -260,7 +261,7 @@ export default function AdminDashboardPage() {
                   {p.status === 'no_receipt' && 'تم الشراء بدون إيصال'}
                   {p.status === 'not_purchased' && 'لم يتم شراؤه'}
                 </td>
-              </td>
+              </tr>
             ))}
           </tbody>
         </table>
@@ -292,7 +293,7 @@ export default function AdminDashboardPage() {
         <button onClick={() => setActiveMainTab('settings')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${activeMainTab === 'settings' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}><Settings size={18} /> الإعدادات</button>
       </div>
 
-      {/* ========== لوحة المعلومات ========== */}
+      {/* Dashboard Tab (مختصر) */}
       {activeMainTab === 'dashboard' && (
         <div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
@@ -307,10 +308,6 @@ export default function AdminDashboardPage() {
             <div className="bg-primary-card p-4 rounded-2xl border border-gold/30"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><LineChartIcon size={20} className="text-gold" /> المبيعات الشهرية</h2><ResponsiveContainer width="100%" height={300}><LineChart data={mockMonthlySales}><CartesianGrid strokeDasharray="3 3" stroke="#333" /><XAxis dataKey="name" stroke="#ddd" /><YAxis stroke="#ddd" tickFormatter={value => `${value / 1000}k`} /><Tooltip contentStyle={{ backgroundColor: '#06264D', borderColor: '#D4AF37' }} formatter={value => formatCurrency(value)} /><Line type="monotone" dataKey="sales" stroke="#D4AF37" strokeWidth={2} dot={{ fill: '#D4AF37' }} /><Line type="monotone" dataKey="commission" stroke="#60A5FA" strokeWidth={2} /></LineChart></ResponsiveContainer></div>
             <div className="bg-primary-card p-4 rounded-2xl border border-gold/30"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><PieChartIcon size={20} className="text-gold" /> أفضل الفئات مبيعاً</h2><ResponsiveContainer width="100%" height={300}><PieChart><Pie data={mockTopCategories} dataKey="sales" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>{mockTopCategories.map((entry, index) => <Cell key={`cell-${index}`} fill={`hsl(${index * 45}, 70%, 55%)`} />)}</Pie><Tooltip formatter={value => formatCurrency(value)} /></PieChart></ResponsiveContainer></div>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Award size={20} className="text-gold" /> أفضل 5 بائعين</h2><div className="space-y-3">{mockTopSellers.map((seller, idx) => (<div key={idx} className="flex justify-between items-center p-2 bg-secondary-blue/30 rounded-lg"><div><span className="font-bold">{idx + 1}.</span> {seller.name}</div><div className="flex gap-4"><span>{formatCurrency(seller.sales)}</span><span className="text-gold">⭐ {seller.rating}</span></div></div>))}</div></div>
-            <div className="bg-primary-card p-4 rounded-2xl border border-gold/30"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Activity size={20} className="text-gold" /> نسبة إتمام الطلبات</h2><div className="flex justify-center items-center h-48"><div className="relative w-40 h-40"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="#333" strokeWidth="8" /><circle cx="50" cy="50" r="45" fill="none" stroke="#D4AF37" strokeWidth="8" strokeDasharray={`${(stats?.completionRate || 85) * 2.827} 283`} transform="rotate(-90 50 50)" /><text x="50" y="50" textAnchor="middle" dy=".3em" fill="white" fontSize="20">{stats?.completionRate || 85}%</text></svg></div></div><p className="text-center text-text-secondary">نسبة الطلبات المكتملة مقابل الملغاة</p></div>
-          </div>
         </div>
       )}
 
@@ -323,7 +320,7 @@ export default function AdminDashboardPage() {
             <button onClick={() => setActiveSubTab('pending_sellers')} className={`px-4 py-2 ${activeSubTab === 'pending_sellers' ? 'border-b-2 border-gold text-gold' : 'text-text-secondary'}`}>طلبات الانضمام {pendingSellersCount > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full ml-1">{pendingSellersCount}</span>}</button>
           </div>
 
-          {/* ========== البائعين (بدون مودال) ========== */}
+          {/* البائعين */}
           {activeSubTab === 'sellers' && (
             <div>
               <div className="mb-4">
@@ -342,7 +339,6 @@ export default function AdminDashboardPage() {
                     <button onClick={() => setSellerDetailTab('stats')} className={`px-4 py-2 rounded-lg ${sellerDetailTab === 'stats' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}>المتابعة والتقييم</button>
                   </div>
 
-                  {/* الملف الشخصي */}
                   {sellerDetailTab === 'profile' && (
                     <>
                       <div className="overflow-x-auto">
@@ -364,7 +360,6 @@ export default function AdminDashboardPage() {
                     </>
                   )}
 
-                  {/* المالية */}
                   {sellerDetailTab === 'finance' && (
                     <>
                       <div className="bg-secondary-blue/30 p-4 rounded-xl mb-4">
@@ -379,7 +374,11 @@ export default function AdminDashboardPage() {
                       </div>
                       <div className="overflow-x-auto mt-4">
                         <table className="w-full text-right border-collapse">
-                          <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th></table></thead>
+                          <thead>
+                            <tr className="border-b border-gold/30">
+                              <th>القسم</th><th>التفاصيل</th>
+                            </tr>
+                          </thead>
                           <tbody>
                             <tr><td className="p-2 font-bold">إجمالي المبيعات</td><td>{formatCurrency(12500)}</td></tr>
                             <tr><td className="p-2 font-bold">إجمالي المرتجعات</td><td>{formatCurrency(500)}</td></tr>
@@ -391,7 +390,6 @@ export default function AdminDashboardPage() {
                     </>
                   )}
 
-                  {/* المتابعة والتقييم */}
                   {sellerDetailTab === 'stats' && (
                     <div className="overflow-x-auto">
                       <table className="w-full text-right border-collapse">
@@ -414,7 +412,6 @@ export default function AdminDashboardPage() {
                 </div>
               )}
 
-              {/* مودال عرض الإيصالات (يبقى منبثقاً لأنه نافذة منفصلة) */}
               {showReceiptsModal && (
                 <Modal onClose={() => setShowReceiptsModal(false)} title="إيصالات التحويل للبائع">
                   <div className="overflow-x-auto">
@@ -434,7 +431,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* ========== المشترين (بدون مودال) ========== */}
+          {/* المشترين (مختصر) */}
           {activeSubTab === 'buyers' && (
             <div>
               <div className="flex gap-4 mb-4">
@@ -493,10 +490,7 @@ export default function AdminDashboardPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-right border-collapse">
                         <thead><tr><th>رقم الطلب</th><th>التاريخ</th><th>المبلغ</th><th>الحالة</th></tr></thead>
-                        <tbody>
-                          {/* يمكن جلب طلبات المشتري من قاعدة البيانات هنا */}
-                          <tr><td colSpan="4" className="text-center p-4">لا توجد طلبات حالياً</td></tr>
-                        </tbody>
+                        <tbody><tr><td colSpan="4" className="text-center p-4">لا توجد طلبات حالياً</td></tr></tbody>
                       </table>
                     </div>
                   )}
@@ -528,7 +522,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ========== المنتجات ========== */}
+      {/* المنتجات */}
       {activeMainTab === 'products' && (
         <div>
           <div className="flex flex-wrap gap-2 mb-6 border-b border-gold/30 pb-2">
