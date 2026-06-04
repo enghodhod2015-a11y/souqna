@@ -431,7 +431,7 @@ export default function AdminDashboardPage() {
                 <select className="bg-secondary-blue rounded-lg px-3 py-2 border border-gold/30">
                   <option>جميع المشترين</option>
                   <option>نشط آخر 30 يوم</option>
-                  <option>غير نشط > 90 يوم</option>
+                  <option>غير نشط أكثر من 90 يوم</option>
                 </select>
                 <Button variant="secondary" onClick={() => refetchUsers()} className="flex items-center gap-2"><Search size={16} /> بحث</Button>
               </div>
@@ -927,4 +927,6 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
+
+
 
