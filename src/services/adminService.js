@@ -19,7 +19,6 @@ export const getAdminStats = async () => {
     .select('*', { count: 'exact', head: true })
   if (ordersError) throw ordersError
 
-  // ✅ استخدام total_amount بدلاً من total_price
   const { data: salesData, error: salesError } = await supabase
     .from('orders')
     .select('total_amount')
@@ -34,10 +33,8 @@ export const getAdminStats = async () => {
     .not('receipt_image', 'is', null)
   if (pendingError) throw pendingError
 
-  // ✅ تعريف stats ككائن فارغ أولاً
   let stats = {}
 
-  // مبيعات اليوم
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const { data: todaySales, error: todayError } = await supabase
@@ -54,17 +51,14 @@ export const getAdminStats = async () => {
     stats.dailyCommission = 0
   }
 
-  // عدد الطلبات الجديدة (اليوم)
   const { count: newOrders, error: newOrdersError } = await supabase
     .from('orders')
     .select('*', { count: 'exact', head: true })
     .gte('created_at', today.toISOString())
   stats.newOrders = newOrdersError ? 0 : newOrders
 
-  // عدد النزاعات المفتوحة (جدول افتراضي)
   stats.openDisputes = 0
 
-  // نسبة إتمام الطلبات
   const { count: completedOrders, error: completedError } = await supabase
     .from('orders')
     .select('*', { count: 'exact', head: true })
@@ -102,14 +96,12 @@ export const getUsers = async (filters = {}) => {
   if (error) throw error
 
   for (const user of data) {
-    // عدد طلبات المشتري
     const { count: orderCount, error: orderErr } = await supabase
       .from('orders')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
     if (!orderErr) user.order_count = orderCount
 
-    // ✅ إجمالي الإنفاق (استخدام total_amount)
     const { data: spentData, error: spentErr } = await supabase
       .from('orders')
       .select('total_amount')
@@ -117,7 +109,6 @@ export const getUsers = async (filters = {}) => {
       .eq('status', 'completed')
     if (!spentErr) user.total_spent = spentData.reduce((s, o) => s + (o.total_amount || 0), 0)
 
-    // آخر طلب
     const { data: lastOrder, error: lastErr } = await supabase
       .from('orders')
       .select('created_at')
@@ -126,7 +117,6 @@ export const getUsers = async (filters = {}) => {
       .limit(1)
     if (!lastErr && lastOrder.length) user.last_order_date = lastOrder[0].created_at
 
-    // بيانات البائع الإضافية
     if (user.account_type === 'seller') {
       const { data: productsData, error: productsErr } = await supabase
         .from('products')
@@ -180,18 +170,37 @@ export const approveSeller = async (sellerId, approved, notes = '') => {
 }
 
 // ==========================================
-// دوال المنتجات
+// دوال المنتجات (معدلة لضمان جلب اسم البائع)
 // ==========================================
 export const getProductsForAdmin = async (filters = {}) => {
+  // ✅ جلب المنتجات مع بيانات البائع باستخدام foreign key الصريح
   let query = supabase
     .from('products')
-    .select('*, seller:profiles(full_name, email)')
+    .select(`
+      *,
+      seller:profiles!products_seller_id_fkey (
+        id,
+        full_name,
+        email,
+        phone
+      )
+    `)
     .order('created_at', { ascending: false })
+  
   if (filters.status === 'pending') query = query.eq('is_approved', false)
   if (filters.status === 'hidden') query = query.eq('is_hidden', true)
+  
   const { data, error } = await query
   if (error) throw error
-  return data.map(p => ({ ...p, title: p.name }))
+  
+  // ✅ إضافة حقول إضافية لتسهيل الوصول للاسم
+  return data.map(product => ({
+    ...product,
+    title: product.name,
+    seller_name: product.seller?.full_name || 'غير معروف',
+    seller_email: product.seller?.email || '',
+    seller_phone: product.seller?.phone || ''
+  }))
 }
 
 export const approveProduct = async (productId, approve, is_hidden = null) => {
@@ -217,7 +226,6 @@ export const getOrdersForAdmin = async () => {
     .select('*, product:products(title, name), buyer:profiles!orders_user_id_fkey(full_name, email)')
     .order('created_at', { ascending: false })
   if (error) throw error
-  // ✅ استخدام total_amount
   return data.map(order => ({
     ...order,
     commission: (order.total_amount || 0) * 0.1,

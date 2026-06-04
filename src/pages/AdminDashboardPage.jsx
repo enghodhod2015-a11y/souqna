@@ -97,14 +97,11 @@ export default function AdminDashboardPage() {
     const fetchSellerStats = async () => {
       try {
         const sellerId = selectedSeller.id
-
-        // 1. عدد المنتجات المنشورة
         const { count: totalProducts } = await supabase
           .from('products')
           .select('*', { count: 'exact', head: true })
           .eq('seller_id', sellerId)
 
-        // 2. عدد المنتجات المباعة (لها طلبات بحالة مكتملة أو shipped)
         const { data: soldData } = await supabase
           .from('order_items')
           .select('product_id')
@@ -112,7 +109,6 @@ export default function AdminDashboardPage() {
           .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
         const soldProducts = soldData?.length || 0
 
-        // 3. المنتجات قيد الشحن (حالة الطلب shipped)
         const { data: shippingData } = await supabase
           .from('order_items')
           .select('product_id')
@@ -120,7 +116,6 @@ export default function AdminDashboardPage() {
           .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
         const shippingProducts = shippingData?.length || 0
 
-        // 4. المنتجات التي لم تشحن مع رفع الإيصال (status = payment_approved)
         const { data: notShippedData } = await supabase
           .from('order_items')
           .select('product_id')
@@ -128,7 +123,6 @@ export default function AdminDashboardPage() {
           .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
         const notShippedWithReceipt = notShippedData?.length || 0
 
-        // 5. المنتجات المشتراة بدون إيصال (status = pending_payment_review)
         const { data: noReceiptData } = await supabase
           .from('order_items')
           .select('product_id')
@@ -136,7 +130,6 @@ export default function AdminDashboardPage() {
           .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
         const noReceiptPurchased = noReceiptData?.length || 0
 
-        // 6. المنتجات غير المشتراة (لا توجد order_items)
         const { data: allProducts } = await supabase
           .from('products')
           .select('id')
@@ -306,7 +299,7 @@ export default function AdminDashboardPage() {
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || []
   const buyerUsers = users?.filter(u => u.account_type === 'buyer') || []
 
-  // ✅ دالة عرض جدول المنتجات (تم إصلاح أخطاء JSX)
+  // ✅ دالة عرض جدول المنتجات (تم تعديلها لاستخدام seller_name)
   const renderProductTable = (filterKey, productsList = products) => {
     if (!productsList || productsList.length === 0) {
       return <div className="text-center p-8 text-text-secondary">لا توجد منتجات</div>
@@ -346,11 +339,12 @@ export default function AdminDashboardPage() {
               <th>تاريخ الشحن</th>
               <th>تاريخ الإيصال</th>
               <th>الحالة</th>
-            </tr>   {/* ✅ تم التصحيح: </tr> بدلاً من </table> */}
+            </tr>
           </thead>
           <tbody>
             {filtered.map((product) => {
-              const sellerName = product.seller?.full_name || product.seller_name || 'غير معروف'
+              // ✅ استخدام seller_name الذي أصبح موجوداً بعد تعديل adminService
+              const sellerName = product.seller_name || product.seller?.full_name || 'غير معروف'
               const orderDate = product.last_order_date ? formatDate(product.last_order_date) : '-'
               const shipDate = product.shipped_date ? formatDate(product.shipped_date) : '-'
               const receiptDate = product.receipt_date ? formatDate(product.receipt_date) : '-'
@@ -541,7 +535,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* المشترين */}
+          {/* المشترين (مختصر) */}
           {activeSubTab === 'buyers' && (
             <div>
               <div className="flex gap-4 mb-4">
@@ -557,12 +551,9 @@ export default function AdminDashboardPage() {
                   <tbody>
                     {buyerUsers.map(user => (
                       <tr key={user.id}>
-                        <td className="p-2">{user.full_name}</td>
-                        <td className="p-2">{user.email}</td>
-                        <td className="p-2">{user.order_count || 0}</td>
-                        <td className="p-2">{formatCurrency(user.total_spent || 0)}</td>
-                        <td className="p-2">{formatDate(user.last_order_date)}</td>
-                        <td className="p-2">{user.is_banned ? 'محظور' : 'نشط'}</td>
+                        <td className="p-2">{user.full_name}</td><td className="p-2">{user.email}</td>
+                        <td className="p-2">{user.order_count || 0}</td><td className="p-2">{formatCurrency(user.total_spent || 0)}</td>
+                        <td className="p-2">{formatDate(user.last_order_date)}</td><td className="p-2">{user.is_banned ? 'محظور' : 'نشط'}</td>
                         <td className="flex gap-2">
                           <button onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { is_banned: !user.is_banned } })} className={`px-2 py-1 rounded text-xs ${user.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{user.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
                           <button onClick={() => { setSelectedBuyer(user); setBuyerDetailTab('profile'); }} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
