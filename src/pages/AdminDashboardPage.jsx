@@ -251,7 +251,6 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
-  // ✅ تم تعديل addTransferMutation لإزالة created_at
   const addTransferMutation = useMutation({
     mutationFn: async ({ sellerId, amount, receiptImage, note }) => {
       const { error } = await supabase.from('seller_wallets').insert({
@@ -271,7 +270,6 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
-  // ✅ تم تعديل loadSellerReceipts لاستخدام id للترتيب
   const loadSellerReceipts = async (sellerId) => {
     if (!sellerId) return
     const { data, error } = await supabase
@@ -300,7 +298,7 @@ export default function AdminDashboardPage() {
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || []
   const buyerUsers = users?.filter(u => u.account_type === 'buyer') || []
 
-  // دالة عرض جدول المنتجات
+  // ✅ دالة عرض جدول المنتجات (تم إصلاح الخطأ في إغلاق الصف)
   const renderProductTable = (filterKey, productsList = products) => {
     if (!productsList || productsList.length === 0) {
       return <div className="text-center p-8 text-text-secondary">لا توجد منتجات</div>
@@ -340,7 +338,7 @@ export default function AdminDashboardPage() {
               <th>تاريخ الشحن</th>
               <th>تاريخ الإيصال</th>
               <th>الحالة</th>
-            </table>
+            </tr>   {/* ✅ تم التصحيح: </tr> بدلاً من <td> */}
           </thead>
           <tbody>
             {filtered.map((product) => {
@@ -359,7 +357,7 @@ export default function AdminDashboardPage() {
                   <td className="p-2">{shipDate}</td>
                   <td className="p-2">{receiptDate}</td>
                   <td className="p-2">{status}</td>
-                </tr>
+                </td>
               )
             })}
           </tbody>
@@ -368,6 +366,7 @@ export default function AdminDashboardPage() {
     )
   }
 
+  // دالة تغيير نوع الحساب
   const toggleAccountType = (user) => {
     const newType = user.account_type === 'seller' ? 'buyer' : 'seller'
     updateUserMutation.mutate({
