@@ -36,9 +36,8 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
     .update({ last_message: message, last_message_at: new Date() })
     .eq('id', conversationId)
 
-  // 3. إضافة إشعار للمستقبل (receiverId)
+  // 3. إضافة إشعار للمستقبل (receiverId) مع تمرير معرف المحادثة
   try {
-    // جلب اسم المرسل
     const { data: senderProfile } = await supabase
       .from('profiles')
       .select('full_name')
@@ -52,13 +51,13 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
       'message',
       'رسالة جديدة',
       `${senderName} أرسل لك: ${shortMessage}`,
-      null   // معرف المحادثة من نوع UUID لا يمكن تخزينه في related_id (integer) فنتركه فارغاً
+      conversationId   // ✅ تمرير conversationId كـ related_id
     )
   } catch (err) {
     console.error('خطأ في إضافة الإشعار:', err)
   }
 
-  // 4. إشعار المتصفح (اختياري – يمكن إزالته)
+  // 4. إشعار المتصفح (اختياري)
   try {
     if (Notification.permission === 'granted') {
       const { data: senderProfile } = await supabase
