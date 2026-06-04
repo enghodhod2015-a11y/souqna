@@ -47,30 +47,30 @@ export default function NotificationsPage() {
   }, [user])
 
   const handleNotificationClick = async (notif) => {
+    // تعليم كمقروء
     if (!notif.is_read) {
       await markNotificationAsRead(notif.id)
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n))
     }
 
+    // ✅ قاعدة جديدة: جميع الإشعارات تفتح المحادثة المناسبة
     if (notif.type === 'message' && notif.related_id) {
+      // رسالة: related_id هو معرف المحادثة
       navigate(`/chat/c/${notif.related_id}`)
     } else if (notif.type === 'order_status' || notif.type === 'payment' || notif.type === 'return') {
-      navigate('/orders')
+      // إشعارات الطلبات: تفتح صفحة طلباتي (أو المحادثة المرتبطة بالطلب لو أمكن)
+      if (notif.related_id) {
+        navigate(`/orders`)  // يمكن توجيهه إلى تفاصيل الطلب إذا أردت
+      } else {
+        navigate('/orders')
+      }
     } else if (notif.related_id) {
+      // إشعار إداري مرتبط بمنتج: يفتح المحادثة الخاصة بهذا المنتج (إن وجدت) أو صفحة المنتج ثم إمكانية الدردشة
+      // ولكن لفتح المحادثة نحتاج إلى product_id. سنفتح صفحة المنتج حيث يوجد زر "استعلام"
       navigate(`/product/${notif.related_id}`)
     } else {
-      toast.custom((t) => (
-        <div className="bg-primary-card rounded-2xl border border-gold/30 p-4 shadow-xl max-w-sm mx-4">
-          <h3 className="font-bold text-gold text-lg mb-2">{notif.title}</h3>
-          <p className="text-text-secondary text-sm">{notif.message}</p>
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            className="mt-3 text-xs text-gold underline"
-          >
-            إغلاق
-          </button>
-        </div>
-      ), { duration: 5000 })
+      // ✅ الإشعارات الإدارية بدون related_id: تفتح صفحة المحادثات العامة (Inbox)
+      navigate('/inbox')
     }
   }
 
@@ -150,4 +150,5 @@ export default function NotificationsPage() {
     </div>
   )
 }
+
 
