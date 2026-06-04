@@ -274,7 +274,7 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
-  // دالة إرسال الإشعارات من الإدارة (تم تعديلها سابقاً)
+  // دالة إرسال الإشعارات من الإدارة
   const sendNotificationMutation = useMutation({
     mutationFn: async ({ userId, title, message }) => {
       const { data: { user: adminUser }, error: adminError } = await supabase.auth.getUser()
@@ -331,11 +331,9 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
-  // ================= التعديل الجوهري هنا =================
-  // استبدال addTransferMutation باستخدام RPC لتجاوز RLS
+  // دالة إضافة تحويل مالي للبائع (باستخدام RPC لتجاوز RLS)
   const addTransferMutation = useMutation({
     mutationFn: async ({ sellerId, amount, receiptImage, note }) => {
-      // استدعاء الدالة المخزنة التي تتجاوز RLS
       const { data, error } = await supabase.rpc('insert_seller_transfer', {
         seller_id_param: sellerId,
         amount_param: parseFloat(amount),
@@ -348,14 +346,19 @@ export default function AdminDashboardPage() {
     onSuccess: () => {
       toast.success('تم تسجيل التحويل')
       setTransferAmount('')
-      loadSellerReceipts(selectedSeller?.id)
+      loadSellerReceipts(selectedSeller?.id).then(() => {
+        if (showReceiptsModal) {
+          // إعادة فتح المودال لتحديث البيانات
+          setShowReceiptsModal(false)
+          setTimeout(() => setShowReceiptsModal(true), 100)
+        }
+      })
     },
     onError: (err) => {
       console.error('خطأ في إدراج التحويل:', err)
-      toast.error(err.message || 'فشل إضافة التحويل - يرجى التحقق من صلاحيات RLS أو وجود الدالة المخزنة')
+      toast.error(err.message || 'فشل إضافة التحويل')
     }
   })
-  // ================= نهاية التعديل =================
 
   const loadSellerReceipts = async (sellerId) => {
     if (!sellerId) return
@@ -367,6 +370,63 @@ export default function AdminDashboardPage() {
     if (error) console.error(error)
     else setSellerReceipts(data || [])
   }
+
+  // ========== دوال مساعدة جديدة للإيصالات ==========
+  // دالة طباعة الإيصال كـ PDF (تفتح الصورة في نافذة جديدة ثم تطبع)
+  const printReceiptAsPDF = (imageUrl, amount, date) => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      toast.error('الرجاء السماح للنوافذ المنبثقة')
+      return
+    }
+    printWindow.document.write(`
+      <html dir="rtl">
+        <head><title>إيصال تحويل - ${amount} ريال</title></head>
+        <body style="text-align:center; font-family:Arial;">
+          <h2>إيصال تحويل مالي</h2>
+          <p>المبلغ: ${amount} ريال</p>
+          <p>التاريخ: ${formatDate(date)}</p>
+          <img src="${imageUrl}" style="max-width:100%; border:1px solid #ccc;" />
+          <script>
+            window.onload = function() { window.print(); setTimeout(function(){ window.close(); }, 1000); }
+          </script>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+  }
+
+  // دالة مشاركة الإيصال (Web Share API)
+  const shareReceipt = async (imageUrl, amount, date) => {
+    if (navigator.share) {
+      try {
+        const response = await fetch(imageUrl)
+        const blob = await response.blob()
+        const file = new File([blob], 'receipt.jpg', { type: blob.type })
+        await navigator.share({
+          title: 'إيصال تحويل',
+          text: `إيصال تحويل بمبلغ ${amount} ريال بتاريخ ${formatDate(date)}`,
+          files: [file]
+        })
+        toast.success('تمت المشاركة')
+      } catch (err) {
+        console.error(err)
+        try {
+          await navigator.share({
+            title: 'إيصال تحويل',
+            text: `إيصال تحويل بمبلغ ${amount} ريال - ${imageUrl}`
+          })
+          toast.success('تمت مشاركة الرابط')
+        } catch (e) {
+          toast.error('لا يمكن المشاركة حالياً')
+        }
+      }
+    } else {
+      navigator.clipboard.writeText(imageUrl)
+      toast.success('تم نسخ رابط الإيصال')
+    }
+  }
+  // ========== نهاية الدوال المساعدة ==========
 
   const pendingProducts = products?.filter(p => !p.is_approved).length || 0
   const pendingSellersCount = pendingSellers?.length || 0
@@ -600,26 +660,67 @@ export default function AdminDashboardPage() {
                 </div>
               )}
 
+              {/* ========== مودال عرض الإيصالات المعدل ========== */}
               {showReceiptsModal && (
                 <Modal onClose={() => setShowReceiptsModal(false)} title="إيصالات التحويل للبائع">
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto max-h-96">
                     <table className="w-full text-right border-collapse">
-                      <thead><tr><th>رقم العملية</th><th>تاريخ الإرسال</th><th>المبلغ</th><th>صورة الإيصال</th><th>ملاحظة</th></tr></thead>
+                      <thead className="sticky top-0 bg-primary-card">
+                        <tr>
+                          <th>رقم العملية</th>
+                          <th>تاريخ الإرسال</th>
+                          <th>المبلغ</th>
+                          <th>صورة الإيصال</th>
+                          <th>ملاحظة</th>
+                          <th>الإجراءات</th>
+                        </tr>
+                      </thead>
                       <tbody>
-                        {sellerReceipts.length === 0 ? <tr><td colSpan="5" className="text-center p-4">لا توجد إيصالات</td></tr> :
+                        {sellerReceipts.length === 0 ? (
+                          <tr><td colSpan="6" className="text-center p-4">لا توجد إيصالات</td></tr>
+                        ) : (
                           sellerReceipts.map(rec => (
-                            <tr key={rec.id}><td>{rec.id}</td><td>{formatDate(rec.created_at)}</td><td>{formatCurrency(rec.amount)}</td><td>{rec.receipt_image ? <a href={rec.receipt_image} target="_blank" className="text-gold">عرض</a> : '-'}</td><td>{rec.note || '-'}</td></tr>
+                            <tr key={rec.id}>
+                              <td className="p-2">{rec.id}</td>
+                              <td className="p-2">{formatDate(rec.created_at)}</td>
+                              <td className="p-2">{formatCurrency(rec.amount)}</td>
+                              <td className="p-2">
+                                {rec.receipt_image ? (
+                                  <a href={rec.receipt_image} target="_blank" className="text-gold underline" rel="noopener noreferrer">عرض الصورة</a>
+                                ) : '-'}
+                              </td>
+                              <td className="p-2">{rec.note || '-'}</td>
+                              <td className="p-2 flex gap-2 flex-wrap">
+                                {rec.receipt_image && (
+                                  <>
+                                    <button
+                                      onClick={() => printReceiptAsPDF(rec.receipt_image, rec.amount, rec.created_at)}
+                                      className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700"
+                                    >
+                                      📄 PDF
+                                    </button>
+                                    <button
+                                      onClick={() => shareReceipt(rec.receipt_image, rec.amount, rec.created_at)}
+                                      className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700"
+                                    >
+                                      🔗 مشاركة
+                                    </button>
+                                  </>
+                                )}
+                              </td>
+                            </tr>
                           ))
-                        }
+                        )}
                       </tbody>
                     </table>
                   </div>
                 </Modal>
               )}
+              {/* ========== نهاية المودال ========== */}
             </div>
           )}
 
-          {/* المشترين (مختصر) */}
+          {/* المشترين (مختصر) - نفس الكود الأصلي */}
           {activeSubTab === 'buyers' && (
             <div>
               <div className="flex gap-4 mb-4">
@@ -646,7 +747,7 @@ export default function AdminDashboardPage() {
                           <button onClick={() => { setSelectedBuyer(user); setBuyerDetailTab('profile'); }} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
                           <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: user.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-2 py-1 rounded text-xs"><Send size={12} /></button>
                         </td>
-                       </tr>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
