@@ -89,6 +89,8 @@ export default function AdminDashboardPage() {
     unansweredInquiries: 0,
     answeredInquiries: 0
   })
+  const [sellerFilterId, setSellerFilterId] = useState(null)
+  const [sellerFinance, setSellerFinance] = useState({ totalSales: 0, totalReceived: 0, remaining: 0 })
   const queryClient = useQueryClient()
 
   // جلب إحصائيات البائع المحدد
@@ -162,6 +164,34 @@ export default function AdminDashboardPage() {
     fetchSellerStats()
   }, [selectedSeller])
 
+  // جلب ملخص مالي للبائع المحدد
+  useEffect(() => {
+    if (!selectedSeller?.id) return
+    const fetchFinanceSummary = async () => {
+      try {
+        // إجمالي المبيعات من الطلبات المكتملة
+        const { data: sales } = await supabase
+          .from('order_items')
+          .select('unit_price, quantity')
+          .eq('order.status', 'completed')
+          .in('product_id', (await supabase.from('products').select('id').eq('seller_id', selectedSeller.id)).data?.map(p => p.id) || [])
+        const totalSales = sales?.reduce((s, i) => s + (i.unit_price * i.quantity), 0) || 0
+
+        // إجمالي المبالغ المحولة للبائع
+        const { data: transfers } = await supabase
+          .from('seller_transfers')
+          .select('amount')
+          .eq('seller_id', selectedSeller.id)
+        const totalReceived = transfers?.reduce((s, t) => s + t.amount, 0) || 0
+
+        setSellerFinance({ totalSales, totalReceived, remaining: totalSales - totalReceived })
+      } catch (err) {
+        console.error('خطأ في جلب الملخص المالي:', err)
+      }
+    }
+    fetchFinanceSummary()
+  }, [selectedSeller])
+
   // Queries
   const { data: stats, refetch: refetchStats, isLoading: statsLoading } = useQuery({
     queryKey: ['adminStats'],
@@ -181,8 +211,11 @@ export default function AdminDashboardPage() {
   })
 
   const { data: products, refetch: refetchProducts, isLoading: productsLoading } = useQuery({
-    queryKey: ['adminProducts', productFilter],
-    queryFn: () => getProductsForAdmin({ status: productFilter === 'pending' ? 'pending' : productFilter === 'hidden' ? 'hidden' : undefined }),
+    queryKey: ['adminProducts', productFilter, sellerFilterId],
+    queryFn: () => getProductsForAdmin({
+      status: productFilter === 'pending' ? 'pending' : productFilter === 'hidden' ? 'hidden' : undefined,
+      seller_id: sellerFilterId
+    }),
     enabled: activeMainTab === 'products'
   })
 
@@ -251,12 +284,12 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
+  // ✅ استخدام جدول seller_transfers بدلاً من seller_wallets
   const addTransferMutation = useMutation({
     mutationFn: async ({ sellerId, amount, receiptImage, note }) => {
-      const { error } = await supabase.from('seller_wallets').insert({
+      const { error } = await supabase.from('seller_transfers').insert({
         seller_id: sellerId,
         amount: parseFloat(amount),
-        type: 'transfer',
         receipt_image: receiptImage,
         note: note
       })
@@ -273,7 +306,7 @@ export default function AdminDashboardPage() {
   const loadSellerReceipts = async (sellerId) => {
     if (!sellerId) return
     const { data, error } = await supabase
-      .from('seller_wallets')
+      .from('seller_transfers')
       .select('*')
       .eq('seller_id', sellerId)
       .order('id', { ascending: false })
@@ -298,7 +331,6 @@ export default function AdminDashboardPage() {
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || []
   const buyerUsers = users?.filter(u => u.account_type === 'buyer') || []
 
-  // ✅ دالة عرض جدول المنتجات (تم إصلاح الخطأ)
   const renderProductTable = (filterKey, productsList = products) => {
     if (!productsList || productsList.length === 0) {
       return <div className="text-center p-8 text-text-secondary">لا توجد منتجات</div>
@@ -338,7 +370,7 @@ export default function AdminDashboardPage() {
               <th>تاريخ الشحن</th>
               <th>تاريخ الإيصال</th>
               <th>الحالة</th>
-            </tr>
+            <tr>
           </thead>
           <tbody>
             {filtered.map((product) => {
@@ -366,7 +398,6 @@ export default function AdminDashboardPage() {
     )
   }
 
-  // دالة تغيير نوع الحساب
   const toggleAccountType = (user) => {
     const newType = user.account_type === 'seller' ? 'buyer' : 'seller'
     updateUserMutation.mutate({
@@ -431,7 +462,7 @@ export default function AdminDashboardPage() {
             <div>
               <div className="mb-4">
                 <label className="block text-gold mb-2">اختر البائع:</label>
-                <Select value={selectedSeller?.id || ''} onChange={(e) => { const seller = sellerUsers.find(u => u.id === e.target.value); setSelectedSeller(seller); loadSellerReceipts(seller?.id); setSellerDetailTab('profile'); }} className="w-full md:w-1/2 bg-white text-gray-900 border border-gold/30 rounded-lg focus:outline-none focus:border-gold">
+                <Select value={selectedSeller?.id || ''} onChange={(e) => { const seller = sellerUsers.find(u => u.id === e.target.value); setSelectedSeller(seller); loadSellerReceipts(seller?.id); setSellerDetailTab('profile'); setSellerFilterId(null); }} className="w-full md:w-1/2 bg-white text-gray-900 border border-gold/30 rounded-lg focus:outline-none focus:border-gold">
                   <option value="">-- اختر بائعاً --</option>
                   {sellerUsers.map(seller => <option key={seller.id} value={seller.id}>{seller.store_name || seller.full_name} ({seller.email})</option>)}
                 </Select>
@@ -482,10 +513,10 @@ export default function AdminDashboardPage() {
                         <table className="w-full text-right border-collapse">
                           <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th></tr></thead>
                           <tbody>
-                            <tr><td className="p-2 font-bold">إجمالي المبيعات</td><td>{formatCurrency(12500)}</td></tr>
-                            <tr><td className="p-2 font-bold">إجمالي المرتجعات</td><td>{formatCurrency(500)}</td></tr>
-                            <tr><td className="p-2 font-bold">إجمالي الاستلامات (تحويلات للموقع)</td><td>{formatCurrency(11500)}</td></tr>
-                            <tr><td className="p-2 font-bold">المبلغ المتبقي (دائن)</td><td>{formatCurrency(500)}</td></tr>
+                            <tr><td className="p-2 font-bold">إجمالي المبيعات</td><td>{formatCurrency(sellerFinance.totalSales)}</td></tr>
+                            <tr><td className="p-2 font-bold">إجمالي المرتجعات</td><td>{formatCurrency(0)}</td></tr>
+                            <tr><td className="p-2 font-bold">إجمالي الاستلامات (تحويلات للموقع)</td><td>{formatCurrency(sellerFinance.totalReceived)}</td></tr>
+                            <tr><td className="p-2 font-bold">المبلغ المتبقي (دائن)</td><td>{formatCurrency(sellerFinance.remaining)}</td></tr>
                           </tbody>
                         </table>
                       </div>
@@ -497,14 +528,14 @@ export default function AdminDashboardPage() {
                       <table className="w-full text-right border-collapse">
                         <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th><th>طلب البيانات</th></tr></thead>
                         <tbody>
-                          <tr><td className="p-2">جميع المنتجات المنشورة</td><td>{sellerStats.totalProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('all'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">المنتجات المباعة</td><td>{sellerStats.soldProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('sold'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">المنتجات قيد الشحن</td><td>{sellerStats.shippingProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('shipping'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">المنتجات التي لم تشحن (تم رفع الإيصال)</td><td>{sellerStats.notShippedWithReceipt}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_shipped'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">المنتجات المشتراة بدون إيصال</td><td>{sellerStats.noReceiptPurchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('no_receipt'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">المنتجات غير المشتراة</td><td>{sellerStats.notPurchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_purchased'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">المنتجات المكررة</td><td>{sellerStats.duplicateProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('duplicate'); }}>عرض</button></td></tr>
-                          <tr><td className="p-2">المنتجات غير اللائقة</td><td>{sellerStats.inappropriateProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('inappropriate'); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">جميع المنتجات المنشورة</td><td>{sellerStats.totalProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('all'); setSellerFilterId(selectedSeller.id); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات المباعة</td><td>{sellerStats.soldProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('sold'); setSellerFilterId(selectedSeller.id); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات قيد الشحن</td><td>{sellerStats.shippingProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('shipping'); setSellerFilterId(selectedSeller.id); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات التي لم تشحن (تم رفع الإيصال)</td><td>{sellerStats.notShippedWithReceipt}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_shipped'); setSellerFilterId(selectedSeller.id); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات المشتراة بدون إيصال</td><td>{sellerStats.noReceiptPurchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('no_receipt'); setSellerFilterId(selectedSeller.id); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات غير المشتراة</td><td>{sellerStats.notPurchased}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setProductsView('not_purchased'); setSellerFilterId(selectedSeller.id); }}>عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات المكررة</td><td>{sellerStats.duplicateProducts}</td><td><button className="text-gold underline">عرض</button></td></tr>
+                          <tr><td className="p-2">المنتجات غير اللائقة</td><td>{sellerStats.inappropriateProducts}</td><td><button className="text-gold underline">عرض</button></td></tr>
                           <tr><td className="p-2">الاستفسارات التي لم يرد عليها</td><td>{sellerStats.unansweredInquiries}</td><td><button className="text-gold underline">عرض</button></td></tr>
                           <tr><td className="p-2">الاستفسارات التي تم الرد عليها</td><td>{sellerStats.answeredInquiries}</td><td><button className="text-gold underline">عرض</button></td></tr>
                         </tbody>
