@@ -93,12 +93,18 @@ export const getProductById = async (id) => {
     if (!id || id === 'undefined') throw new Error('معرف المنتج غير صالح')
     const numericId = parseInt(id, 10)
     if (isNaN(numericId)) throw new Error('معرف المنتج يجب أن يكون رقماً')
+    
     const { data: product, error } = await supabase
       .from('products')
       .select('*')
       .eq('id', numericId)
-      .single()
+      .maybeSingle()   // ✅ التصحيح: استخدام maybeSingle() بدلاً من single()
+    
     if (error) throw error
+    
+    // ✅ إذا لم يوجد المنتج، نعيد null بدلاً من رمي خطأ
+    if (!product) return null
+    
     if (product?.seller_id) {
       const { data: seller } = await supabase
         .from('profiles')
@@ -107,18 +113,18 @@ export const getProductById = async (id) => {
         .maybeSingle()
       if (seller) product.seller = seller
     }
-    if (product) {
-      product.title = product.name
-      if (product.compare_at_price && product.compare_at_price > product.price) {
-        product.discount_percentage = Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)
-        product.final_price = product.price
-      } else {
-        product.discount_percentage = 0
-        product.final_price = product.price
-      }
-      product.cover_image = fixImageUrl(product.cover_image)
-      if (product.images) product.images = product.images.map(img => fixImageUrl(img)).filter(Boolean)
+    
+    product.title = product.name
+    if (product.compare_at_price && product.compare_at_price > product.price) {
+      product.discount_percentage = Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)
+      product.final_price = product.price
+    } else {
+      product.discount_percentage = 0
+      product.final_price = product.price
     }
+    product.cover_image = fixImageUrl(product.cover_image)
+    if (product.images) product.images = product.images.map(img => fixImageUrl(img)).filter(Boolean)
+    
     return product
   } catch (error) {
     console.error('❌ فشل جلب المنتج:', error)
@@ -173,14 +179,12 @@ export const deleteProduct = async (id) => {
   }
 }
 
-// CHANGED: دالة رفع الصور مع دعم تتبع التقدم
 export const uploadProductImages = async (files, productId, onProgress = null) => {
   try {
     const urls = []
     let completed = 0
     for (const file of files) {
       const fileName = `${productId}/${Date.now()}_${file.name}`
-      // استخدام upload مع خيارات لتتبع التقدم إذا أردت (لكن Supabase JS لا يدعم onProgress مباشرة، سنستخدم وهمي)
       const { error } = await supabase.storage.from('product-images').upload(fileName, file)
       if (error) throw error
       const { data } = supabase.storage.from('product-images').getPublicUrl(fileName)
@@ -196,4 +200,5 @@ export const uploadProductImages = async (files, productId, onProgress = null) =
     throw error
   }
 }
+
 
