@@ -17,6 +17,7 @@ import InboxPage from '../pages/InboxPage'
 import ProfilePage from '../pages/ProfilePage'
 import CheckoutPage from '../pages/CheckoutPage'
 import PaymentPage from '../pages/PaymentPage'
+import NotificationsPage from '../pages/NotificationsPage'   // ✅ إضافة صفحة الإشعارات
 
 // ─── صفحات البائع ───
 import AddProductPage from '../pages/AddProductPage'
@@ -68,6 +69,11 @@ export default function AppRoutes() {
       <Route path="/payment/:orderId" element={
         <ProtectedRoute allowedRoles={['buyer', 'seller', 'admin']}>
           <PaymentPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/notifications" element={
+        <ProtectedRoute allowedRoles={['buyer', 'seller', 'admin']}>
+          <NotificationsPage />
         </ProtectedRoute>
       } />
 

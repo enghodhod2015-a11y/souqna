@@ -31,7 +31,6 @@ export const playNotificationSound = () => {
   } catch (err) { console.log('خطأ في تشغيل الصوت:', err) }
 }
 
-// CHANGED: تحويل type إلى القيم المسموحة: info, success, warning, error
 const mapType = (type) => {
   switch (type) {
     case 'message':
