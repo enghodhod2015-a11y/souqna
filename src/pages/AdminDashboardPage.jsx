@@ -274,19 +274,65 @@ export default function AdminDashboardPage() {
     onError: (err) => toast.error(err.message)
   })
 
+  // التعديل الجوهري: sendNotificationMutation الآن تنشئ محادثة بين الإدارة والمستخدم وتضع related_id في الإشعار
   const sendNotificationMutation = useMutation({
     mutationFn: async ({ userId, title, message }) => {
-      const { error } = await supabase.from('notifications').insert({
+      // 1. الحصول على معرف الإدارة الحالي
+      const { data: { user: adminUser }, error: adminError } = await supabase.auth.getUser()
+      if (adminError) throw new Error('لا يمكن تحديد هوية الإدارة')
+      const adminId = adminUser.id
+
+      // 2. البحث عن محادثة موجودة بين الإدارة وهذا المستخدم
+      let conversationId = null
+      const { data: existingConv } = await supabase
+        .from('conversations')
+        .select('id')
+        .or(`and(buyer_id.eq.${adminId},seller_id.eq.${userId}),and(buyer_id.eq.${userId},seller_id.eq.${adminId})`)
+        .maybeSingle()
+
+      if (existingConv) {
+        conversationId = existingConv.id
+      } else {
+        // إنشاء محادثة جديدة (الإدارة كمشتري، المستخدم كبائع - أو العكس)
+        const { data: newConv, error: convError } = await supabase
+          .from('conversations')
+          .insert({
+            buyer_id: adminId,
+            seller_id: userId,
+            product_id: null,
+            created_at: new Date().toISOString(),
+            last_message: message,
+            last_message_at: new Date().toISOString()
+          })
+          .select()
+          .single()
+        if (convError) throw convError
+        conversationId = newConv.id
+      }
+
+      // 3. إدراج الإشعار مع related_id = conversationId
+      const { error: notifError } = await supabase.from('notifications').insert({
         user_id: userId,
-        type: 'info',
+        type: 'message',  // تغيير النوع إلى message حتى تفتح صفحة الشات
         title,
         message,
+        related_id: conversationId,
         is_read: false,
         created_at: new Date().toISOString()
       })
-      if (error) throw error
+      if (notifError) throw notifError
+
+      // 4. إدراج رسالة في المحادثة (اختياري لتظهر مباشرة)
+      await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        sender_id: adminId,
+        receiver_id: userId,
+        message: message,
+        created_at: new Date().toISOString(),
+        is_read: false
+      })
     },
-    onSuccess: () => toast.success('تم إرسال الإشعار'),
+    onSuccess: () => toast.success('تم إرسال الإشعار وفتح محادثة مع الإدارة'),
     onError: (err) => toast.error(err.message)
   })
 

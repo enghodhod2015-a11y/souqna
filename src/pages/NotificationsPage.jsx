@@ -47,31 +47,23 @@ export default function NotificationsPage() {
   }, [user])
 
   const handleNotificationClick = async (notif) => {
-    // تعليم كمقروء
+    // منع تكرار الاستدعاء
+    if (notif._processing) return
+    notif._processing = true
+
     if (!notif.is_read) {
       await markNotificationAsRead(notif.id)
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n))
     }
 
-    // ✅ قاعدة جديدة: جميع الإشعارات تفتح المحادثة المناسبة
-    if (notif.type === 'message' && notif.related_id) {
-      // رسالة: related_id هو معرف المحادثة
+    // جميع الإشعارات المرسلة من الإدارة أو النظام يجب أن تحتوي على related_id
+    if (notif.related_id) {
       navigate(`/chat/c/${notif.related_id}`)
-    } else if (notif.type === 'order_status' || notif.type === 'payment' || notif.type === 'return') {
-      // إشعارات الطلبات: تفتح صفحة طلباتي (أو المحادثة المرتبطة بالطلب لو أمكن)
-      if (notif.related_id) {
-        navigate(`/orders`)  // يمكن توجيهه إلى تفاصيل الطلب إذا أردت
-      } else {
-        navigate('/orders')
-      }
-    } else if (notif.related_id) {
-      // إشعار إداري مرتبط بمنتج: يفتح المحادثة الخاصة بهذا المنتج (إن وجدت) أو صفحة المنتج ثم إمكانية الدردشة
-      // ولكن لفتح المحادثة نحتاج إلى product_id. سنفتح صفحة المنتج حيث يوجد زر "استعلام"
-      navigate(`/product/${notif.related_id}`)
     } else {
-      // ✅ الإشعارات الإدارية بدون related_id: تفتح صفحة المحادثات العامة (Inbox)
+      // حالة نادرة: الإشعارات القديمة التي لا تملك related_id تذهب إلى Inbox
       navigate('/inbox')
     }
+    delete notif._processing
   }
 
   const markAllAsRead = async () => {
@@ -119,7 +111,10 @@ export default function NotificationsPage() {
           {notifications.map(notif => (
             <div
               key={notif.id}
-              onClick={() => handleNotificationClick(notif)}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleNotificationClick(notif)
+              }}
               className={`bg-primary-card rounded-2xl border p-4 transition-all cursor-pointer hover:border-gold/60
                 ${!notif.is_read ? 'border-gold bg-secondary-blue/20' : 'border-gold/30 opacity-80'}`}
             >
@@ -150,5 +145,4 @@ export default function NotificationsPage() {
     </div>
   )
 }
-
 
