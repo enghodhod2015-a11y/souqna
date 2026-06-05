@@ -88,69 +88,39 @@ export const getBuyerOrders = async (buyerId) => {
 }
 
 // ─────────────────────────────────────────────────────────────
-// جلب طلبات البائع (نسخة مبسطة وموثوقة)
+// جلب طلبات البائع (نسخة معدلة تعمل مع هيكل الجداول الحالي)
 // ─────────────────────────────────────────────────────────────
 export const getSellerOrders = async (sellerId) => {
+  console.log('🔍 getSellerOrders called with sellerId:', sellerId);
   try {
-    // 1. جلب جميع منتجات البائع
-    const { data: products, error: productsError } = await supabase
-      .from('products')
-      .select('id, name, cover_image')
-      .eq('seller_id', sellerId)
-    if (productsError) throw productsError
-    if (!products || products.length === 0) {
-      console.log('لا توجد منتجات للبائع', sellerId)
-      return []
-    }
-
-    const productIds = products.map(p => p.id)
-    console.log('منتجات البائع IDs:', productIds)
-
-    // 2. جلب عناصر الطلبات التي تحتوي على هذه المنتجات
-    const { data: orderItems, error: itemsError } = await supabase
+    // استعلام واحد يجلب order_items التي ترتبط بمنتجات يملكها هذا البائع
+    const { data: items, error } = await supabase
       .from('order_items')
-      .select('*, order_id, product_id, quantity, product_price, product_name')
-      .in('product_id', productIds)
-    if (itemsError) throw itemsError
-    if (!orderItems || orderItems.length === 0) {
-      console.log('لا توجد عناصر طلبات لهذه المنتجات')
-      return []
-    }
-    console.log('عناصر الطلبات:', orderItems)
+      .select(`
+        *,
+        order:orders(*),
+        product:products!inner(id, name, cover_image, seller_id)
+      `)
+      .eq('product.seller_id', sellerId)
+      .order('order.created_at', { ascending: false });
 
-    // 3. استخراج معرفات الطلبات الفريدة
-    const orderIds = [...new Set(orderItems.map(item => item.order_id))]
-    console.log('معرفات الطلبات:', orderIds)
-
-    // 4. جلب تفاصيل الطلبات
-    const { data: orders, error: ordersError } = await supabase
-      .from('orders')
-      .select('*')
-      .in('id', orderIds)
-      .order('created_at', { ascending: false })
-    if (ordersError) throw ordersError
-    console.log('تفاصيل الطلبات:', orders)
-
-    // 5. جلب بيانات المشترين
-    const buyerIds = [...new Set(orders.map(order => order.user_id).filter(Boolean))]
-    let buyersMap = new Map()
-    if (buyerIds.length) {
-      const { data: buyers, error: buyersError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, phone')
-        .in('id', buyerIds)
-      if (!buyersError && buyers) {
-        buyers.forEach(b => buyersMap.set(b.id, b))
-      }
+    if (error) {
+      console.error('❌ error fetching seller orders:', error);
+      return [];
     }
 
-    // 6. تجميع النتائج
-    const ordersMap = new Map()
-    for (const item of orderItems) {
-      const order = orders.find(o => o.id === item.order_id)
-      if (!order) continue
-      
-      const product = products.find(p => p.id === item.product_id)
+    if (!items || items.length === 0) {
+      console.log('⚠️ no orders found for seller', sellerId);
+      return [];
+    }
+
+    console.log('✅ items found:', items.length);
+
+    // تجميع النتائج حسب order
+    const ordersMap = new Map();
+    for (const item of items) {
+      const order = item.order;
+      if (!order) continue;
       if (!ordersMap.has(order.id)) {
         ordersMap.set(order.id, {
           id: order.id,
@@ -159,25 +129,41 @@ export const getSellerOrders = async (sellerId) => {
           total_price: order.total_amount,
           shipping_address: order.shipping_address,
           receipt_image: order.receipt_image,
-          buyer: buyersMap.get(order.user_id) || null,
+          buyer: null, // سيتم تعبئته لاحقاً
           created_at: order.created_at,
-          product: product ? { ...product, title: product.name } : null,
+          product: item.product ? { ...item.product, title: item.product.name } : null,
           quantity: item.quantity,
           return_status: order.return_status,
           return_reason: order.return_reason,
           completed_at: order.completed_at,
           status: order.status,
           total_amount: order.total_amount
-        })
+        });
       }
     }
 
-    const result = Array.from(ordersMap.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    console.log('النتيجة النهائية (عدد الطلبات):', result.length)
-    return result
-  } catch (error) {
-    console.error('خطأ في جلب طلبات البائع:', error)
-    return []
+    // جلب بيانات المشترين
+    const buyerIds = [...new Set(items.map(i => i.order?.user_id).filter(Boolean))];
+    if (buyerIds.length) {
+      const { data: buyers } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, phone')
+        .in('id', buyerIds);
+      if (buyers) {
+        const buyerMap = new Map(buyers.map(b => [b.id, b]));
+        for (const order of ordersMap.values()) {
+          const buyerId = items.find(i => i.order?.id === order.id)?.order?.user_id;
+          if (buyerId) order.buyer = buyerMap.get(buyerId) || null;
+        }
+      }
+    }
+
+    const result = Array.from(ordersMap.values());
+    console.log('🎉 final orders for seller:', result.length);
+    return result;
+  } catch (err) {
+    console.error('💥 error in getSellerOrders:', err);
+    return [];
   }
 }
 
