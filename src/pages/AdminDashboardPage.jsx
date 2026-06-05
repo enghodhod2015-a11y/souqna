@@ -151,7 +151,7 @@ export default function AdminDashboardPage() {
     fetchSellerStats()
   }, [selectedSeller])
 
-  // جلب ملخص مالي للبائع المحدد (باستخدام بيانات حقيقية مع console.log)
+  // جلب ملخص مالي للبائع المحدد (النسخة النهائية - تشمل delivered كمكتملة)
   useEffect(() => {
     if (!selectedSeller?.id) return;
     const fetchFinanceSummary = async () => {
@@ -185,7 +185,7 @@ export default function AdminDashboardPage() {
             const orderIds = [...new Set(orderItems.map(oi => oi.order_id))];
             console.log('📦 orderIds الفريدة:', orderIds);
             
-            // 3. جلب الطلبات المرتبطة
+            // 3. جلب الطلبات المرتبطة (بما في ذلك delivered و completed)
             const { data: orders, error: ordersError } = await supabase
               .from('orders')
               .select('id, status, return_status')
@@ -198,15 +198,17 @@ export default function AdminDashboardPage() {
             for (const item of orderItems) {
               const order = ordersMap.get(item.order_id);
               if (order) {
-                if (order.status === 'completed') {
+                // ✅ تضمين delivered أيضاً لأنها تعتبر مكتملة
+                const isCompleted = order.status === 'completed' || order.status === 'delivered';
+                if (isCompleted) {
                   const saleAmount = item.product_price * item.quantity;
                   totalSales += saleAmount;
-                  console.log(`✅ مبيعات مكتملة: order ${item.order_id}, product_price ${item.product_price}, quantity ${item.quantity}, المبلغ ${saleAmount}`);
+                  console.log(`✅ مبيعات مكتملة (${order.status}): order ${item.order_id}, المبلغ ${saleAmount}`);
                 }
                 if (order.return_status === 'approved') {
                   const returnAmount = item.product_price * item.quantity;
                   totalReturns += returnAmount;
-                  console.log(`🔄 مرتجع معتمد: order ${item.order_id}, product_price ${item.product_price}, quantity ${item.quantity}, المبلغ ${returnAmount}`);
+                  console.log(`🔄 مرتجع معتمد: order ${item.order_id}, المبلغ ${returnAmount}`);
                 }
               } else {
                 console.warn(`⚠️ لم يتم العثور على order للمعرف: ${item.order_id}`);
@@ -657,5 +659,4 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
-
 
