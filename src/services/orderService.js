@@ -93,12 +93,15 @@ export const getBuyerOrders = async (buyerId) => {
 export const getSellerOrders = async (sellerId) => {
   console.log('🔍 getSellerOrders called with sellerId:', sellerId);
   try {
-    // 1. جلب جميع منتجات البائع
+    // 1. جلب جميع منتجات البائع (مع التحقق)
     const { data: products, error: productsError } = await supabase
       .from('products')
       .select('id, name, cover_image')
       .eq('seller_id', sellerId)
-    if (productsError) throw productsError
+    if (productsError) {
+      console.error('❌ خطأ في جلب المنتجات:', productsError);
+      return [];
+    }
     if (!products || products.length === 0) {
       console.log('⚠️ لا توجد منتجات لهذا البائع', sellerId);
       return []
@@ -107,17 +110,30 @@ export const getSellerOrders = async (sellerId) => {
     const productIds = products.map(p => p.id)
     console.log('📦 منتجات البائع (IDs):', productIds)
 
-    // 2. جلب عناصر الطلبات التي تحتوي على هذه المنتجات
+    // 2. جلب عناصر الطلبات التي تحتوي على هذه المنتجات (محاولة أولى)
     const { data: orderItems, error: itemsError } = await supabase
       .from('order_items')
       .select('*')
       .in('product_id', productIds)
-    if (itemsError) throw itemsError
-    if (!orderItems || orderItems.length === 0) {
-      console.log('⚠️ لا توجد عناصر طلبات لهذه المنتجات')
-      return []
+    
+    if (itemsError) {
+      console.error('❌ خطأ في جلب order_items:', itemsError);
+      return [];
     }
-    console.log('📦 عدد عناصر الطلبات:', orderItems.length)
+    
+    if (!orderItems || orderItems.length === 0) {
+      console.log('⚠️ لا توجد عناصر طلبات لهذه المنتجات. productIds:', productIds);
+      // جرب استعلام بدون فلتر للتأكد من وجود بيانات في الجدول
+      const { data: allItems, error: allError } = await supabase
+        .from('order_items')
+        .select('product_id')
+        .limit(5);
+      console.log('🔍 عينة من order_items (بدون فلتر):', allItems, allError);
+      return [];
+    }
+    
+    console.log('📦 عدد عناصر الطلبات:', orderItems.length);
+    console.log('📦 أول عنصر:', orderItems[0]);
 
     // 3. استخراج معرفات الطلبات الفريدة
     const orderIds = [...new Set(orderItems.map(item => item.order_id))]
@@ -129,7 +145,10 @@ export const getSellerOrders = async (sellerId) => {
       .select('*')
       .in('id', orderIds)
       .order('created_at', { ascending: false })
-    if (ordersError) throw ordersError
+    if (ordersError) {
+      console.error('❌ خطأ في جلب الطلبات:', ordersError);
+      return [];
+    }
     if (!orders || orders.length === 0) return []
     console.log('📦 عدد الطلبات:', orders.length)
 
@@ -178,7 +197,7 @@ export const getSellerOrders = async (sellerId) => {
     console.log('🎉 النتيجة النهائية (عدد الطلبات):', result.length)
     return result
   } catch (err) {
-    console.error('💥 خطأ في getSellerOrders:', err)
+    console.error('💥 خطأ غير متوقع في getSellerOrders:', err)
     return []
   }
 }
