@@ -326,21 +326,60 @@ export const getPlatformCommissions = async ({ start, end } = {}) => {
 // ==========================================
 // إدارة إيصالات تحويل البائعين
 // ==========================================
+// ==========================================
+// إدارة إيصالات تحويل البائعين
+// ==========================================
 export const addSellerReceipt = async (sellerId, amount, receiptImageUrl, notes = '') => {
-  const { data, error } = await supabase
-   .from('seller_transfers')
-   .insert({
-      seller_id: sellerId,
-      amount: amount,
-      receipt_image: receiptImageUrl,
-      notes: notes
-    })
-   .select()
-   .single();
+  try {
+    console.log('📤 addSellerReceipt called:', { sellerId, amount, receiptImageUrl, notes });
+    
+    // التحقق من وجود الجدول وإنشائه إذا لم يكن موجوداً (اختياري، لكن سيتم تنفيذه مرة واحدة)
+    // يمكنك تنفيذ SQL يدوياً لإنشاء الجدول كما هو موضح أدناه.
+    
+    const { data, error } = await supabase
+      .from('seller_transfers')
+      .insert({
+        seller_id: sellerId,
+        amount: amount,
+        receipt_image: receiptImageUrl,
+        notes: notes || null,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
 
-  if (error) throw error;
-  await addAuditLog('add_seller_receipt', 'seller_transfer', data.id, { sellerId, amount });
-  return data;
+    if (error) {
+      console.error('❌ insert error:', error);
+      throw error;
+    }
+    
+    console.log('✅ insert success:', data);
+    
+    // إضافة سجل العمليات (اختياري، قد يفشل إذا كان جدول audit_logs لا يحتوي على الأعمدة المطلوبة)
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('audit_logs')
+          .insert({ 
+            admin_id: user.id, 
+            action: 'add_seller_receipt', 
+            target_type: 'seller_transfer', 
+            target_id: data.id, 
+            details: JSON.stringify({ sellerId, amount, notes }),
+            ip_address: null,
+            created_at: new Date().toISOString()
+          });
+      }
+    } catch (logErr) {
+      console.warn('⚠️ Audit log failed (non-critical):', logErr.message);
+    }
+    
+    return data;
+  } catch (err) {
+    console.error('💥 addSellerReceipt failed:', err);
+    throw new Error(err.message || 'فشل إضافة التحويل');
+  }
 };
 
 export const getSellerReceipts = async (sellerId) => {

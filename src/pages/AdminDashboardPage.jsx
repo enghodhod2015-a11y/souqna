@@ -271,56 +271,78 @@ export default function AdminDashboardPage() {
   };
 
   // ================== التعديل الأساسي: رفع الصورة وإدراج التحويل ==================
-  const handleAddTransfer = async () => {
-    if (!selectedSeller) {
-      toast.error('اختر بائعاً أولاً')
-      return
-    }
-    if (!transferAmount || parseFloat(transferAmount) <= 0) {
-      toast.error('أدخل مبلغاً صحيحاً')
-      return
-    }
-    if (!receiptFile) {
-      toast.error('يرجى اختيار صورة الإيصال')
-      return
-    }
+  // ================== رفع الصورة وإدراج التحويل ==================
+const handleAddTransfer = async () => {
+  if (!selectedSeller) {
+    toast.error('اختر بائعاً أولاً');
+    return;
+  }
+  const amountNum = parseFloat(transferAmount);
+  if (isNaN(amountNum) || amountNum <= 0) {
+    toast.error('أدخل مبلغاً صحيحاً');
+    return;
+  }
+  if (!receiptFile) {
+    toast.error('يرجى اختيار صورة الإيصال');
+    return;
+  }
 
-    setUploading(true)
-    try {
-      // 1. رفع الصورة إلى Supabase Storage
-      const fileName = `seller_transfers/${selectedSeller.id}/${Date.now()}_${receiptFile.name}`
-      const { error: uploadError } = await supabase.storage
+  setUploading(true);
+  let uploadedUrl = null;
+  try {
+    // 1. رفع الصورة إلى Supabase Storage
+    const fileExt = receiptFile.name.split('.').pop();
+    const fileName = `seller_transfers/${selectedSeller.id}/${Date.now()}.${fileExt}`;
+    console.log('📤 Uploading file:', fileName);
+    
+    const { error: uploadError } = await supabase.storage
       .from('receipts')
-      .upload(fileName, receiptFile)
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage
+      .upload(fileName, receiptFile, {
+        cacheControl: '3600',
+        upsert: false
+      });
+      
+    if (uploadError) {
+      console.error('❌ Upload error:', uploadError);
+      throw new Error(`فشل رفع الملف: ${uploadError.message}`);
+    }
+    
+    const { data: { publicUrl } } = supabase.storage
       .from('receipts')
-      .getPublicUrl(fileName)
-
-      // 2. إدراج السجل عبر الدالة
-      await addSellerReceipt(selectedSeller.id, parseFloat(transferAmount), publicUrl, transferNote || '')
-
-      toast.success('تم تسجيل التحويل بنجاح')
-      setTransferAmount('')
-      setTransferNote('')
-      setReceiptFile(null)
-      document.getElementById('receiptFileInput').value = ''
-
-      // تحديث الملخص المالي
-      const { data: transfers } = await supabase
+      .getPublicUrl(fileName);
+    uploadedUrl = publicUrl;
+    console.log('✅ File uploaded:', uploadedUrl);
+    
+    // 2. إدراج السجل عبر الدالة
+    await addSellerReceipt(selectedSeller.id, amountNum, uploadedUrl, transferNote || '');
+    
+    toast.success('تم تسجيل التحويل بنجاح');
+    setTransferAmount('');
+    setTransferNote('');
+    setReceiptFile(null);
+    const fileInput = document.getElementById('receiptFileInput');
+    if (fileInput) fileInput.value = '';
+    
+    // تحديث الملخص المالي
+    const { data: transfers } = await supabase
       .from('seller_transfers')
       .select('amount')
-      .eq('seller_id', selectedSeller.id)
-      const totalReceived = transfers?.reduce((s, t) => s + t.amount, 0) || 0
-      setSellerFinance(prev => ({...prev, totalReceived, remaining: prev.totalSales - totalReceived }))
-    } catch (err) {
-      console.error(err)
-      toast.error(err.message || 'فشل إضافة التحويل')
-    } finally {
-      setUploading(false)
+      .eq('seller_id', selectedSeller.id);
+    const totalReceived = transfers?.reduce((s, t) => s + (t.amount || 0), 0) || 0;
+    setSellerFinance(prev => ({ ...prev, totalReceived, remaining: prev.totalSales - totalReceived }));
+    
+  } catch (err) {
+    console.error('💥 Transfer error:', err);
+    toast.error(err.message || 'فشل إضافة التحويل');
+    // إذا تم رفع الملف ولكن فشل الإدراج، يمكن حذف الملف (اختياري)
+    if (uploadedUrl) {
+      // محاولة حذف الملف (لكن ليس ضرورياً)
+      console.warn('File uploaded but insertion failed, consider manual cleanup:', uploadedUrl);
     }
+  } finally {
+    setUploading(false);
   }
+};
   // =====================================================================
 
   const pendingProducts = products?.filter(p =>!p.is_approved).length || 0
