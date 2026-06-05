@@ -15,11 +15,11 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Select } from '../components/ui/Select'
 import { Modal } from '../components/ui/Modal'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
 import {
   Users, Package, ShoppingBag, DollarSign, Search,
   TrendingUp, Activity, RefreshCw, Wallet, Send, BarChart3, LineChart as LineChartIcon,
-  Loader, MessageCircle, Star, Clock, CheckCircle, XCircle
+  Loader, MessageCircle
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../services/supabase'
@@ -33,7 +33,15 @@ const formatCurrency = (amount) => {
   return new Intl.NumberFormat('ar-YE', { style: 'currency', currency: 'YER' }).format(amount || 0)
 }
 
-const COLORS = ['#D4AF37', '#3B82F6', '#EF4444', '#10B981', '#8B5CF6']
+// بيانات افتراضية للمخططات
+const mockMonthlySales = [
+  { name: 'يناير', sales: 12500 },
+  { name: 'فبراير', sales: 15200 },
+  { name: 'مارس', sales: 18700 },
+  { name: 'أبريل', sales: 22300 },
+  { name: 'مايو', sales: 19800 },
+  { name: 'يونيو', sales: 24500 },
+]
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate()
@@ -72,16 +80,16 @@ export default function AdminDashboardPage() {
     if (activeMainTab !== 'dashboard') return
     const fetchDashboardExtras = async () => {
       try {
-        // أفضل المنتجات مبيعًا (حسب عدد الطلبات)
+        // أفضل المنتجات مبيعًا (حسب عدد الطلبات) - استعلام مبسط
         const { data: topItems } = await supabase
           .from('order_items')
-          .select('product_id, products(name, price), quantity')
+          .select('product_id, quantity, products(name, price)')
           .eq('order.status', 'completed')
-          .limit(5)
+          .limit(10)
         if (topItems) {
           const grouped = topItems.reduce((acc, item) => {
             const id = item.product_id
-            if (!acc[id]) acc[id] = { ...item.products, total_quantity: 0, revenue: 0 }
+            if (!acc[id]) acc[id] = { name: item.products?.name || 'منتج', total_quantity: 0, revenue: 0 }
             acc[id].total_quantity += item.quantity
             acc[id].revenue += (item.products?.price || 0) * item.quantity
             return acc
@@ -92,10 +100,19 @@ export default function AdminDashboardPage() {
         // أحدث الطلبات
         const { data: recent } = await supabase
           .from('orders')
-          .select('id, total_amount, status, created_at, user_id, profiles(full_name)')
+          .select('id, total_amount, status, created_at, user_id')
           .order('created_at', { ascending: false })
           .limit(10)
-        setRecentOrders(recent || [])
+        if (recent) {
+          // جلب أسماء المستخدمين
+          const userIds = recent.map(o => o.user_id).filter(Boolean)
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', userIds)
+          const profileMap = Object.fromEntries(profiles?.map(p => [p.id, p.full_name]) || [])
+          setRecentOrders(recent.map(o => ({ ...o, buyer_name: profileMap[o.user_id] || 'مستخدم' })))
+        }
 
         // الإجراءات المعلقة
         const { count: pendingProducts } = await supabase
@@ -118,19 +135,63 @@ export default function AdminDashboardPage() {
     fetchDashboardExtras()
   }, [activeMainTab])
 
-  // جلب ملخص مالي للبائع - باستخدام دالة RPC (تجاوز RLS)
+  // جلب ملخص مالي للبائع - باستخدام جلب مباشر للبيانات
   useEffect(() => {
     if (!selectedSeller?.id) return
     const fetchFinanceSummary = async () => {
       try {
         const sellerId = selectedSeller.id
-        const { data, error } = await supabase.rpc('get_seller_finance', { seller_id: sellerId })
-        if (error) throw error
-        if (data && data.length) {
-          const { total_sales, total_returns, total_received } = data[0]
-          const remaining = total_sales - total_returns - total_received
-          setSellerFinance({ totalSales: total_sales, totalReturns: total_returns, totalReceived: total_received, remaining })
+        
+        // 1. جلب منتجات البائع
+        const { data: products } = await supabase
+          .from('products')
+          .select('id')
+          .eq('seller_id', sellerId)
+        const productIds = products?.map(p => p.id) || []
+        
+        let totalSales = 0
+        let totalReturns = 0
+        
+        if (productIds.length > 0) {
+          // 2. جلب order_items المرتبطة بهذه المنتجات
+          const { data: orderItems } = await supabase
+            .from('order_items')
+            .select('order_id, product_price, quantity')
+            .in('product_id', productIds)
+          
+          if (orderItems && orderItems.length > 0) {
+            const orderIds = [...new Set(orderItems.map(oi => oi.order_id))]
+            
+            // 3. جلب حالات الطلبات
+            const { data: orders } = await supabase
+              .from('orders')
+              .select('id, status, return_status')
+              .in('id', orderIds)
+            const ordersMap = new Map(orders?.map(o => [o.id, o]) || [])
+            
+            for (const item of orderItems) {
+              const order = ordersMap.get(item.order_id)
+              if (order) {
+                if (order.status === 'completed' || order.status === 'delivered') {
+                  totalSales += item.product_price * item.quantity
+                }
+                if (order.return_status === 'approved') {
+                  totalReturns += item.product_price * item.quantity
+                }
+              }
+            }
+          }
         }
+        
+        // 4. جلب الاستلامات
+        const { data: transfers } = await supabase
+          .from('seller_transfers')
+          .select('amount')
+          .eq('seller_id', sellerId)
+        const totalReceived = transfers?.reduce((s, t) => s + (t.amount || 0), 0) || 0
+        
+        const remaining = totalSales - totalReturns - totalReceived
+        setSellerFinance({ totalSales, totalReturns, totalReceived, remaining })
       } catch (err) {
         console.error('خطأ في جلب المالية:', err)
         toast.error('فشل تحميل البيانات المالية')
@@ -258,12 +319,16 @@ export default function AdminDashboardPage() {
       if (fileInput) fileInput.value = ''
 
       // تحديث المالية
-      const { data: finance } = await supabase.rpc('get_seller_finance', { seller_id: selectedSeller.id })
-      if (finance && finance.length) {
-        const { total_sales, total_returns, total_received } = finance[0]
-        const remaining = total_sales - total_returns - total_received
-        setSellerFinance({ totalSales: total_sales, totalReturns: total_returns, totalReceived: total_received, remaining })
-      }
+      const { data: transfers } = await supabase
+        .from('seller_transfers')
+        .select('amount')
+        .eq('seller_id', selectedSeller.id)
+      const totalReceived = transfers?.reduce((s, t) => s + (t.amount || 0), 0) || 0
+      setSellerFinance(prev => ({
+        ...prev,
+        totalReceived,
+        remaining: prev.totalSales - prev.totalReturns - totalReceived
+      }))
     } catch (err) {
       console.error(err)
       toast.error(err.message || 'فشل إضافة التحويل')
@@ -300,10 +365,9 @@ export default function AdminDashboardPage() {
         <button onClick={() => setActiveMainTab('products')} className={`flex items-center gap-2 px-4 py-2 rounded-lg ${activeMainTab === 'products' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}><Package size={18} /> المنتجات</button>
       </div>
 
-      {/* لوحة المعلومات (Dashboard) مع أقسام جديدة */}
+      {/* Dashboard Tab */}
       {activeMainTab === 'dashboard' && (
         <div>
-          {/* البطاقات الإحصائية */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <div className="bg-primary-card p-4 rounded-2xl border-gold/30"><DollarSign className="text-gold mb-2" size={32} /><p className="text-text-secondary text-sm">مبيعات اليوم</p><p className="text-2xl font-bold">{formatCurrency(stats?.dailySales || 0)}</p></div>
             <div className="bg-primary-card p-4 rounded-2xl border-gold/30"><TrendingUp className="text-gold mb-2" size={32} /><p className="text-text-secondary text-sm">عمولة اليوم</p><p className="text-2xl font-bold">{formatCurrency(stats?.dailyCommission || 0)}</p></div>
@@ -311,7 +375,6 @@ export default function AdminDashboardPage() {
             <div className="bg-primary-card p-4 rounded-2xl border-gold/30"><Wallet className="text-gold mb-2" size={32} /><p className="text-text-secondary text-sm">إيصالات معلقة</p><p className="text-2xl font-bold">{pendingActions.receipts}</p></div>
           </div>
 
-          {/* صف ثانوي: إجراءات سريعة */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <div className="bg-primary-card p-4 rounded-2xl border-gold/30 text-center">
               <Clock className="mx-auto text-gold mb-2" size={28} />
@@ -331,7 +394,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* أفضل المنتجات مبيعًا */}
           {topProducts.length > 0 && (
             <div className="bg-primary-card p-4 rounded-2xl border-gold/30 mb-8">
               <h2 className="text-xl font-bold mb-4">⭐ أفضل المنتجات مبيعاً</h2>
@@ -346,14 +408,13 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* أحدث الطلبات */}
           {recentOrders.length > 0 && (
             <div className="bg-primary-card p-4 rounded-2xl border-gold/30 mb-8">
               <h2 className="text-xl font-bold mb-4">📋 أحدث الطلبات</h2>
               <div className="space-y-3">
                 {recentOrders.map(order => (
                   <div key={order.id} className="flex justify-between items-center p-3 bg-secondary-blue/30 rounded-xl">
-                    <div><p className="font-bold">طلب #{order.id}</p><p className="text-xs">{order.profiles?.full_name || 'مستخدم'}</p></div>
+                    <div><p className="font-bold">طلب #{order.id}</p><p className="text-xs">{order.buyer_name}</p></div>
                     <div className="text-right"><p className="text-gold">{formatCurrency(order.total_amount)}</p><p className="text-xs text-text-secondary">{order.status}</p></div>
                   </div>
                 ))}
@@ -361,7 +422,6 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* المبيعات الشهرية (المخطط البياني) */}
           <div className="bg-primary-card p-4 rounded-2xl border-gold/30">
             <h2 className="text-xl font-bold mb-4"><LineChartIcon className="inline ml-2 text-gold" /> المبيعات الشهرية</h2>
             <ResponsiveContainer width="100%" height={300}>
@@ -377,7 +437,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* باقي الأقسام (users, products) */}
+      {/* Users Tab */}
       {activeMainTab === 'users' && (
         <div>
           <div className="flex border-b border-gold/30 mb-4">
@@ -411,11 +471,15 @@ export default function AdminDashboardPage() {
 
                   {sellerDetailTab === 'profile' && (
                     <>
-                      <div className="overflow-x-auto"><table className="w-full text-right"><tbody>
-                        <tr><td className="p-2 font-bold text-gold">الاسم</td><td>{selectedSeller.full_name || '-'}</td><td className="p-2 font-bold text-gold">البريد</td><td>{selectedSeller.email}</td></tr>
-                        <tr><td className="p-2 font-bold text-gold">نوع الحساب</td><td>{selectedSeller.account_type === 'seller' ? 'بائع' : 'مشتري'}</td><td className="p-2 font-bold text-gold">الحالة</td><td>{selectedSeller.is_banned ? 'محظور' : 'نشط'}</td></tr>
-                        <tr><td className="p-2 font-bold text-gold">تاريخ التسجيل</td><td>{formatDate(selectedSeller.created_at)}</td><td className="p-2 font-bold text-gold">رقم الهاتف</td><td>{selectedSeller.phone || '-'}</td></tr>
-                      </tbody></table></div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-right">
+                          <tbody>
+                            <tr><td className="p-2 font-bold text-gold">الاسم</td><td>{selectedSeller.full_name || '-'}</td><td className="p-2 font-bold text-gold">البريد</td><td>{selectedSeller.email}</td></tr>
+                            <tr><td className="p-2 font-bold text-gold">نوع الحساب</td><td>{selectedSeller.account_type === 'seller' ? 'بائع' : 'مشتري'}</td><td className="p-2 font-bold text-gold">الحالة</td><td>{selectedSeller.is_banned ? 'محظور' : 'نشط'}</td></tr>
+                            <tr><td className="p-2 font-bold text-gold">تاريخ التسجيل</td><td>{formatDate(selectedSeller.created_at)}</td><td className="p-2 font-bold text-gold">رقم الهاتف</td><td>{selectedSeller.phone || '-'}</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
                       <div className="flex gap-2 mt-4 flex-wrap">
                         <button onClick={() => updateUserMutation.mutate({ userId: selectedSeller.id, updates: { is_banned: !selectedSeller.is_banned } })} className={`px-3 py-1 rounded text-white ${selectedSeller.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{selectedSeller.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
                         <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: selectedSeller.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-3 py-1 rounded text-white flex items-center gap-1"><Send size={14} /> إرسال إشعار</button>
@@ -441,7 +505,7 @@ export default function AdminDashboardPage() {
                       </div>
                       <div className="overflow-x-auto mt-4">
                         <table className="w-full text-right border-collapse">
-                          <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th></tr></thead>
+                          <thead><tr className="border-b border-gold/30"><th className="p-2">القسم</th><th className="p-2">التفاصيل</th></tr></thead>
                           <tbody>
                             <tr><td className="p-2 font-bold">إجمالي المبيعات</td><td>{formatCurrency(sellerFinance.totalSales)}</td></tr>
                             <tr><td className="p-2 font-bold">إجمالي المرتجعات</td><td>{formatCurrency(sellerFinance.totalReturns)}</td></tr>
@@ -482,29 +546,34 @@ export default function AdminDashboardPage() {
                 <Input placeholder="بحث..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="flex-1 bg-white" />
                 <Button variant="secondary" onClick={() => refetchUsers()}><Search size={16} /> بحث</Button>
               </div>
-              <div className="overflow-x-auto"><table className="w-full text-right border-collapse"><thead><tr><th>الاسم</th><th>البريد</th><th>عدد الطلبات</th><th>إجمالي الإنفاق</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>
-                {buyerUsers.map(user => (
-                  <tr key={user.id}>
-                    <td>{user.full_name}</td>
-                    <td>{user.email}</td>
-                    <td>{user.order_count || 0}</td>
-                    <td>{formatCurrency(user.total_spent || 0)}</td>
-                    <td>{user.is_banned ? 'محظور' : 'نشط'}</td>
-                    <td className="p-3">
-                      <div className="flex gap-2 flex-wrap">
-                        <button onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { is_banned: !user.is_banned } })} className={`px-2 py-1 rounded text-xs ${user.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{user.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
-                        <button onClick={() => { setSelectedBuyer(user); setBuyerDetailTab('profile'); }} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
-                        <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: user.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-2 py-1 rounded text-xs"><Send size={12} /></button>
-                        <button onClick={() => {
-                          const newType = user.account_type === 'seller' ? 'buyer' : 'seller'
-                          if (confirm(`تغيير نوع الحساب من ${user.account_type === 'seller' ? 'بائع' : 'مشتري'} إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
-                            updateUserMutation.mutate({ userId: user.id, updates: { account_type: newType } })
-                        }} className="bg-amber-600 px-2 py-1 rounded text-xs text-white">🔄 تغيير</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody></table></div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-right border-collapse">
+                  <thead><tr><th>الاسم</th><th>البريد</th><th>عدد الطلبات</th><th>إجمالي الإنفاق</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
+                  <tbody>
+                    {buyerUsers.map(user => (
+                      <tr key={user.id}>
+                        <td>{user.full_name}</td>
+                        <td>{user.email}</td>
+                        <td>{user.order_count || 0}</td>
+                        <td>{formatCurrency(user.total_spent || 0)}</td>
+                        <td>{user.is_banned ? 'محظور' : 'نشط'}</td>
+                        <td className="p-3">
+                          <div className="flex gap-2 flex-wrap">
+                            <button onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { is_banned: !user.is_banned } })} className={`px-2 py-1 rounded text-xs ${user.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>{user.is_banned ? 'إلغاء الحظر' : 'حظر'}</button>
+                            <button onClick={() => { setSelectedBuyer(user); setBuyerDetailTab('profile'); }} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
+                            <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: user.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-2 py-1 rounded text-xs"><Send size={12} /></button>
+                            <button onClick={() => {
+                              const newType = user.account_type === 'seller' ? 'buyer' : 'seller'
+                              if (confirm(`تغيير نوع الحساب من ${user.account_type === 'seller' ? 'بائع' : 'مشتري'} إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
+                                updateUserMutation.mutate({ userId: user.id, updates: { account_type: newType } })
+                            }} className="bg-amber-600 px-2 py-1 rounded text-xs text-white">🔄 تغيير</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
@@ -524,17 +593,24 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+      {/* Products Tab */}
       {activeMainTab === 'products' && (
         <div className="bg-primary-card p-4 rounded-2xl border-gold/30">
           <h3 className="text-xl font-bold mb-4 text-gold">قائمة المنتجات</h3>
-          <div className="overflow-x-auto"><table className="w-full text-right"><thead><tr><th>اسم المنتج</th><th>البائع</th><th>السعر</th><th>الحالة</th></tr></thead><tbody>
-            {products?.map(p => (
-              <tr key={p.id}><td>{p.name}</td><td>{p.seller_name}</td><td>{formatCurrency(p.price)}</td><td>{p.is_approved ? 'موافق' : 'قيد المراجعة'}</td></tr>
-            ))}
-          </tbody></table></div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-right">
+              <thead><tr><th>اسم المنتج</th><th>البائع</th><th>السعر</th><th>الحالة</th></tr></thead>
+              <tbody>
+                {products?.map(p => (
+                  <tr key={p.id}><td>{p.name}</td><td>{p.seller_name}</td><td>{formatCurrency(p.price)}</td><td>{p.is_approved ? 'موافق' : 'قيد المراجعة'}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
+      {/* Receipts Modal */}
       {showReceiptsModal && (
         <Modal onClose={() => setShowReceiptsModal(false)} title="جميع إيصالات التحويل">
           <div className="overflow-x-auto bg-white rounded-lg">
@@ -559,4 +635,5 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
+
 
