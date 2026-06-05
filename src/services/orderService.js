@@ -7,7 +7,6 @@ export const createOrder = async (orderData) => {
   const { buyer_id, total_amount, shipping_address, shipping_city, payment_method, notes, items } = orderData
 
   // 1. إنشاء الطلب في جدول orders
-  // تم تغيير payment_status من 'pending' إلى 'unpaid' لتجنب انتهاك القيد في قاعدة البيانات
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({
@@ -18,7 +17,7 @@ export const createOrder = async (orderData) => {
       payment_method: payment_method,
       notes: notes,
       status: 'pending',
-      payment_status: 'unpaid',  // ← تم التعديل هنا
+      payment_status: 'unpaid',
       created_at: new Date().toISOString()
     })
     .select()
@@ -27,12 +26,13 @@ export const createOrder = async (orderData) => {
   if (orderError) throw orderError
 
   // 2. إدراج عناصر الطلب في order_items
+  // تم تعديل unit_price إلى price لأن عمود unit_price غير موجود في الجدول
   const orderItems = items.map(item => ({
     order_id: order.id,
     product_id: item.product_id,
     quantity: item.quantity,
-    unit_price: item.unit_price,
-    product_name: null  // سيتم تعبئتها تلقائياً عبر trigger في قاعدة البيانات
+    price: item.unit_price,        // ← تم التغيير من unit_price إلى price
+    product_name: null
   }))
 
   const { error: itemsError } = await supabase
