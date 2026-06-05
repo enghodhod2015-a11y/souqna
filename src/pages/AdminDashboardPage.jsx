@@ -151,12 +151,13 @@ export default function AdminDashboardPage() {
     fetchSellerStats()
   }, [selectedSeller])
 
-  // جلب ملخص مالي للبائع المحدد (باستخدام بيانات حقيقية)
+  // جلب ملخص مالي للبائع المحدد (باستخدام بيانات حقيقية مع console.log)
   useEffect(() => {
     if (!selectedSeller?.id) return;
     const fetchFinanceSummary = async () => {
       try {
         const sellerId = selectedSeller.id;
+        console.log('💰 جلب المالية للبائع:', sellerId);
         
         // 1. جلب جميع منتجات البائع
         const { data: products, error: productsError } = await supabase
@@ -166,43 +167,69 @@ export default function AdminDashboardPage() {
         if (productsError) throw productsError;
         
         const productIds = products?.map(p => p.id) || [];
+        console.log('📦 منتجات البائع IDs:', productIds);
+        
         let totalSales = 0;
         let totalReturns = 0;
         
         if (productIds.length > 0) {
-          // إجمالي المبيعات: order_items للطلبات المكتملة
-          const { data: completedItems, error: itemsError } = await supabase
+          // 2. جلب order_items للمنتجات
+          const { data: orderItems, error: itemsError } = await supabase
             .from('order_items')
-            .select('product_price, quantity, order:orders(status)')
-            .in('product_id', productIds)
-            .eq('order.status', 'completed');
-          if (!itemsError && completedItems) {
-            totalSales = completedItems.reduce((sum, item) => sum + (item.product_price * item.quantity), 0);
-          }
+            .select('order_id, product_price, quantity')
+            .in('product_id', productIds);
+          if (itemsError) throw itemsError;
+          console.log('📦 order_items المستلمة:', orderItems);
           
-          // إجمالي المرتجعات: order_items حيث order.return_status = 'approved'
-          const { data: returnItems, error: returnsError } = await supabase
-            .from('order_items')
-            .select('product_price, quantity, order:orders(return_status)')
-            .in('product_id', productIds)
-            .eq('order.return_status', 'approved');
-          if (!returnsError && returnItems) {
-            totalReturns = returnItems.reduce((sum, item) => sum + (item.product_price * item.quantity), 0);
+          if (orderItems && orderItems.length > 0) {
+            const orderIds = [...new Set(orderItems.map(oi => oi.order_id))];
+            console.log('📦 orderIds الفريدة:', orderIds);
+            
+            // 3. جلب الطلبات المرتبطة
+            const { data: orders, error: ordersError } = await supabase
+              .from('orders')
+              .select('id, status, return_status')
+              .in('id', orderIds);
+            if (ordersError) throw ordersError;
+            console.log('📦 الطلبات:', orders);
+            
+            const ordersMap = new Map(orders?.map(o => [o.id, o]) || []);
+            
+            for (const item of orderItems) {
+              const order = ordersMap.get(item.order_id);
+              if (order) {
+                if (order.status === 'completed') {
+                  const saleAmount = item.product_price * item.quantity;
+                  totalSales += saleAmount;
+                  console.log(`✅ مبيعات مكتملة: order ${item.order_id}, product_price ${item.product_price}, quantity ${item.quantity}, المبلغ ${saleAmount}`);
+                }
+                if (order.return_status === 'approved') {
+                  const returnAmount = item.product_price * item.quantity;
+                  totalReturns += returnAmount;
+                  console.log(`🔄 مرتجع معتمد: order ${item.order_id}, product_price ${item.product_price}, quantity ${item.quantity}, المبلغ ${returnAmount}`);
+                }
+              } else {
+                console.warn(`⚠️ لم يتم العثور على order للمعرف: ${item.order_id}`);
+              }
+            }
           }
         }
         
-        // إجمالي الاستلامات من seller_transfers
+        // 4. جلب الاستلامات
         const { data: transfers, error: transfersError } = await supabase
           .from('seller_transfers')
           .select('amount')
           .eq('seller_id', sellerId);
         if (transfersError) throw transfersError;
-        const totalReceived = transfers?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+        const totalReceived = transfers?.reduce((s, t) => s + (t.amount || 0), 0) || 0;
+        console.log('💰 إجمالي الاستلامات:', totalReceived);
         
         const remaining = totalSales - totalReturns - totalReceived;
+        console.log('📊 النتائج النهائية:', { totalSales, totalReturns, totalReceived, remaining });
+        
         setSellerFinance({ totalSales, totalReturns, totalReceived, remaining });
       } catch (err) {
-        console.error('خطأ في جلب البيانات المالية:', err);
+        console.error('❌ خطأ في جلب المالية:', err);
         toast.error('فشل تحميل البيانات المالية');
       }
     };
@@ -449,7 +476,7 @@ export default function AdminDashboardPage() {
                         <tr><td className="p-2 font-bold text-gold">الاسم</td><td>{selectedSeller.full_name || '-'}</td><td className="p-2 font-bold text-gold">البريد</td><td>{selectedSeller.email}</td></tr>
                         <tr><td className="p-2 font-bold text-gold">نوع الحساب</td><td>{selectedSeller.account_type === 'seller'? 'بائع' : 'مشتري'}</td><td className="p-2 font-bold text-gold">الحالة</td><td>{selectedSeller.is_banned? 'محظور' : 'نشط'}</td></tr>
                         <tr><td className="p-2 font-bold text-gold">تاريخ التسجيل</td><td>{formatDate(selectedSeller.created_at)}</td><td className="p-2 font-bold text-gold">رقم الهاتف</td><td>{selectedSeller.phone || '-'}</td></tr>
-                      </tbody></table></div>
+                      </tbody>}</table></div>
                       <div className="flex gap-2 mt-4 flex-wrap">
                         <button onClick={() => updateUserMutation.mutate({ userId: selectedSeller.id, updates: { is_banned: !selectedSeller.is_banned }})} className={`px-3 py-1 rounded text-white ${selectedSeller.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>
                           {selectedSeller.is_banned ? 'إلغاء الحظر' : 'حظر'}
@@ -630,4 +657,5 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
+
 
