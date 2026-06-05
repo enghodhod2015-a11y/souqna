@@ -88,67 +88,97 @@ export const getBuyerOrders = async (buyerId) => {
 }
 
 // ─────────────────────────────────────────────────────────────
-// جلب طلبات البائع
+// جلب طلبات البائع (نسخة مبسطة وموثوقة)
 // ─────────────────────────────────────────────────────────────
 export const getSellerOrders = async (sellerId) => {
-  const { data: products, error: productsError } = await supabase
-    .from('products')
-    .select('id')
-    .eq('seller_id', sellerId)
-  if (productsError) throw productsError
-  if (!products || products.length === 0) return []
-
-  const productIds = products.map(p => p.id)
-  // ✅ إزالة .order('order.created_at') لأنها تسبب خطأ 400
-  const { data: items, error: itemsError } = await supabase
-    .from('order_items')
-    .select('*, order:orders(*), product:products(name, cover_image)')
-    .in('product_id', productIds)
-  if (itemsError) throw itemsError
-  if (!items || items.length === 0) return []
-
-  const buyerIds = [...new Set(items.map(i => i.order?.user_id).filter(Boolean))]
-  let buyersMap = new Map()
-  if (buyerIds.length) {
-    const { data: buyers, error: buyersError } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, phone')
-      .in('id', buyerIds)
-    if (!buyersError && buyers) {
-      buyers.forEach(b => buyersMap.set(b.id, b))
+  try {
+    // 1. جلب جميع منتجات البائع
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id, name, cover_image')
+      .eq('seller_id', sellerId)
+    if (productsError) throw productsError
+    if (!products || products.length === 0) {
+      console.log('لا توجد منتجات للبائع', sellerId)
+      return []
     }
-  }
 
-  const ordersMap = new Map()
-  items.forEach(item => {
-    if (!item.order) return
-    const orderId = item.order.id
-    if (!ordersMap.has(orderId)) {
-      ordersMap.set(orderId, {
-        id: orderId,
-        order_status: item.order.status,
-        payment_status: item.order.payment_status,
-        total_price: item.order.total_amount,
-        shipping_address: item.order.shipping_address,
-        receipt_image: item.order.receipt_image,
-        buyer: buyersMap.get(item.order.user_id) || null,
-        created_at: item.order.created_at,
-        product: item.product ? { ...item.product, title: item.product.name } : null,
-        quantity: item.quantity,
-        return_status: item.order.return_status,
-        return_reason: item.order.return_reason,
-        completed_at: item.order.completed_at
-      })
-    } else {
-      const existing = ordersMap.get(orderId)
-      if (!existing.product && item.product) {
-        existing.product = item.product ? { ...item.product, title: item.product.name } : null
+    const productIds = products.map(p => p.id)
+    console.log('منتجات البائع IDs:', productIds)
+
+    // 2. جلب عناصر الطلبات التي تحتوي على هذه المنتجات
+    const { data: orderItems, error: itemsError } = await supabase
+      .from('order_items')
+      .select('*, order_id, product_id, quantity, product_price, product_name')
+      .in('product_id', productIds)
+    if (itemsError) throw itemsError
+    if (!orderItems || orderItems.length === 0) {
+      console.log('لا توجد عناصر طلبات لهذه المنتجات')
+      return []
+    }
+    console.log('عناصر الطلبات:', orderItems)
+
+    // 3. استخراج معرفات الطلبات الفريدة
+    const orderIds = [...new Set(orderItems.map(item => item.order_id))]
+    console.log('معرفات الطلبات:', orderIds)
+
+    // 4. جلب تفاصيل الطلبات
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select('*')
+      .in('id', orderIds)
+      .order('created_at', { ascending: false })
+    if (ordersError) throw ordersError
+    console.log('تفاصيل الطلبات:', orders)
+
+    // 5. جلب بيانات المشترين
+    const buyerIds = [...new Set(orders.map(order => order.user_id).filter(Boolean))]
+    let buyersMap = new Map()
+    if (buyerIds.length) {
+      const { data: buyers, error: buyersError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, phone')
+        .in('id', buyerIds)
+      if (!buyersError && buyers) {
+        buyers.forEach(b => buyersMap.set(b.id, b))
       }
     }
-  })
 
-  // ✅ الترتيب في JavaScript بدلاً من Supabase لتجنب خطأ 400
-  return Array.from(ordersMap.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    // 6. تجميع النتائج
+    const ordersMap = new Map()
+    for (const item of orderItems) {
+      const order = orders.find(o => o.id === item.order_id)
+      if (!order) continue
+      
+      const product = products.find(p => p.id === item.product_id)
+      if (!ordersMap.has(order.id)) {
+        ordersMap.set(order.id, {
+          id: order.id,
+          order_status: order.status,
+          payment_status: order.payment_status,
+          total_price: order.total_amount,
+          shipping_address: order.shipping_address,
+          receipt_image: order.receipt_image,
+          buyer: buyersMap.get(order.user_id) || null,
+          created_at: order.created_at,
+          product: product ? { ...product, title: product.name } : null,
+          quantity: item.quantity,
+          return_status: order.return_status,
+          return_reason: order.return_reason,
+          completed_at: order.completed_at,
+          status: order.status,
+          total_amount: order.total_amount
+        })
+      }
+    }
+
+    const result = Array.from(ordersMap.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    console.log('النتيجة النهائية (عدد الطلبات):', result.length)
+    return result
+  } catch (error) {
+    console.error('خطأ في جلب طلبات البائع:', error)
+    return []
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
