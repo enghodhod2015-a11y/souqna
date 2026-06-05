@@ -151,7 +151,7 @@ export default function AdminDashboardPage() {
     fetchSellerStats()
   }, [selectedSeller])
 
-  // جلب ملخص مالي للبائع المحدد (النسخة النهائية - تشمل delivered كمكتملة)
+  // جلب ملخص مالي للبائع المحدد (باستخدام استعلام مباشر)
   useEffect(() => {
     if (!selectedSeller?.id) return;
     const fetchFinanceSummary = async () => {
@@ -159,65 +159,37 @@ export default function AdminDashboardPage() {
         const sellerId = selectedSeller.id;
         console.log('💰 جلب المالية للبائع:', sellerId);
         
-        // 1. جلب جميع منتجات البائع
-        const { data: products, error: productsError } = await supabase
-          .from('products')
-          .select('id')
-          .eq('seller_id', sellerId);
-        if (productsError) throw productsError;
+        // 1. إجمالي المبيعات (من orders ذات status = 'completed' أو 'delivered')
+        const { data: salesData, error: salesError } = await supabase
+          .from('order_items')
+          .select(`
+            product_price,
+            quantity,
+            order:orders!inner(status, return_status)
+          `)
+          .eq('order.status', 'completed')
+          .eq('product.seller_id', sellerId);
         
-        const productIds = products?.map(p => p.id) || [];
-        console.log('📦 منتجات البائع IDs:', productIds);
+        if (salesError) console.error('❌ خطأ في جلب المبيعات:', salesError);
+        const totalSales = salesData?.reduce((sum, item) => sum + (item.product_price * item.quantity), 0) || 0;
+        console.log('💰 إجمالي المبيعات:', totalSales);
         
-        let totalSales = 0;
-        let totalReturns = 0;
+        // 2. إجمالي المرتجعات (من orders ذات return_status = 'approved')
+        const { data: returnsData, error: returnsError } = await supabase
+          .from('order_items')
+          .select(`
+            product_price,
+            quantity,
+            order:orders!inner(return_status)
+          `)
+          .eq('order.return_status', 'approved')
+          .eq('product.seller_id', sellerId);
         
-        if (productIds.length > 0) {
-          // 2. جلب order_items للمنتجات
-          const { data: orderItems, error: itemsError } = await supabase
-            .from('order_items')
-            .select('order_id, product_price, quantity')
-            .in('product_id', productIds);
-          if (itemsError) throw itemsError;
-          console.log('📦 order_items المستلمة:', orderItems);
-          
-          if (orderItems && orderItems.length > 0) {
-            const orderIds = [...new Set(orderItems.map(oi => oi.order_id))];
-            console.log('📦 orderIds الفريدة:', orderIds);
-            
-            // 3. جلب الطلبات المرتبطة (بما في ذلك delivered و completed)
-            const { data: orders, error: ordersError } = await supabase
-              .from('orders')
-              .select('id, status, return_status')
-              .in('id', orderIds);
-            if (ordersError) throw ordersError;
-            console.log('📦 الطلبات:', orders);
-            
-            const ordersMap = new Map(orders?.map(o => [o.id, o]) || []);
-            
-            for (const item of orderItems) {
-              const order = ordersMap.get(item.order_id);
-              if (order) {
-                // ✅ تضمين delivered أيضاً لأنها تعتبر مكتملة
-                const isCompleted = order.status === 'completed' || order.status === 'delivered';
-                if (isCompleted) {
-                  const saleAmount = item.product_price * item.quantity;
-                  totalSales += saleAmount;
-                  console.log(`✅ مبيعات مكتملة (${order.status}): order ${item.order_id}, المبلغ ${saleAmount}`);
-                }
-                if (order.return_status === 'approved') {
-                  const returnAmount = item.product_price * item.quantity;
-                  totalReturns += returnAmount;
-                  console.log(`🔄 مرتجع معتمد: order ${item.order_id}, المبلغ ${returnAmount}`);
-                }
-              } else {
-                console.warn(`⚠️ لم يتم العثور على order للمعرف: ${item.order_id}`);
-              }
-            }
-          }
-        }
+        if (returnsError) console.error('❌ خطأ في جلب المرتجعات:', returnsError);
+        const totalReturns = returnsData?.reduce((sum, item) => sum + (item.product_price * item.quantity), 0) || 0;
+        console.log('💰 إجمالي المرتجعات:', totalReturns);
         
-        // 4. جلب الاستلامات
+        // 3. إجمالي الاستلامات
         const { data: transfers, error: transfersError } = await supabase
           .from('seller_transfers')
           .select('amount')
@@ -659,4 +631,5 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
+
 
