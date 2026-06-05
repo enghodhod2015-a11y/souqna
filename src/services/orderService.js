@@ -7,6 +7,7 @@ export const createOrder = async (orderData) => {
   const { buyer_id, total_amount, shipping_address, shipping_city, payment_method, notes, items } = orderData
 
   // 1. إنشاء الطلب في جدول orders
+  // تم تغيير payment_status من 'pending' إلى 'unpaid' لتجنب انتهاك القيد في قاعدة البيانات
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({
@@ -17,7 +18,7 @@ export const createOrder = async (orderData) => {
       payment_method: payment_method,
       notes: notes,
       status: 'pending',
-      payment_status: 'pending',
+      payment_status: 'unpaid',  // ← تم التعديل هنا
       created_at: new Date().toISOString()
     })
     .select()
