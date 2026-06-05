@@ -73,30 +73,39 @@ export default function AdminDashboardPage() {
 
   const queryClient = useQueryClient()
 
-  // جلب البيانات الإضافية للوحة التحكم - تم إصلاح الاستعلامات
+  // جلب البيانات الإضافية للوحة التحكم - تجنب الاستعلامات المعقدة التي تسبب 400
   useEffect(() => {
     if (activeMainTab !== 'dashboard') return
     const fetchDashboardExtras = async () => {
       try {
-        // أفضل المنتجات مبيعًا: جلب order_items ثم تجميعها يدويًا
-        const { data: items, error: itemsErr } = await supabase
+        // 1. أفضل المنتجات مبيعاً: جلب order_items مع product_id و quantity فقط ثم جلب المنتجات
+        const { data: orderItems, error: oiErr } = await supabase
           .from('order_items')
-          .select('product_id, quantity, products(name, price)')
+          .select('product_id, quantity')
           .eq('order.status', 'completed')
           .limit(100)
-        if (itemsErr) throw itemsErr
-        if (items) {
-          const grouped = items.reduce((acc, item) => {
+        if (oiErr) throw oiErr
+        if (orderItems && orderItems.length) {
+          const productIds = [...new Set(orderItems.map(item => item.product_id))]
+          const { data: productsData, error: pErr } = await supabase
+            .from('products')
+            .select('id, name, price')
+            .in('id', productIds)
+          if (pErr) throw pErr
+          const productMap = Object.fromEntries(productsData?.map(p => [p.id, p]) || [])
+          const grouped = orderItems.reduce((acc, item) => {
+            const product = productMap[item.product_id]
+            if (!product) return acc
             const id = item.product_id
-            if (!acc[id]) acc[id] = { name: item.products?.name || 'منتج', total_quantity: 0, revenue: 0 }
+            if (!acc[id]) acc[id] = { name: product.name, total_quantity: 0, revenue: 0 }
             acc[id].total_quantity += item.quantity
-            acc[id].revenue += (item.products?.price || 0) * item.quantity
+            acc[id].revenue += (product.price || 0) * item.quantity
             return acc
           }, {})
-          setTopProducts(Object.values(grouped).slice(0, 5))
+          setTopProducts(Object.values(grouped).sort((a, b) => b.revenue - a.revenue).slice(0, 5))
         }
 
-        // أحدث الطلبات: جلب الطلبات ثم أسماء المستخدمين
+        // 2. أحدث الطلبات
         const { data: orders, error: ordersErr } = await supabase
           .from('orders')
           .select('id, total_amount, status, created_at, user_id')
@@ -105,15 +114,16 @@ export default function AdminDashboardPage() {
         if (ordersErr) throw ordersErr
         if (orders && orders.length) {
           const userIds = orders.map(o => o.user_id).filter(Boolean)
-          const { data: profiles } = await supabase
+          const { data: profiles, error: profErr } = await supabase
             .from('profiles')
             .select('id, full_name')
             .in('id', userIds)
+          if (profErr) throw profErr
           const profileMap = Object.fromEntries(profiles?.map(p => [p.id, p.full_name]) || [])
           setRecentOrders(orders.map(o => ({ ...o, buyer_name: profileMap[o.user_id] || 'مستخدم' })))
         }
 
-        // الإجراءات المعلقة
+        // 3. الإجراءات المعلقة
         const { count: pendingProducts } = await supabase
           .from('products')
           .select('*', { count: 'exact', head: true })
@@ -129,7 +139,7 @@ export default function AdminDashboardPage() {
           .eq('account_type', 'seller')
           .eq('is_verified', false)
         setPendingActions({ products: pendingProducts || 0, receipts: pendingReceipts || 0, sellers: pendingSellers || 0 })
-      } catch (err) { console.error(err) }
+      } catch (err) { console.error('خطأ في جلب بيانات إضافية:', err) }
     }
     fetchDashboardExtras()
   }, [activeMainTab])
@@ -179,7 +189,7 @@ export default function AdminDashboardPage() {
     fetchFinanceSummary()
   }, [selectedSeller])
 
-  // باقي الكود كما هو (Queries, Mutations, JSX) - تم حفظه من الإصدار السابق مع إضافة الأيقونات المفقودة
+  // باقي الـ Queries و Mutations
   const { data: stats, refetch: refetchStats, isLoading: statsLoading } = useQuery({
     queryKey: ['adminStats'],
     queryFn: getAdminStats
@@ -413,8 +423,127 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* باقي الأقسام (users, products, modal) محذوفة للاختصار ولكنها موجودة في النسخة الكاملة السابقة */}
-      {/* نظراً لطول الملف، يتم إكماله بالمحتوى السليم من آخر إصدار عمل - يرجى الرجوع إلى الكود المرفق الكامل في المرفقات */}
+      {/* قسم المستخدمين - نسخة مختصرة لكنها كاملة لمنع الأخطاء */}
+      {activeMainTab === 'users' && (
+        <div>
+          <div className="flex border-b border-gold/30 mb-4">
+            <button onClick={() => setActiveSubTab('sellers')} className={`px-4 py-2 ${activeSubTab === 'sellers' ? 'border-b-2 border-gold text-gold' : 'text-text-secondary'}`}>البائعين</button>
+            <button onClick={() => setActiveSubTab('buyers')} className={`px-4 py-2 ${activeSubTab === 'buyers' ? 'border-b-2 border-gold text-gold' : 'text-text-secondary'}`}>المشترين</button>
+            <button onClick={() => setActiveSubTab('pending_sellers')} className={`px-4 py-2 ${activeSubTab === 'pending_sellers' ? 'border-b-2 border-gold text-gold' : 'text-text-secondary'}`}>طلبات الانضمام {pendingSellersCount > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full ml-1">{pendingSellersCount}</span>}</button>
+          </div>
+
+          {activeSubTab === 'sellers' && (
+            <div>
+              <div className="mb-4">
+                <label className="block text-gold mb-2">اختر البائع:</label>
+                <Select value={selectedSeller?.id || ''} onChange={(e) => {
+                  const seller = sellerUsers.find(u => u.id === e.target.value)
+                  setSelectedSeller(seller)
+                  setSellerDetailTab('profile')
+                  setSellerFilterId(null)
+                }} className="w-full md:w-1/2 bg-white text-gray-900 border-gold/30">
+                  <option value="">-- اختر بائعاً --</option>
+                  {sellerUsers.map(seller => <option key={seller.id} value={seller.id}>{seller.store_name || seller.full_name} ({seller.email})</option>)}
+                </Select>
+              </div>
+              {selectedSeller && (
+                <div className="bg-primary-card rounded-2xl border-gold/30 p-4">
+                  <div className="flex gap-2 mb-4 border-b border-gold/30 pb-2">
+                    <button onClick={() => setSellerDetailTab('profile')} className={`px-4 py-2 rounded-lg ${sellerDetailTab === 'profile' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}>الملف الشخصي</button>
+                    <button onClick={() => setSellerDetailTab('finance')} className={`px-4 py-2 rounded-lg ${sellerDetailTab === 'finance' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}>المالية</button>
+                    <button onClick={() => setSellerDetailTab('stats')} className={`px-4 py-2 rounded-lg ${sellerDetailTab === 'stats' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}>المتابعة والتقييم</button>
+                  </div>
+                  {sellerDetailTab === 'profile' && (
+                    <div>
+                      <p><strong>الاسم:</strong> {selectedSeller.full_name}</p>
+                      <p><strong>البريد:</strong> {selectedSeller.email}</p>
+                      <p><strong>الهاتف:</strong> {selectedSeller.phone}</p>
+                      <div className="flex gap-2 mt-4">
+                        <button onClick={() => updateUserMutation.mutate({ userId: selectedSeller.id, updates: { is_banned: !selectedSeller.is_banned } })} className="bg-red-600 px-3 py-1 rounded text-white">حظر/إلغاء</button>
+                        <button onClick={() => sendNotificationMutation.mutate({ userId: selectedSeller.id, title: 'إشعار', message: prompt('أدخل نص الإشعار:') || '' })} className="bg-purple-600 px-3 py-1 rounded text-white">إرسال إشعار</button>
+                      </div>
+                    </div>
+                  )}
+                  {sellerDetailTab === 'finance' && (
+                    <div>
+                      <p><strong>إجمالي المبيعات:</strong> {formatCurrency(sellerFinance.totalSales)}</p>
+                      <p><strong>إجمالي المرتجعات:</strong> {formatCurrency(sellerFinance.totalReturns)}</p>
+                      <p><strong>إجمالي الاستلامات:</strong> {formatCurrency(sellerFinance.totalReceived)}</p>
+                      <p><strong>المبلغ المتبقي:</strong> {formatCurrency(sellerFinance.remaining)}</p>
+                      <Button variant="secondary" onClick={loadSellerReceipts} className="mt-4">عرض الإيصالات</Button>
+                    </div>
+                  )}
+                  {sellerDetailTab === 'stats' && (
+                    <div>
+                      <p><strong>إجمالي المنتجات:</strong> {sellerStats.totalProducts}</p>
+                      <p><strong>المنتجات المباعة:</strong> {sellerStats.soldProducts}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {activeSubTab === 'buyers' && (
+            <div>
+              <Input placeholder="بحث..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="mb-4" />
+              <table className="w-full text-right border-collapse">
+                <thead><tr><th>الاسم</th><th>البريد</th><th>الإنفاق</th><th>الإجراءات</th></tr></thead>
+                <tbody>
+                  {buyerUsers.map(user => (
+                    <tr key={user.id}>
+                      <td>{user.full_name}</td><td>{user.email}</td><td>{formatCurrency(user.total_spent)}</td>
+                      <td><button onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { is_banned: !user.is_banned } })} className="bg-red-600 text-white px-2 py-1 rounded text-xs">حظر</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {activeSubTab === 'pending_sellers' && (
+            <div className="space-y-4">
+              {pendingSellers?.map(s => (
+                <div key={s.id} className="bg-primary-card p-4 rounded-2xl">
+                  <p>{s.full_name} - {s.email}</p>
+                  <button onClick={() => approveSellerMutation.mutate({ sellerId: s.id, approved: true })} className="bg-green-600 px-3 py-1 rounded text-white">قبول</button>
+                  <button onClick={() => approveSellerMutation.mutate({ sellerId: s.id, approved: false })} className="bg-red-600 px-3 py-1 rounded text-white">رفض</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeMainTab === 'products' && (
+        <div className="bg-primary-card p-4 rounded-2xl">
+          <h3 className="text-xl font-bold mb-4">المنتجات</h3>
+          <table className="w-full text-right">
+            <thead><tr><th>الاسم</th><th>البائع</th><th>السعر</th><th>الحالة</th></tr></thead>
+            <tbody>
+              {products?.map(p => (
+                <tr key={p.id}><td>{p.name}</td><td>{p.seller_name}</td><td>{formatCurrency(p.price)}</td><td>{p.is_approved ? 'موافق' : 'قيد المراجعة'}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showReceiptsModal && (
+        <Modal onClose={() => setShowReceiptsModal(false)} title="الإيصالات">
+          <table className="w-full text-right">
+            <thead><tr><th>المبلغ</th><th>التاريخ</th><th>الصورة</th></tr></thead>
+            <tbody>
+              {sellerReceiptsList.map(rec => (
+                <tr key={rec.id}>
+                  <td>{formatCurrency(rec.amount)}</td>
+                  <td>{formatDate(rec.created_at)}</td>
+                  <td><a href={rec.receipt_image} target="_blank" rel="noreferrer">عرض</a></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="mt-4 text-left"><Button variant="secondary" onClick={() => setShowReceiptsModal(false)}>إغلاق</Button></div>
+        </Modal>
+      )}
     </div>
   )
 }
