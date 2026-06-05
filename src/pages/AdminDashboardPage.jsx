@@ -377,7 +377,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* باقي الأقسام (users, products) كما هي في الكود السابق مع تصحيح عرض البيانات */}
+      {/* باقي الأقسام (users, products) */}
       {activeMainTab === 'users' && (
         <div>
           <div className="flex border-b border-gold/30 mb-4">
@@ -457,14 +457,19 @@ export default function AdminDashboardPage() {
                   )}
 
                   {sellerDetailTab === 'stats' && (
-                    <div className="overflow-x-auto"><table className="w-full text-right"><thead><tr><th>القسم</th><th>التفاصيل</th><th>طلب البيانات</th></tr></thead><tbody>
-                      <tr><td>جميع المنتجات</td><td>{sellerStats.totalProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setSellerFilterId(selectedSeller.id); }}>عرض</button></td></tr>
-                      <tr><td>المنتجات المباعة</td><td>{sellerStats.soldProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setSellerFilterId(selectedSeller.id); }}>عرض</button></td></tr>
-                      <tr><td>المنتجات قيد الشحن</td><td>{sellerStats.shippingProducts}</td><td><button className="text-gold underline">عرض</button></td></tr>
-                      <tr><td>لم تشحن (تم رفع الإيصال)</td><td>{sellerStats.notShippedWithReceipt}</td><td><button className="text-gold underline">عرض</button></td></tr>
-                      <tr><td>مشتريات بدون إيصال</td><td>{sellerStats.noReceiptPurchased}</td><td><button className="text-gold underline">عرض</button></td></tr>
-                      <tr><td>غير مشتراة</td><td>{sellerStats.notPurchased}</td><td><button className="text-gold underline">عرض</button></td></tr>
-                    </tbody></tr></div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-right">
+                        <thead><tr><th>القسم</th><th>التفاصيل</th><th>طلب البيانات</th></tr></thead>
+                        <tbody>
+                          <tr><td>جميع المنتجات</td><td>{sellerStats.totalProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setSellerFilterId(selectedSeller.id); }}>عرض</button></td></tr>
+                          <tr><td>المنتجات المباعة</td><td>{sellerStats.soldProducts}</td><td><button className="text-gold underline" onClick={() => { setActiveMainTab('products'); setSellerFilterId(selectedSeller.id); }}>عرض</button></td></tr>
+                          <tr><td>المنتجات قيد الشحن</td><td>{sellerStats.shippingProducts}</td><td><button className="text-gold underline">عرض</button></td></tr>
+                          <tr><td>لم تشحن (تم رفع الإيصال)</td><td>{sellerStats.notShippedWithReceipt}</td><td><button className="text-gold underline">عرض</button></td></tr>
+                          <tr><td>مشتريات بدون إيصال</td><td>{sellerStats.noReceiptPurchased}</td><td><button className="text-gold underline">عرض</button></td></tr>
+                          <tr><td>غير مشتراة</td><td>{sellerStats.notPurchased}</td><td><button className="text-gold underline">عرض</button></td></tr>
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </div>
               )}
@@ -542,7 +547,7 @@ export default function AdminDashboardPage() {
                     <td className="p-3 text-gray-800">{formatDate(rec.created_at)}</td>
                     <td className="p-3">{rec.receipt_image ? <a href={rec.receipt_image} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">عرض</a> : '-'}</td>
                     <td className="p-3 text-gray-800">{rec.notes || '-'}</td>
-                  </td>
+                  </tr>
                 ))}
                 {sellerReceiptsList.length === 0 && <tr><td colSpan="4" className="text-center p-6 text-gray-500">لا توجد إيصالات</td></tr>}
               </tbody>
