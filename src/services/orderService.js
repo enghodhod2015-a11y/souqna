@@ -26,12 +26,12 @@ export const createOrder = async (orderData) => {
   if (orderError) throw orderError
 
   // 2. إدراج عناصر الطلب في order_items
-  // تم تعديل unit_price إلى price لأن عمود unit_price غير موجود في الجدول
+  // ✅ تم التعديل: استخدام 'product_price' بدلاً من 'price' أو 'unit_price'
   const orderItems = items.map(item => ({
     order_id: order.id,
     product_id: item.product_id,
     quantity: item.quantity,
-    price: item.unit_price,        // ← تم التغيير من unit_price إلى price
+    product_price: item.unit_price,   // السعر الفعلي للوحدة
     product_name: null
   }))
 
@@ -40,7 +40,7 @@ export const createOrder = async (orderData) => {
     .insert(orderItems)
 
   if (itemsError) {
-    // حذف الطلب إذا فشلت إضافة العناصر (للحفاظ على التكامل)
+    // حذف الطلب إذا فشلت إضافة العناصر
     await supabase.from('orders').delete().eq('id', order.id)
     throw itemsError
   }
