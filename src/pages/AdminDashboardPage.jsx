@@ -488,11 +488,45 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Modal عرض الإيصالات */}
+            {/* Modal عرض الإيصالات */}
       {showReceiptsModal && (
         <Modal onClose={() => setShowReceiptsModal(false)} title="جميع إيصالات التحويل">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto bg-white rounded-lg">
             <table className="w-full text-right border-collapse">
+              <thead>
+                <tr className="border-b border-gray-300 bg-gray-100">
+                  <th className="p-3 font-bold text-gray-800">المبلغ</th>
+                  <th className="p-3 font-bold text-gray-800">تاريخ الإضافة</th>
+                  <th className="p-3 font-bold text-gray-800">صورة الإيصال</th>
+                  <th className="p-3 font-bold text-gray-800">ملاحظات</th>
+                 </tr>
+              </thead>
+              <tbody>
+                {sellerReceiptsList.map(rec => (
+                  <tr key={rec.id} className="border-b border-gray-200 hover:bg-gray-50">
+                    <td className="p-3 text-gray-800">{formatCurrency(rec.amount)}</td>
+                    <td className="p-3 text-gray-800">{formatDate(rec.created_at)}</td>
+                    <td className="p-3">
+                      {rec.receipt_image ? (
+                        <a href={rec.receipt_image} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">عرض</a>
+                      ) : '-'}
+                    </td>
+                    <td className="p-3 text-gray-800">{rec.notes || '-'}</td>
+                  </tr>
+                ))}
+                {sellerReceiptsList.length === 0 && (
+                  <tr>
+                    <td colSpan="4" className="text-center p-6 text-gray-500">لا توجد إيصالات</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4 text-left">
+            <Button variant="secondary" onClick={() => setShowReceiptsModal(false)}>إغلاق</Button>
+          </div>
+        </Modal>
+      )}
               <thead>
                 <tr className="border-b border-gold/30 bg-primary-card/50">
                   <th className="p-2">المبلغ</th>
@@ -528,4 +562,7 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
+
+
+
 
