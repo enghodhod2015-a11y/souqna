@@ -88,47 +88,47 @@ export default function AdminDashboardPage() {
       try {
         const sellerId = selectedSeller.id
         const { count: totalProducts } = await supabase
-         .from('products')
-         .select('*', { count: 'exact', head: true })
-         .eq('seller_id', sellerId)
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('seller_id', sellerId)
 
         const { data: soldData } = await supabase
-         .from('order_items')
-         .select('product_id')
-         .eq('order.status', 'completed')
-         .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
+        .from('order_items')
+        .select('product_id')
+        .eq('order.status', 'completed')
+        .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
         const soldProducts = soldData?.length || 0
 
         const { data: shippingData } = await supabase
-         .from('order_items')
-         .select('product_id')
-         .eq('order.status', 'shipped')
-         .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
+        .from('order_items')
+        .select('product_id')
+        .eq('order.status', 'shipped')
+        .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
         const shippingProducts = shippingData?.length || 0
 
         const { data: notShippedData } = await supabase
-         .from('order_items')
-         .select('product_id')
-         .eq('order.status', 'payment_approved')
-         .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
+        .from('order_items')
+        .select('product_id')
+        .eq('order.status', 'payment_approved')
+        .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
         const notShippedWithReceipt = notShippedData?.length || 0
 
         const { data: noReceiptData } = await supabase
-         .from('order_items')
-         .select('product_id')
-         .eq('order.status', 'pending_payment_review')
-         .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
+        .from('order_items')
+        .select('product_id')
+        .eq('order.status', 'pending_payment_review')
+        .in('product_id', (await supabase.from('products').select('id').eq('seller_id', sellerId)).data?.map(p => p.id) || [])
         const noReceiptPurchased = noReceiptData?.length || 0
 
         const { data: allProducts } = await supabase
-         .from('products')
-         .select('id')
-         .eq('seller_id', sellerId)
+        .from('products')
+        .select('id')
+        .eq('seller_id', sellerId)
         const productIds = allProducts?.map(p => p.id) || []
         const { data: orderedProductIds } = await supabase
-         .from('order_items')
-         .select('product_id')
-         .in('product_id', productIds)
+        .from('order_items')
+        .select('product_id')
+        .in('product_id', productIds)
         const orderedSet = new Set(orderedProductIds?.map(o => o.product_id))
         const notPurchased = productIds.filter(id =>!orderedSet.has(id)).length
 
@@ -152,23 +152,23 @@ export default function AdminDashboardPage() {
     const fetchFinanceSummary = async () => {
       try {
         const { data: allProducts } = await supabase
-         .from('products')
-         .select('id')
-         .eq('seller_id', selectedSeller.id)
+        .from('products')
+        .select('id')
+        .eq('seller_id', selectedSeller.id)
         const productIds = allProducts?.map(p => p.id) || []
         let totalSales = 0
         if (productIds.length > 0) {
           const { data: sales } = await supabase
-           .from('order_items')
-           .select('unit_price, quantity')
-           .eq('order.status', 'completed')
-           .in('product_id', productIds)
+          .from('order_items')
+          .select('unit_price, quantity')
+          .eq('order.status', 'completed')
+          .in('product_id', productIds)
           totalSales = sales?.reduce((s, i) => s + (i.unit_price * i.quantity), 0) || 0
         }
         const { data: transfers } = await supabase
-         .from('seller_transfers')
-         .select('amount')
-         .eq('seller_id', selectedSeller.id)
+        .from('seller_transfers')
+        .select('amount')
+        .eq('seller_id', selectedSeller.id)
         const totalReceived = transfers?.reduce((s, t) => s + t.amount, 0) || 0
         setSellerFinance({ totalSales, totalReceived, remaining: totalSales - totalReceived })
       } catch (err) {
@@ -222,10 +222,10 @@ export default function AdminDashboardPage() {
       const adminId = adminUser.id
       let conversationId = null
       const { data: existingConv } = await supabase
-       .from('conversations')
-       .select('id')
-       .or(`and(buyer_id.eq.${adminId},seller_id.eq.${userId}),and(buyer_id.eq.${userId},seller_id.eq.${adminId})`)
-       .maybeSingle()
+      .from('conversations')
+      .select('id')
+      .or(`and(buyer_id.eq.${adminId},seller_id.eq.${userId}),and(buyer_id.eq.${userId},seller_id.eq.${adminId})`)
+      .maybeSingle()
       if (existingConv) conversationId = existingConv.id
       else {
         const { data: newConv, error } = await supabase.from('conversations').insert({
@@ -279,13 +279,13 @@ export default function AdminDashboardPage() {
       // 1. رفع الصورة إلى Supabase Storage
       const fileName = `seller_transfers/${selectedSeller.id}/${Date.now()}_${receiptFile.name}`
       const { error: uploadError } = await supabase.storage
-       .from('receipts')
-       .upload(fileName, receiptFile)
+      .from('receipts')
+      .upload(fileName, receiptFile)
       if (uploadError) throw uploadError
 
       const { data: { publicUrl } = supabase.storage
-       .from('receipts')
-       .getPublicUrl(fileName)
+      .from('receipts')
+      .getPublicUrl(fileName)
 
       // 2. إدراج السجل عبر الدالة
       await addSellerReceipt(selectedSeller.id, parseFloat(transferAmount), publicUrl, transferNote || '')
@@ -298,9 +298,9 @@ export default function AdminDashboardPage() {
 
       // تحديث الملخص المالي
       const { data: transfers } = await supabase
-       .from('seller_transfers')
-       .select('amount')
-       .eq('seller_id', selectedSeller.id)
+      .from('seller_transfers')
+      .select('amount')
+      .eq('seller_id', selectedSeller.id)
       const totalReceived = transfers?.reduce((s, t) => s + t.amount, 0) || 0
       setSellerFinance(prev => ({...prev, totalReceived, remaining: prev.totalSales - totalReceived }))
     } catch (err) {
@@ -527,4 +527,5 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
+
 
