@@ -207,7 +207,17 @@ export default function AdminDashboardPage() {
   // Mutations
   const updateUserMutation = useMutation({
     mutationFn: ({ userId, updates }) => updateUser(userId, updates),
-    onSuccess: () => { queryClient.invalidateQueries(['adminUsers']); toast.success('تم تحديث المستخدم') },
+    onSuccess: () => { 
+      queryClient.invalidateQueries(['adminUsers']); 
+      toast.success('تم تحديث المستخدم');
+      // تحديث البيانات المحلية إذا كان المستخدم هو المحدد
+      if (selectedSeller && selectedSeller.id === userId) {
+        setSelectedSeller(prev => ({ ...prev, ...updates }));
+      }
+      if (selectedBuyer && selectedBuyer.id === userId) {
+        setSelectedBuyer(prev => ({ ...prev, ...updates }));
+      }
+    },
     onError: (err) => toast.error(err.message)
   })
 
@@ -391,8 +401,26 @@ export default function AdminDashboardPage() {
                         <tr><td className="p-2 font-bold text-gold">تاريخ التسجيل</td><td>{formatDate(selectedSeller.created_at)}</td><td className="p-2 font-bold text-gold">رقم الهاتف</td><td>{selectedSeller.phone || '-'}</td></tr>
                       </tbody></table></div>
                       <div className="flex gap-2 mt-4 flex-wrap">
-                        <button onClick={() => updateUserMutation.mutate({ userId: selectedSeller.id, updates: { is_banned:!selectedSeller.is_banned }})} className={`px-3 py-1 rounded text-white ${selectedSeller.is_banned? 'bg-green-600' : 'bg-red-600'}`}>{selectedSeller.is_banned? 'إلغاء الحظر' : 'حظر'}</button>
-                        <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: selectedSeller.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-3 py-1 rounded text-white flex items-center gap-1"><Send size={14} /> إرسال إشعار</button>
+                        <button onClick={() => updateUserMutation.mutate({ userId: selectedSeller.id, updates: { is_banned: !selectedSeller.is_banned }})} className={`px-3 py-1 rounded text-white ${selectedSeller.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>
+                          {selectedSeller.is_banned ? 'إلغاء الحظر' : 'حظر'}
+                        </button>
+                        <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: selectedSeller.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-3 py-1 rounded text-white flex items-center gap-1">
+                          <Send size={14} /> إرسال إشعار
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const newType = selectedSeller.account_type === 'seller' ? 'buyer' : 'seller';
+                            if (confirm(`هل أنت متأكد من تغيير نوع الحساب من ${selectedSeller.account_type === 'seller' ? 'بائع' : 'مشتري'} إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`)) {
+                              updateUserMutation.mutate({ 
+                                userId: selectedSeller.id, 
+                                updates: { account_type: newType } 
+                              });
+                            }
+                          }}
+                          className="bg-amber-600 px-3 py-1 rounded text-white flex items-center gap-1"
+                        >
+                          🔄 تغيير نوع الحساب
+                        </button>
                       </div>
                     </>
                   )}
@@ -454,9 +482,33 @@ export default function AdminDashboardPage() {
               <div className="overflow-x-auto"><table className="w-full text-right border-collapse"><thead><tr><th>الاسم</th><th>البريد</th><th>عدد الطلبات</th><th>إجمالي الإنفاق</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>
                 {buyerUsers.map(user => (
                   <tr key={user.id}><td>{user.full_name}</td><td>{user.email}</td><td>{user.order_count || 0}</td><td>{formatCurrency(user.total_spent || 0)}</td><td>{user.is_banned? 'محظور' : 'نشط'}</td>
-                  <td><button onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { is_banned:!user.is_banned }})} className={`px-2 py-1 rounded text-xs ${user.is_banned? 'bg-green-600' : 'bg-red-600'}`}>{user.is_banned? 'إلغاء الحظر' : 'حظر'}</button>
-                  <button onClick={() => { setSelectedBuyer(user); setBuyerDetailTab('profile'); }} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
-                  <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: user.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-2 py-1 rounded text-xs"><Send size={12} /></button></td></tr>
+                  <td className="p-3">
+                    <div className="flex gap-2 flex-wrap">
+                      <button onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { is_banned: !user.is_banned }})} className={`px-2 py-1 rounded text-xs ${user.is_banned ? 'bg-green-600' : 'bg-red-600'}`}>
+                        {user.is_banned ? 'إلغاء الحظر' : 'حظر'}
+                      </button>
+                      <button onClick={() => { setSelectedBuyer(user); setBuyerDetailTab('profile'); }} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">
+                        تفاصيل
+                      </button>
+                      <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: user.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-2 py-1 rounded text-xs">
+                        <Send size={12} />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const newType = user.account_type === 'seller' ? 'buyer' : 'seller';
+                          if (confirm(`تغيير نوع الحساب من ${user.account_type === 'seller' ? 'بائع' : 'مشتري'} إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`)) {
+                            updateUserMutation.mutate({ 
+                              userId: user.id, 
+                              updates: { account_type: newType } 
+                            });
+                          }
+                        }}
+                        className="bg-amber-600 px-2 py-1 rounded text-xs text-white"
+                      >
+                        🔄 تغيير
+                      </button>
+                    </div>
+                  </td></tr>
                 ))}
               </tbody></table></div>
             </div>
@@ -488,7 +540,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-            {/* Modal عرض الإيصالات */}
+      {/* Modal عرض الإيصالات */}
       {showReceiptsModal && (
         <Modal onClose={() => setShowReceiptsModal(false)} title="جميع إيصالات التحويل">
           <div className="overflow-x-auto bg-white rounded-lg">
@@ -499,7 +551,7 @@ export default function AdminDashboardPage() {
                   <th className="p-3 font-bold text-gray-800">تاريخ الإضافة</th>
                   <th className="p-3 font-bold text-gray-800">صورة الإيصال</th>
                   <th className="p-3 font-bold text-gray-800">ملاحظات</th>
-                 </tr>
+                </tr>
               </thead>
               <tbody>
                 {sellerReceiptsList.map(rec => (
@@ -527,42 +579,7 @@ export default function AdminDashboardPage() {
           </div>
         </Modal>
       )}
-              <thead>
-                <tr className="border-b border-gold/30 bg-primary-card/50">
-                  <th className="p-2">المبلغ</th>
-                  <th className="p-2">تاريخ الإضافة</th>
-                  <th className="p-2">صورة الإيصال</th>
-                  <th className="p-2">ملاحظات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sellerReceiptsList.map(rec => (
-                  <tr key={rec.id}>
-                    <td className="p-2">{formatCurrency(rec.amount)}</td>
-                    <td className="p-2">{formatDate(rec.created_at)}</td>
-                    <td className="p-2">
-                      {rec.receipt_image? (
-                        <a href={rec.receipt_image} target="_blank" rel="noopener noreferrer" className="text-gold underline">عرض</a>
-                      ) : '-'}
-                    </td>
-                    <td className="p-2">{rec.notes || '-'}</td>
-                  </tr>
-                ))}
-                {sellerReceiptsList.length === 0 && (
-                  <tr><td colSpan="4" className="text-center p-4">لا توجد إيصالات</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-4 text-left">
-            <Button variant="secondary" onClick={() => setShowReceiptsModal(false)}>إغلاق</Button>
-          </div>
-        </Modal>
-      )}
     </div>
   )
 }
-
-
-
 
