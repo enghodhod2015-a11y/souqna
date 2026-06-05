@@ -610,7 +610,7 @@ export const exportReport = async (type, format, dateRange) => {
 // دوال سجل العمليات
 // ==========================================
 export const addAuditLog = async (action, targetType, targetId, details) => {
-  const { data: { user } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
   const { error } = await supabase
    .from('audit_logs')
@@ -655,5 +655,4 @@ export const getMonthlySalesAll = async () => {
   }
   return results
 }
-
 
