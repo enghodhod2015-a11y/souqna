@@ -216,9 +216,10 @@ export default function AdminDashboardPage() {
     onSuccess: () => { queryClient.invalidateQueries(['pendingSellers']); toast.success('تم تحديث حالة البائع') }
   })
 
+  // ✅ الجزء المصحح - الأقواس صحيحة الآن
   const sendNotificationMutation = useMutation({
     mutationFn: async ({ userId, title, message }) => {
-      const { data: { user: adminUser } = await supabase.auth.getUser()
+      const { data: { user: adminUser } } = await supabase.auth.getUser()
       const adminId = adminUser.id
       let conversationId = null
       const { data: existingConv } = await supabase
@@ -283,7 +284,7 @@ export default function AdminDashboardPage() {
       .upload(fileName, receiptFile)
       if (uploadError) throw uploadError
 
-      const { data: { publicUrl } = supabase.storage
+      const { data: { publicUrl } } = supabase.storage
       .from('receipts')
       .getPublicUrl(fileName)
 
@@ -390,7 +391,7 @@ export default function AdminDashboardPage() {
                         <tr><td className="p-2 font-bold text-gold">تاريخ التسجيل</td><td>{formatDate(selectedSeller.created_at)}</td><td className="p-2 font-bold text-gold">رقم الهاتف</td><td>{selectedSeller.phone || '-'}</td></tr>
                       </tbody></table></div>
                       <div className="flex gap-2 mt-4 flex-wrap">
-                        <button onClick={() => updateUserMutation.mutate({ userId: selectedSeller.id, updates: { is_banned:!selectedSeller.is_banned })} className={`px-3 py-1 rounded text-white ${selectedSeller.is_banned? 'bg-green-600' : 'bg-red-600'}`}>{selectedSeller.is_banned? 'إلغاء الحظر' : 'حظر'}</button>
+                        <button onClick={() => updateUserMutation.mutate({ userId: selectedSeller.id, updates: { is_banned:!selectedSeller.is_banned }})} className={`px-3 py-1 rounded text-white ${selectedSeller.is_banned? 'bg-green-600' : 'bg-red-600'}`}>{selectedSeller.is_banned? 'إلغاء الحظر' : 'حظر'}</button>
                         <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: selectedSeller.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-3 py-1 rounded text-white flex items-center gap-1"><Send size={14} /> إرسال إشعار</button>
                       </div>
                     </>
@@ -453,7 +454,7 @@ export default function AdminDashboardPage() {
               <div className="overflow-x-auto"><table className="w-full text-right border-collapse"><thead><tr><th>الاسم</th><th>البريد</th><th>عدد الطلبات</th><th>إجمالي الإنفاق</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>
                 {buyerUsers.map(user => (
                   <tr key={user.id}><td>{user.full_name}</td><td>{user.email}</td><td>{user.order_count || 0}</td><td>{formatCurrency(user.total_spent || 0)}</td><td>{user.is_banned? 'محظور' : 'نشط'}</td>
-                  <td><button onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { is_banned:!user.is_banned })} className={`px-2 py-1 rounded text-xs ${user.is_banned? 'bg-green-600' : 'bg-red-600'}`}>{user.is_banned? 'إلغاء الحظر' : 'حظر'}</button>
+                  <td><button onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { is_banned:!user.is_banned }})} className={`px-2 py-1 rounded text-xs ${user.is_banned? 'bg-green-600' : 'bg-red-600'}`}>{user.is_banned? 'إلغاء الحظر' : 'حظر'}</button>
                   <button onClick={() => { setSelectedBuyer(user); setBuyerDetailTab('profile'); }} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
                   <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationMutation.mutate({ userId: user.id, title: 'إشعار من الإدارة', message: msg }); }} className="bg-purple-600 px-2 py-1 rounded text-xs"><Send size={12} /></button></td></tr>
                 ))}
@@ -527,5 +528,4 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
-
 
