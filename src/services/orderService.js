@@ -1,12 +1,27 @@
+/**
+ * services/orderService.js
+ * 
+ * دوال إدارة الطلبات (Orders)
+ * 
+ * قائمة الدوال:
+ * 1. createOrder(orderData)        - إنشاء طلب جديد
+ * 2. getBuyerOrders(buyerId)       - جلب طلبات المشتري
+ * 3. getSellerOrders(sellerId)     - جلب طلبات البائع (باستخدام RPC)
+ * 4. updateOrderStatus(orderId, status) - تحديث حالة الطلب
+ * 5. confirmDelivery(orderId)      - تأكيد استلام الطلب
+ * 6. requestReturn(orderId, reason)- طلب استرجاع المنتج
+ * 7. approveReturn(orderId, approve, adminNotes) - قبول/رفض الاسترجاع
+ * 8. uploadReceipt(orderId, file, transferData) - رفع إيصال الدفع
+ * 9. getSellerStats(sellerId)      - إحصائيات البائع
+ * 10. getMonthlySales(sellerId)    - المبيعات الشهرية (غير مفعلة)
+ */
+
 import { supabase } from './supabase'
 
-// ─────────────────────────────────────────────────────────────
-// إنشاء طلب جديد (بدون RPC، باستخدام إدراج مباشر)
-// ─────────────────────────────────────────────────────────────
+// 1️⃣ إنشاء طلب جديد
 export const createOrder = async (orderData) => {
   const { buyer_id, total_amount, shipping_address, shipping_city, payment_method, notes, items } = orderData
 
-  // 1. إنشاء الطلب في جدول orders
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({
@@ -25,7 +40,6 @@ export const createOrder = async (orderData) => {
 
   if (orderError) throw orderError
 
-  // 2. جلب أسماء المنتجات لجميع العناصر
   const itemsWithNames = await Promise.all(items.map(async (item) => {
     const { data: product, error: productError } = await supabase
       .from('products')
@@ -42,13 +56,11 @@ export const createOrder = async (orderData) => {
     }
   }))
 
-  // 3. إدراج عناصر الطلب في order_items
   const { error: itemsError } = await supabase
     .from('order_items')
     .insert(itemsWithNames)
 
   if (itemsError) {
-    // حذف الطلب إذا فشلت إضافة العناصر
     await supabase.from('orders').delete().eq('id', order.id)
     throw itemsError
   }
@@ -56,9 +68,7 @@ export const createOrder = async (orderData) => {
   return { id: order.id }
 }
 
-// ─────────────────────────────────────────────────────────────
-// جلب طلبات المشتري
-// ─────────────────────────────────────────────────────────────
+// 2️⃣ جلب طلبات المشتري
 export const getBuyerOrders = async (buyerId) => {
   const { data: orders, error } = await supabase
     .from('orders')
@@ -87,124 +97,63 @@ export const getBuyerOrders = async (buyerId) => {
   })
 }
 
-// ─────────────────────────────────────────────────────────────
-// جلب طلبات البائع (نسخة تعمل خطوة بخطوة)
-// ─────────────────────────────────────────────────────────────
+// 3️⃣ جلب طلبات البائع (باستخدام RPC)
 export const getSellerOrders = async (sellerId) => {
   console.log('🔍 getSellerOrders called with sellerId:', sellerId);
   try {
-    // 1. جلب جميع منتجات البائع (مع التحقق)
-    const { data: products, error: productsError } = await supabase
-      .from('products')
-      .select('id, name, cover_image')
-      .eq('seller_id', sellerId)
-    if (productsError) {
-      console.error('❌ خطأ في جلب المنتجات:', productsError);
+    const { data, error } = await supabase.rpc('get_seller_orders', { p_seller_id: sellerId });
+    if (error) {
+      console.error('❌ RPC error:', error);
       return [];
     }
-    if (!products || products.length === 0) {
-      console.log('⚠️ لا توجد منتجات لهذا البائع', sellerId);
-      return []
+    if (!data || data.length === 0) {
+      console.log('⚠️ no data from RPC');
+      return [];
     }
-
-    const productIds = products.map(p => p.id)
-    console.log('📦 منتجات البائع (IDs):', productIds)
-
-    // 2. جلب عناصر الطلبات التي تحتوي على هذه المنتجات (محاولة أولى)
-    const { data: orderItems, error: itemsError } = await supabase
-      .from('order_items')
-      .select('*')
-      .in('product_id', productIds)
+    console.log('✅ RPC returned rows:', data.length);
     
-    if (itemsError) {
-      console.error('❌ خطأ في جلب order_items:', itemsError);
-      return [];
-    }
-    
-    if (!orderItems || orderItems.length === 0) {
-      console.log('⚠️ لا توجد عناصر طلبات لهذه المنتجات. productIds:', productIds);
-      // جرب استعلام بدون فلتر للتأكد من وجود بيانات في الجدول
-      const { data: allItems, error: allError } = await supabase
-        .from('order_items')
-        .select('product_id')
-        .limit(5);
-      console.log('🔍 عينة من order_items (بدون فلتر):', allItems, allError);
-      return [];
-    }
-    
-    console.log('📦 عدد عناصر الطلبات:', orderItems.length);
-    console.log('📦 أول عنصر:', orderItems[0]);
-
-    // 3. استخراج معرفات الطلبات الفريدة
-    const orderIds = [...new Set(orderItems.map(item => item.order_id))]
-    console.log('📦 معرفات الطلبات الفريدة:', orderIds)
-
-    // 4. جلب تفاصيل الطلبات
-    const { data: orders, error: ordersError } = await supabase
-      .from('orders')
-      .select('*')
-      .in('id', orderIds)
-      .order('created_at', { ascending: false })
-    if (ordersError) {
-      console.error('❌ خطأ في جلب الطلبات:', ordersError);
-      return [];
-    }
-    if (!orders || orders.length === 0) return []
-    console.log('📦 عدد الطلبات:', orders.length)
-
-    // 5. جلب بيانات المشترين
-    const buyerIds = [...new Set(orders.map(order => order.user_id).filter(Boolean))]
-    let buyersMap = new Map()
-    if (buyerIds.length) {
-      const { data: buyers, error: buyersError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, phone')
-        .in('id', buyerIds)
-      if (!buyersError && buyers) {
-        buyers.forEach(b => buyersMap.set(b.id, b))
+    const ordersMap = new Map();
+    for (const row of data) {
+      if (!ordersMap.has(row.id)) {
+        ordersMap.set(row.id, {
+          id: row.id,
+          order_status: row.order_status,
+          payment_status: row.payment_status,
+          total_price: row.total_price,
+          total_amount: row.total_price,
+          shipping_address: row.shipping_address,
+          receipt_image: row.receipt_image,
+          buyer: row.buyer_id ? { 
+            id: row.buyer_id, 
+            full_name: row.buyer_name, 
+            email: row.buyer_email, 
+            phone: row.buyer_phone 
+          } : null,
+          created_at: row.created_at,
+          product: { 
+            id: row.product_id, 
+            name: row.product_name, 
+            title: row.product_name,
+            cover_image: row.product_cover_image 
+          },
+          quantity: row.quantity,
+          return_status: row.return_status,
+          return_reason: row.return_reason,
+          completed_at: row.completed_at,
+          status: row.order_status
+        });
       }
     }
-
-    // 6. تجميع النتائج
-    const ordersMap = new Map()
-    for (const item of orderItems) {
-      const order = orders.find(o => o.id === item.order_id)
-      if (!order) continue
-      const product = products.find(p => p.id === item.product_id)
-      
-      if (!ordersMap.has(order.id)) {
-        ordersMap.set(order.id, {
-          id: order.id,
-          order_status: order.status,
-          payment_status: order.payment_status,
-          total_price: order.total_amount,
-          shipping_address: order.shipping_address,
-          receipt_image: order.receipt_image,
-          buyer: buyersMap.get(order.user_id) || null,
-          created_at: order.created_at,
-          product: product ? { ...product, title: product.name } : null,
-          quantity: item.quantity,
-          return_status: order.return_status,
-          return_reason: order.return_reason,
-          completed_at: order.completed_at,
-          status: order.status,
-          total_amount: order.total_amount
-        })
-      }
-    }
-
-    const result = Array.from(ordersMap.values())
-    console.log('🎉 النتيجة النهائية (عدد الطلبات):', result.length)
-    return result
+    const result = Array.from(ordersMap.values());
+    console.log('🎉 final orders count:', result.length);
+    return result;
   } catch (err) {
-    console.error('💥 خطأ غير متوقع في getSellerOrders:', err)
-    return []
+    console.error('💥 error in getSellerOrders:', err);
+    return [];
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// تحديث حالة الطلب
-// ─────────────────────────────────────────────────────────────
+// 4️⃣ تحديث حالة الطلب
 export const updateOrderStatus = async (orderId, status) => {
   const { data, error } = await supabase
     .from('orders')
@@ -216,9 +165,7 @@ export const updateOrderStatus = async (orderId, status) => {
   return data
 }
 
-// ─────────────────────────────────────────────────────────────
-// تأكيد الاستلام
-// ─────────────────────────────────────────────────────────────
+// 5️⃣ تأكيد الاستلام
 export const confirmDelivery = async (orderId) => {
   const { data, error } = await supabase
     .from('orders')
@@ -234,9 +181,7 @@ export const confirmDelivery = async (orderId) => {
   return data
 }
 
-// ─────────────────────────────────────────────────────────────
-// طلب استرجاع
-// ─────────────────────────────────────────────────────────────
+// 6️⃣ طلب استرجاع
 export const requestReturn = async (orderId, reason) => {
   const { data: order, error: fetchError } = await supabase
     .from('orders')
@@ -271,9 +216,7 @@ export const requestReturn = async (orderId, reason) => {
   return data
 }
 
-// ─────────────────────────────────────────────────────────────
-// الموافقة على الاسترجاع
-// ─────────────────────────────────────────────────────────────
+// 7️⃣ الموافقة على الاسترجاع
 export const approveReturn = async (orderId, approve, adminNotes = '') => {
   const newStatus = approve ? 'return_approved' : 'return_rejected'
   const { data, error } = await supabase
@@ -290,9 +233,7 @@ export const approveReturn = async (orderId, approve, adminNotes = '') => {
   return data
 }
 
-// ─────────────────────────────────────────────────────────────
-// رفع إيصال الدفع
-// ─────────────────────────────────────────────────────────────
+// 8️⃣ رفع إيصال الدفع
 export const uploadReceipt = async (orderId, file, transferData = {}) => {
   const { transfer_number, transfer_name, buyer_phone } = transferData
 
@@ -324,9 +265,7 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
   return publicUrl
 }
 
-// ─────────────────────────────────────────────────────────────
-// إحصائيات البائع
-// ─────────────────────────────────────────────────────────────
+// 9️⃣ إحصائيات البائع
 export const getSellerStats = async (sellerId) => {
   const { count: productsCount, error: prodCountErr } = await supabase
     .from('products')
@@ -350,11 +289,8 @@ export const getSellerStats = async (sellerId) => {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// المبيعات الشهرية للبائع
-// ─────────────────────────────────────────────────────────────
+// 🔟 المبيعات الشهرية للبائع (غير مفعلة)
 export const getMonthlySales = async (sellerId) => {
   return []
 }
-
 
