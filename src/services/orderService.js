@@ -99,11 +99,11 @@ export const getSellerOrders = async (sellerId) => {
   if (!products || products.length === 0) return []
 
   const productIds = products.map(p => p.id)
+  // ✅ إزالة .order('order.created_at') لأنها تسبب خطأ 400
   const { data: items, error: itemsError } = await supabase
     .from('order_items')
     .select('*, order:orders(*), product:products(name, cover_image)')
     .in('product_id', productIds)
-    .order('order.created_at', { ascending: false })
   if (itemsError) throw itemsError
   if (!items || items.length === 0) return []
 
@@ -147,6 +147,7 @@ export const getSellerOrders = async (sellerId) => {
     }
   })
 
+  // ✅ الترتيب في JavaScript بدلاً من Supabase لتجنب خطأ 400
   return Array.from(ordersMap.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 }
 
