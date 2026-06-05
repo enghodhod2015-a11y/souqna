@@ -25,19 +25,27 @@ export const createOrder = async (orderData) => {
 
   if (orderError) throw orderError
 
-  // 2. إدراج عناصر الطلب في order_items
-  // ✅ تم التعديل: استخدام 'product_price' بدلاً من 'price' أو 'unit_price'
-  const orderItems = items.map(item => ({
-    order_id: order.id,
-    product_id: item.product_id,
-    quantity: item.quantity,
-    product_price: item.unit_price,   // السعر الفعلي للوحدة
-    product_name: null
+  // 2. جلب أسماء المنتجات لجميع العناصر
+  const itemsWithNames = await Promise.all(items.map(async (item) => {
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .select('name')
+      .eq('id', item.product_id)
+      .single()
+    if (productError) throw productError
+    return {
+      order_id: order.id,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      product_price: item.unit_price,
+      product_name: product.name
+    }
   }))
 
+  // 3. إدراج عناصر الطلب في order_items
   const { error: itemsError } = await supabase
     .from('order_items')
-    .insert(orderItems)
+    .insert(itemsWithNames)
 
   if (itemsError) {
     // حذف الطلب إذا فشلت إضافة العناصر
