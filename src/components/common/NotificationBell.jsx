@@ -17,7 +17,7 @@ export const NotificationBell = () => {
     if (!user) return
     try {
       const data = await getUserNotifications(user.id)
-      setNotifications(data.slice(0, 5)) // آخر 5 إشعارات فقط
+      setNotifications(data.slice(0, 5))
       setUnreadCount(data.filter(n => !n.is_read).length)
     } catch (err) {
       console.error('خطأ في جلب الإشعارات:', err)
@@ -62,9 +62,20 @@ export const NotificationBell = () => {
       setUnreadCount(prev => Math.max(0, prev - 1))
     }
 
-    // الانتقال إلى صفحة المحادثة إذا كان للإشعار related_id
-    if (notif.related_id) {
-      navigate(`/chat/c/${notif.related_id}`)
+    // ✅ التوجيه بناءً على نوع الإشعار
+    const type = notif.type
+    const relatedId = notif.related_id
+
+    if (type === 'message' || type === 'return' || type === 'info') {
+      // إشعارات الرسائل والاسترجاعات تذهب إلى المحادثة (related_id هو معرف المحادثة)
+      if (relatedId) {
+        navigate(`/chat/c/${relatedId}`)
+      } else {
+        navigate('/inbox')
+      }
+    } else if (type === 'payment' || type === 'order_status') {
+      // إشعارات الدفع وحالة الطلب تذهب إلى صفحة الطلبات
+      navigate('/orders')
     } else {
       navigate('/inbox')
     }
@@ -139,4 +150,5 @@ export const NotificationBell = () => {
     </div>
   )
 }
+
 

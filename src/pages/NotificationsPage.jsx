@@ -47,7 +47,6 @@ export default function NotificationsPage() {
   }, [user])
 
   const handleNotificationClick = async (notif) => {
-    // منع تكرار الاستدعاء
     if (notif._processing) return
     notif._processing = true
 
@@ -56,11 +55,19 @@ export default function NotificationsPage() {
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n))
     }
 
-    // جميع الإشعارات المرسلة من الإدارة أو النظام يجب أن تحتوي على related_id
-    if (notif.related_id) {
-      navigate(`/chat/c/${notif.related_id}`)
+    // ✅ التوجيه بناءً على نوع الإشعار
+    const type = notif.type
+    const relatedId = notif.related_id
+
+    if (type === 'message' || type === 'return' || type === 'info') {
+      if (relatedId) {
+        navigate(`/chat/c/${relatedId}`)
+      } else {
+        navigate('/inbox')
+      }
+    } else if (type === 'payment' || type === 'order_status') {
+      navigate('/orders')
     } else {
-      // حالة نادرة: الإشعارات القديمة التي لا تملك related_id تذهب إلى Inbox
       navigate('/inbox')
     }
     delete notif._processing

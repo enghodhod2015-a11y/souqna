@@ -55,8 +55,9 @@ export const addNotification = async (userId, type, title, message, relatedId = 
     is_read: false,
     created_at: new Date().toISOString()
   }
-  if (relatedId !== null && !isNaN(Number(relatedId))) {
-    insertData.related_id = Number(relatedId)
+  // ✅ تخزين related_id كما هو (نص أو رقم) دون تحويل
+  if (relatedId !== null) {
+    insertData.related_id = String(relatedId) // تخزين كنص لتجنب مشاكل UUID
   }
   const { data, error } = await supabase
     .from('notifications')
