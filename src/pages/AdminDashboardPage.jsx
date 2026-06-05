@@ -25,14 +25,14 @@ import {
 import toast from 'react-hot-toast'
 import { supabase } from '../services/supabase'
 
-// Helper functions
+// Helper functions - العملة: ريال يمني
 const formatDate = (dateString) => {
   if (!dateString) return '-'
-  return new Date(dateString).toLocaleString('ar-EG')
+  return new Date(dateString).toLocaleString('ar-YE')
 }
 
 const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('ar-EG', { style: 'currency', currency: 'EGP' }).format(amount || 0)
+  return new Intl.NumberFormat('ar-YE', { style: 'currency', currency: 'YER' }).format(amount || 0)
 }
 
 // Mock data for charts
@@ -73,7 +73,12 @@ export default function AdminDashboardPage() {
     unansweredInquiries: 0, answeredInquiries: 0
   })
   const [sellerFilterId, setSellerFilterId] = useState(null)
-  const [sellerFinance, setSellerFinance] = useState({ totalSales: 0, totalReceived: 0, remaining: 0 })
+  const [sellerFinance, setSellerFinance] = useState({ 
+    totalSales: 0, 
+    totalReturns: 0, 
+    totalReceived: 0, 
+    remaining: 0 
+  })
 
   // الحالات المضافة
   const [showReceiptsModal, setShowReceiptsModal] = useState(false);
@@ -146,37 +151,63 @@ export default function AdminDashboardPage() {
     fetchSellerStats()
   }, [selectedSeller])
 
-  // جلب ملخص مالي للبائع المحدد
+  // جلب ملخص مالي للبائع المحدد (باستخدام بيانات حقيقية)
   useEffect(() => {
-    if (!selectedSeller?.id) return
+    if (!selectedSeller?.id) return;
     const fetchFinanceSummary = async () => {
       try {
-        const { data: allProducts } = await supabase
-        .from('products')
-        .select('id')
-        .eq('seller_id', selectedSeller.id)
-        const productIds = allProducts?.map(p => p.id) || []
-        let totalSales = 0
+        const sellerId = selectedSeller.id;
+        
+        // 1. جلب جميع منتجات البائع
+        const { data: products, error: productsError } = await supabase
+          .from('products')
+          .select('id')
+          .eq('seller_id', sellerId);
+        if (productsError) throw productsError;
+        
+        const productIds = products?.map(p => p.id) || [];
+        let totalSales = 0;
+        let totalReturns = 0;
+        
         if (productIds.length > 0) {
-          const { data: sales } = await supabase
-          .from('order_items')
-          .select('unit_price, quantity')
-          .eq('order.status', 'completed')
-          .in('product_id', productIds)
-          totalSales = sales?.reduce((s, i) => s + (i.unit_price * i.quantity), 0) || 0
+          // إجمالي المبيعات: order_items للطلبات المكتملة
+          const { data: completedItems, error: itemsError } = await supabase
+            .from('order_items')
+            .select('product_price, quantity, order:orders(status)')
+            .in('product_id', productIds)
+            .eq('order.status', 'completed');
+          if (!itemsError && completedItems) {
+            totalSales = completedItems.reduce((sum, item) => sum + (item.product_price * item.quantity), 0);
+          }
+          
+          // إجمالي المرتجعات: order_items حيث order.return_status = 'approved'
+          const { data: returnItems, error: returnsError } = await supabase
+            .from('order_items')
+            .select('product_price, quantity, order:orders(return_status)')
+            .in('product_id', productIds)
+            .eq('order.return_status', 'approved');
+          if (!returnsError && returnItems) {
+            totalReturns = returnItems.reduce((sum, item) => sum + (item.product_price * item.quantity), 0);
+          }
         }
-        const { data: transfers } = await supabase
-        .from('seller_transfers')
-        .select('amount')
-        .eq('seller_id', selectedSeller.id)
-        const totalReceived = transfers?.reduce((s, t) => s + t.amount, 0) || 0
-        setSellerFinance({ totalSales, totalReceived, remaining: totalSales - totalReceived })
+        
+        // إجمالي الاستلامات من seller_transfers
+        const { data: transfers, error: transfersError } = await supabase
+          .from('seller_transfers')
+          .select('amount')
+          .eq('seller_id', sellerId);
+        if (transfersError) throw transfersError;
+        const totalReceived = transfers?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+        
+        const remaining = totalSales - totalReturns - totalReceived;
+        setSellerFinance({ totalSales, totalReturns, totalReceived, remaining });
       } catch (err) {
-        console.error(err)
+        console.error('خطأ في جلب البيانات المالية:', err);
+        toast.error('فشل تحميل البيانات المالية');
       }
-    }
-    fetchFinanceSummary()
-  }, [selectedSeller])
+    };
+    fetchFinanceSummary();
+  }, [selectedSeller]);
 
   // Queries
   const { data: stats, refetch: refetchStats, isLoading: statsLoading } = useQuery({
@@ -210,7 +241,6 @@ export default function AdminDashboardPage() {
     onSuccess: () => { 
       queryClient.invalidateQueries(['adminUsers']); 
       toast.success('تم تحديث المستخدم');
-      // تحديث البيانات المحلية إذا كان المستخدم هو المحدد
       if (selectedSeller && selectedSeller.id === userId) {
         setSelectedSeller(prev => ({ ...prev, ...updates }));
       }
@@ -226,7 +256,6 @@ export default function AdminDashboardPage() {
     onSuccess: () => { queryClient.invalidateQueries(['pendingSellers']); toast.success('تم تحديث حالة البائع') }
   })
 
-  // ✅ الجزء المصحح - الأقواس صحيحة الآن
   const sendNotificationMutation = useMutation({
     mutationFn: async ({ userId, title, message }) => {
       const { data: { user: adminUser } } = await supabase.auth.getUser()
@@ -270,79 +299,78 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // ================== التعديل الأساسي: رفع الصورة وإدراج التحويل ==================
   // ================== رفع الصورة وإدراج التحويل ==================
-const handleAddTransfer = async () => {
-  if (!selectedSeller) {
-    toast.error('اختر بائعاً أولاً');
-    return;
-  }
-  const amountNum = parseFloat(transferAmount);
-  if (isNaN(amountNum) || amountNum <= 0) {
-    toast.error('أدخل مبلغاً صحيحاً');
-    return;
-  }
-  if (!receiptFile) {
-    toast.error('يرجى اختيار صورة الإيصال');
-    return;
-  }
+  const handleAddTransfer = async () => {
+    if (!selectedSeller) {
+      toast.error('اختر بائعاً أولاً');
+      return;
+    }
+    const amountNum = parseFloat(transferAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      toast.error('أدخل مبلغاً صحيحاً');
+      return;
+    }
+    if (!receiptFile) {
+      toast.error('يرجى اختيار صورة الإيصال');
+      return;
+    }
 
-  setUploading(true);
-  let uploadedUrl = null;
-  try {
-    // 1. رفع الصورة إلى Supabase Storage
-    const fileExt = receiptFile.name.split('.').pop();
-    const fileName = `seller_transfers/${selectedSeller.id}/${Date.now()}.${fileExt}`;
-    console.log('📤 Uploading file:', fileName);
-    
-    const { error: uploadError } = await supabase.storage
-      .from('receipts')
-      .upload(fileName, receiptFile, {
-        cacheControl: '3600',
-        upsert: false
-      });
+    setUploading(true);
+    let uploadedUrl = null;
+    try {
+      const fileExt = receiptFile.name.split('.').pop();
+      const fileName = `seller_transfers/${selectedSeller.id}/${Date.now()}.${fileExt}`;
+      console.log('📤 Uploading file:', fileName);
       
-    if (uploadError) {
-      console.error('❌ Upload error:', uploadError);
-      throw new Error(`فشل رفع الملف: ${uploadError.message}`);
+      const { error: uploadError } = await supabase.storage
+        .from('receipts')
+        .upload(fileName, receiptFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
+        
+      if (uploadError) {
+        console.error('❌ Upload error:', uploadError);
+        throw new Error(`فشل رفع الملف: ${uploadError.message}`);
+      }
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('receipts')
+        .getPublicUrl(fileName);
+      uploadedUrl = publicUrl;
+      console.log('✅ File uploaded:', uploadedUrl);
+      
+      await addSellerReceipt(selectedSeller.id, amountNum, uploadedUrl, transferNote || '');
+      
+      toast.success('تم تسجيل التحويل بنجاح');
+      setTransferAmount('');
+      setTransferNote('');
+      setReceiptFile(null);
+      const fileInput = document.getElementById('receiptFileInput');
+      if (fileInput) fileInput.value = '';
+      
+      // تحديث الملخص المالي
+      const { data: transfers } = await supabase
+        .from('seller_transfers')
+        .select('amount')
+        .eq('seller_id', selectedSeller.id);
+      const totalReceived = transfers?.reduce((s, t) => s + (t.amount || 0), 0) || 0;
+      setSellerFinance(prev => ({ 
+        ...prev, 
+        totalReceived, 
+        remaining: prev.totalSales - prev.totalReturns - totalReceived 
+      }));
+      
+    } catch (err) {
+      console.error('💥 Transfer error:', err);
+      toast.error(err.message || 'فشل إضافة التحويل');
+      if (uploadedUrl) {
+        console.warn('File uploaded but insertion failed, consider manual cleanup:', uploadedUrl);
+      }
+    } finally {
+      setUploading(false);
     }
-    
-    const { data: { publicUrl } } = supabase.storage
-      .from('receipts')
-      .getPublicUrl(fileName);
-    uploadedUrl = publicUrl;
-    console.log('✅ File uploaded:', uploadedUrl);
-    
-    // 2. إدراج السجل عبر الدالة
-    await addSellerReceipt(selectedSeller.id, amountNum, uploadedUrl, transferNote || '');
-    
-    toast.success('تم تسجيل التحويل بنجاح');
-    setTransferAmount('');
-    setTransferNote('');
-    setReceiptFile(null);
-    const fileInput = document.getElementById('receiptFileInput');
-    if (fileInput) fileInput.value = '';
-    
-    // تحديث الملخص المالي
-    const { data: transfers } = await supabase
-      .from('seller_transfers')
-      .select('amount')
-      .eq('seller_id', selectedSeller.id);
-    const totalReceived = transfers?.reduce((s, t) => s + (t.amount || 0), 0) || 0;
-    setSellerFinance(prev => ({ ...prev, totalReceived, remaining: prev.totalSales - totalReceived }));
-    
-  } catch (err) {
-    console.error('💥 Transfer error:', err);
-    toast.error(err.message || 'فشل إضافة التحويل');
-    // إذا تم رفع الملف ولكن فشل الإدراج، يمكن حذف الملف (اختياري)
-    if (uploadedUrl) {
-      // محاولة حذف الملف (لكن ليس ضرورياً)
-      console.warn('File uploaded but insertion failed, consider manual cleanup:', uploadedUrl);
-    }
-  } finally {
-    setUploading(false);
-  }
-};
+  };
   // =====================================================================
 
   const pendingProducts = products?.filter(p =>!p.is_approved).length || 0
@@ -465,7 +493,7 @@ const handleAddTransfer = async () => {
                           <thead><tr className="border-b border-gold/30"><th>القسم</th><th>التفاصيل</th></tr></thead>
                           <tbody>
                             <tr><td className="p-2 font-bold">إجمالي المبيعات</td><td>{formatCurrency(sellerFinance.totalSales)}</td></tr>
-                            <tr><td className="p-2 font-bold">إجمالي المرتجعات</td><td>{formatCurrency(0)}</td></tr>
+                            <tr><td className="p-2 font-bold">إجمالي المرتجعات</td><td>{formatCurrency(sellerFinance.totalReturns)}</td></tr>
                             <tr><td className="p-2 font-bold">إجمالي الاستلامات</td><td>{formatCurrency(sellerFinance.totalReceived)}</td></tr>
                             <tr><td className="p-2 font-bold">المبلغ المتبقي</td><td>{formatCurrency(sellerFinance.remaining)}</td></tr>
                           </tbody>
@@ -589,9 +617,7 @@ const handleAddTransfer = async () => {
                   </tr>
                 ))}
                 {sellerReceiptsList.length === 0 && (
-                  <tr>
-                    <td colSpan="4" className="text-center p-6 text-gray-500">لا توجد إيصالات</td>
-                  </tr>
+                  <tr><td colSpan="4" className="text-center p-6 text-gray-500">لا توجد إيصالات</td></tr>
                 )}
               </tbody>
             </table>
