@@ -266,6 +266,7 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
 }
 
 // 9️⃣ إحصائيات البائع (معدلة لجلب بيانات حقيقية مع console.log للتشخيص)
+// 9️⃣ إحصائيات البائع (معدلة بحيث تحسب المبيعات فقط للطلبات المكتملة أو المسلمة)
 export const getSellerStats = async (sellerId) => {
   console.log('📊 getSellerStats called for seller:', sellerId);
   try {
@@ -341,9 +342,14 @@ export const getSellerStats = async (sellerId) => {
       if (!status) continue;
 
       const saleAmount = item.product_price * item.quantity;
-      totalSales += saleAmount;
       console.log(`💰 order ${item.order_id}: ${saleAmount} ريال (الحالة: ${status})`);
 
+      // ✅ المبيعات فقط للطلبات المكتملة أو المسلمة
+      if (status === 'completed' || status === 'delivered') {
+        totalSales += saleAmount;
+      }
+
+      // تصنيف الطلبات حسب الحالة (للإحصائيات الأخرى)
       if (status === 'pending' || status === 'pending_payment_review') {
         pendingOrders++;
       } else if (status === 'payment_approved' || status === 'processing' || status === 'shipped') {
