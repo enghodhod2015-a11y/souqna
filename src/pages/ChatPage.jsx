@@ -8,6 +8,13 @@ import { Button } from '../components/ui/Button'
 import { Send, CheckCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+// دالة للتحقق من صحة UUID
+const isValidUUID = (id) => {
+  if (!id) return false
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  return uuidRegex.test(id.toString())
+}
+
 export default function ChatPage() {
   const { productId, conversationId } = useParams() 
   const { user } = useAuth()
@@ -37,6 +44,13 @@ export default function ChatPage() {
       let currentProduct = null
 
       if (conversationId) {
+        // ✅ التحقق من صحة UUID قبل الجلب
+        if (!isValidUUID(conversationId)) {
+          console.error('معرف المحادثة غير صالح (ليس UUID):', conversationId)
+          toast.error('رابط المحادثة غير صالح')
+          navigate('/inbox')
+          return
+        }
         const { data: convData, error: convErr } = await supabase
           .from('conversations')
           .select('*')
@@ -44,6 +58,7 @@ export default function ChatPage() {
           .single()
         if (convErr) throw convErr
         currentConv = convData
+        // ✅ جلب المنتج فقط إذا كان موجوداً (لا نجبر على وجوده)
         if (currentConv.product_id) {
           currentProduct = await getProductById(currentConv.product_id)
         }
@@ -67,9 +82,7 @@ export default function ChatPage() {
       if (currentConv) {
         const msgs = await getMessages(currentConv.id)
         setMessages(msgs || [])
-        // تحديث حالة القراءة للمشاهد الحالي
         await markMessagesAsRead(currentConv.id, user.id)
-        // إعادة تحميل الرسائل لتحديث is_read (اختياري)
         const updatedMsgs = await getMessages(currentConv.id)
         setMessages(updatedMsgs || [])
       }
@@ -103,7 +116,6 @@ export default function ChatPage() {
           })
           if (payload.new.receiver_id === user.id) {
             markMessagesAsRead(conversation.id, user.id).then(() => {
-              // تحديث حالة القراءة في الواجهة
               setMessages(prev => prev.map(m => 
                 m.id === payload.new.id ? { ...m, is_read: true } : m
               ))
@@ -113,7 +125,6 @@ export default function ChatPage() {
       })
       .subscribe()
 
-    // استماع لتحديثات حالة القراءة (عندما يقرأ الطرف الآخر الرسائل)
     const readChannel = supabase
       .channel(`read:${conversation.id}`)
       .on('postgres_changes', {
@@ -171,19 +182,27 @@ export default function ChatPage() {
   }
 
   if (loading) return <div className="text-center py-20 text-gray-500">جاري التحميل...</div>
-  if (!product) return <div className="text-center py-20 text-gray-500">المنتج غير موجود</div>
-
+  
+  // ✅ إذا كانت المحادثة موجودة ولكن المنتج غير موجود (محادثة مع الإدارة) نعرض واجهة بديلة
+  const isAdminChat = conversation && !product && !productId && conversation.product_id === null
   const isBuyer = conversation?.buyer_id === user?.id
   const chatPartnerRole = isBuyer ? 'البائع' : 'المشتري المحتمل'
+  const pageTitle = isAdminChat ? '💬 محادثة مع الإدارة' : `💬 محادثة مع: ${chatPartnerRole}`
+  const productInfo = isAdminChat ? null : product
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="bg-white rounded-2xl border border-gold/40 shadow-xl overflow-hidden">
         <div className="p-5 border-b border-gold/30 bg-gradient-to-r from-gray-50 to-white">
           <h2 className="text-2xl font-bold text-gold flex items-center gap-2">
-            💬 محادثة مع: {chatPartnerRole}
+            {pageTitle}
           </h2>
-          <p className="text-sm text-gray-600 mt-1">بخصوص منتج: <span className="text-gold font-medium">{product?.title}</span></p>
+          {productInfo && (
+            <p className="text-sm text-gray-600 mt-1">بخصوص منتج: <span className="text-gold font-medium">{productInfo.title}</span></p>
+          )}
+          {isAdminChat && (
+            <p className="text-sm text-gray-600 mt-1">هذه محادثة مع فريق الدعم والإدارة</p>
+          )}
         </div>
 
         <div className="h-[500px] overflow-y-auto p-5 space-y-4 bg-gray-50">
@@ -220,7 +239,7 @@ export default function ChatPage() {
               type="text"
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="اكتب رسالتك بخصوص المنتج..."
+              placeholder="اكتب رسالتك..."
               className="flex-1 px-5 py-3 rounded-full bg-gray-100 text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
               onKeyPress={(e) => e.key === 'Enter' && !sending && handleSend()}
             />
@@ -238,4 +257,5 @@ export default function ChatPage() {
     </div>
   )
 }
+
 
