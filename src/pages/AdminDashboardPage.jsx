@@ -347,69 +347,122 @@ export default function AdminDashboardPage() {
   }, [activeMainTab]);
 
   // ------------------- Seller stats (when selected) -------------------
-  useEffect(() => {
-    if (!selectedSeller?.id) return;
-    const fetchSellerStats = async () => {
-      try {
-        const sellerId = selectedSeller.id;
-        const { data: productsList } = await supabase
-          .from('products')
-          .select('id')
-          .eq('seller_id', sellerId);
-        const totalProducts = productsList?.length || 0;
-        const productIds = productsList?.map(p => p.id) || [];
-        let soldProducts = 0;
-        let pendingPayment = 0,
-          paymentApproved = 0,
-          processing = 0,
-          shipped = 0,
-          delivered = 0,
-          notPurchased = totalProducts;
+    // جلب إحصائيات البائع المحدد (نسخة نهائية 100%)
+useEffect(() => {
+  if (!selectedSeller?.id) return;
+  const fetchSellerStats = async () => {
+    try {
+      const sellerId = selectedSeller.id;
+      
+      // 1. جلب جميع منتجات البائع
+      const { data: productsList, error: prodErr } = await supabase
+        .from('products')
+        .select('id')
+        .eq('seller_id', sellerId);
+      if (prodErr) throw prodErr;
+      const totalProducts = productsList?.length || 0;
+      const productIds = productsList?.map(p => p.id) || [];
 
-        if (productIds.length) {
-          const { data: orderItems } = await supabase
-            .from('order_items')
-            .select('order_id, product_id, quantity')
-            .in('product_id', productIds);
-          const orderIds = [...new Set(orderItems?.map(i => i.order_id) || [])];
-          const { data: orders } = await supabase
-            .from('orders')
-            .select('id, status')
-            .in('id', orderIds);
-          const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
-          const productSoldSet = new Set();
-          for (const item of orderItems || []) {
-            const order = orderMap.get(item.order_id);
-            if (!order) continue;
-            productSoldSet.add(item.product_id);
-            soldProducts += item.quantity;
-            if (order.status === 'pending_payment_review') pendingPayment++;
-            else if (order.status === 'payment_approved') paymentApproved++;
-            else if (order.status === 'processing') processing++;
-            else if (order.status === 'shipped') shipped++;
-            else if (order.status === 'delivered') delivered++;
-          }
-          notPurchased = totalProducts - productSoldSet.size;
-        }
+      if (productIds.length === 0) {
         setSellerStats({
-          totalProducts,
-          soldProducts,
-          pendingPayment,
-          paymentApproved,
-          processing,
-          shipped,
-          delivered,
-          notPurchased,
+          totalProducts: 0,
+          soldProducts: 0,
+          pendingPayment: 0,
+          paymentApproved: 0,
+          processing: 0,
+          shipped: 0,
+          delivered: 0,
+          notPurchased: 0,
           shippingProducts: 0,
           notShippedWithReceipt: 0,
           noReceiptPurchased: 0,
         });
-      } catch (err) {
-        console.error(err);
+        return;
       }
-    };
-    fetchSellerStats();
-  }, [selectedSeller]);
+
+      // 2. جلب order_items للمنتجات
+      const { data: orderItems, error: oiErr } = await supabase
+        .from('order_items')
+        .select('order_id, product_id, quantity')
+        .in('product_id', productIds);
+      if (oiErr) throw oiErr;
+
+      if (!orderItems || orderItems.length === 0) {
+        setSellerStats({
+          totalProducts,
+          soldProducts: 0,
+          pendingPayment: 0,
+          paymentApproved: 0,
+          processing: 0,
+          shipped: 0,
+          delivered: 0,
+          notPurchased: totalProducts,
+          shippingProducts: 0,
+          notShippedWithReceipt: 0,
+          noReceiptPurchased: 0,
+        });
+        return;
+      }
+
+      // 3. جلب الطلبات المرتبطة
+      const orderIds = [...new Set(orderItems.map(oi => oi.order_id))];
+      const { data: orders, error: ordErr } = await supabase
+        .from('orders')
+        .select('id, status')
+        .in('id', orderIds);
+      if (ordErr) throw ordErr;
+      const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
+
+      // 4. حساب الإحصائيات
+      let soldProducts = 0;
+      const productSoldSet = new Set();
+      const statusCount = {
+        pending_payment_review: new Set(),
+        payment_approved: new Set(),
+        processing: new Set(),
+        shipped: new Set(),
+        delivered: new Set(),
+      };
+
+      for (const item of orderItems) {
+        const order = orderMap.get(item.order_id);
+        if (!order) continue;
+        
+        productSoldSet.add(item.product_id);
+        
+        // ✅ القطع المباعة فقط للطلبات المكتملة أو المسلمة
+        if (order.status === 'completed' || order.status === 'delivered') {
+          soldProducts += item.quantity;
+        }
+        
+        // تسجيل الطلب في مجموعته حسب الحالة
+        if (statusCount[order.status]) {
+          statusCount[order.status].add(order.id);
+        }
+      }
+
+      const notPurchased = totalProducts - productSoldSet.size;
+
+      setSellerStats({
+        totalProducts,
+        soldProducts,
+        pendingPayment: statusCount.pending_payment_review.size,
+        paymentApproved: statusCount.payment_approved.size,
+        processing: statusCount.processing.size,
+        shipped: statusCount.shipped.size,
+        delivered: statusCount.delivered.size,
+        notPurchased,
+        shippingProducts: 0,
+        notShippedWithReceipt: 0,
+        noReceiptPurchased: 0,
+      });
+    } catch (err) {
+      console.error('❌ خطأ في جلب إحصائيات البائع:', err);
+      toast.error('فشل تحميل إحصائيات البائع');
+    }
+  };
+  fetchSellerStats();
+}, [selectedSeller]);
 
   // ------------------- Seller Finance (including commission) -------------------
   const calculateFinance = async () => {
