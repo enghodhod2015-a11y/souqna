@@ -93,8 +93,8 @@ export default function AdminDashboardPage() {
   });
   const [salesChartData, setSalesChartData] = useState([]);
 
-  // Product filter
-  const [productFilter, setProductFilter] = useState('all'); // 'all', 'pending', 'approved', 'hidden'
+  // Product filter (status based on order status)
+  const [productFilterStatus, setProductFilterStatus] = useState('all'); // 'all', 'pending_payment', 'payment_approved', 'processing', 'shipped', 'delivered', 'completed', 'cancelled', 'returned'
 
   // Inquiries/Orders tab
   const [inquiries, setInquiries] = useState([]);
@@ -143,23 +143,90 @@ export default function AdminDashboardPage() {
     enabled: activeMainTab === 'users' && activeSubTab === 'pending_users',
   });
 
+  // Fetch products with advanced filtering by order status and buyer name
   const { data: products, refetch: refetchProducts, isLoading: productsLoading } = useQuery({
-    queryKey: ['adminProducts', sellerFilterId, productFilter],
+    queryKey: ['adminProducts', sellerFilterId, productFilterStatus],
     queryFn: async () => {
-      let query = supabase
-        .from('products')
-        .select(`
-          *,
-          seller:profiles!products_seller_id_fkey (id, full_name, email)
-        `)
-        .order('created_at', { ascending: false });
-      if (sellerFilterId) query = query.eq('seller_id', sellerFilterId);
-      if (productFilter === 'pending') query = query.eq('is_approved', false);
-      else if (productFilter === 'approved') query = query.eq('is_approved', true);
-      else if (productFilter === 'hidden') query = query.eq('is_hidden', true);
-      const { data, error } = await query;
-      if (error) throw error;
-      return data.map(p => ({ ...p, seller_name: p.seller?.full_name || 'غير معروف' }));
+      try {
+        // First, get all products (optionally filtered by seller)
+        let query = supabase
+          .from('products')
+          .select(`
+            *,
+            seller:profiles!products_seller_id_fkey (id, full_name, email)
+          `)
+          .order('created_at', { ascending: false });
+        if (sellerFilterId) query = query.eq('seller_id', sellerFilterId);
+        const { data: allProducts, error: productsError } = await query;
+        if (productsError) throw productsError;
+
+        if (productFilterStatus === 'all') {
+          // Return all products with seller name
+          return allProducts.map(p => ({
+            ...p,
+            seller_name: p.seller?.full_name || 'غير معروف',
+            last_buyer_name: null, // will be filled later if needed
+            last_order_date: null,
+          }));
+        }
+
+        // For filtering by order status, we need to get products that have orders with that status
+        const { data: orderItems, error: oiError } = await supabase
+          .from('order_items')
+          .select(`
+            product_id,
+            order:orders(id, status, user_id, created_at)
+          `);
+        if (oiError) throw oiError;
+
+        // Map order status filter to actual status string
+        const statusMap = {
+          'pending_payment': ['pending', 'pending_payment_review'],
+          'payment_approved': ['payment_approved'],
+          'processing': ['processing'],
+          'shipped': ['shipped'],
+          'delivered': ['delivered'],
+          'completed': ['completed'],
+          'cancelled': ['cancelled'],
+          'returned': ['return_requested', 'return_approved'],
+        };
+        const targetStatuses = statusMap[productFilterStatus] || [];
+
+        // Collect product IDs that have orders with target status
+        const productIdsWithStatus = new Set();
+        const productLastBuyer = new Map(); // product_id -> { buyer_name, last_order_date }
+        for (const item of orderItems || []) {
+          const order = item.order;
+          if (order && targetStatuses.includes(order.status)) {
+            productIdsWithStatus.add(item.product_id);
+            // Get buyer name for this product (latest order)
+            if (!productLastBuyer.has(item.product_id) || new Date(order.created_at) > new Date(productLastBuyer.get(item.product_id).last_order_date)) {
+              // Fetch buyer profile
+              const { data: buyer } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', order.user_id)
+                .single();
+              productLastBuyer.set(item.product_id, {
+                buyer_name: buyer?.full_name || 'مستخدم',
+                last_order_date: order.created_at,
+              });
+            }
+          }
+        }
+
+        // Filter products
+        const filtered = allProducts.filter(p => productIdsWithStatus.has(p.id));
+        return filtered.map(p => ({
+          ...p,
+          seller_name: p.seller?.full_name || 'غير معروف',
+          last_buyer_name: productLastBuyer.get(p.id)?.buyer_name || '-',
+          last_order_date: productLastBuyer.get(p.id)?.last_order_date || null,
+        }));
+      } catch (err) {
+        console.error(err);
+        return [];
+      }
     },
     enabled: activeMainTab === 'products',
   });
@@ -303,7 +370,7 @@ export default function AdminDashboardPage() {
     fetchDashboard();
   }, [activeMainTab]);
 
-  // ------------------- Seller stats (when selected) -------------------
+  // ------------------- Seller stats (when selected) - FIXED -------------------
   useEffect(() => {
     if (!selectedSeller?.id) return;
     const fetchSellerStats = async () => {
@@ -362,7 +429,6 @@ export default function AdminDashboardPage() {
           shipped,
           delivered,
           notPurchased,
-          // keep other fields default
           shippingProducts: 0,
           notShippedWithReceipt: 0,
           noReceiptPurchased: 0,
@@ -375,55 +441,57 @@ export default function AdminDashboardPage() {
   }, [selectedSeller]);
 
   // ------------------- Seller Finance (including commission) -------------------
-  useEffect(() => {
+  const calculateFinance = async () => {
     if (!selectedSeller?.id) return;
-    const fetchFinance = async () => {
-      try {
-        const sellerId = selectedSeller.id;
-        const { data: products } = await supabase
-          .from('products')
-          .select('id')
-          .eq('seller_id', sellerId);
-        const productIds = products?.map(p => p.id) || [];
-        let totalSales = 0,
-          totalReturns = 0;
-        if (productIds.length) {
-          const { data: orderItems } = await supabase
-            .from('order_items')
-            .select('order_id, product_price, quantity')
-            .in('product_id', productIds);
-          if (orderItems?.length) {
-            const orderIds = [...new Set(orderItems.map(i => i.order_id))];
-            const { data: orders } = await supabase
-              .from('orders')
-              .select('id, status, return_status')
-              .in('id', orderIds);
-            const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
-            for (const item of orderItems) {
-              const order = orderMap.get(item.order_id);
-              if (order) {
-                if (order.status === 'completed' || order.status === 'delivered')
-                  totalSales += item.product_price * item.quantity;
-                if (order.return_status === 'approved')
-                  totalReturns += item.product_price * item.quantity;
-              }
+    try {
+      const sellerId = selectedSeller.id;
+      const { data: products } = await supabase
+        .from('products')
+        .select('id')
+        .eq('seller_id', sellerId);
+      const productIds = products?.map(p => p.id) || [];
+      let totalSales = 0,
+        totalReturns = 0;
+      if (productIds.length) {
+        const { data: orderItems } = await supabase
+          .from('order_items')
+          .select('order_id, product_price, quantity')
+          .in('product_id', productIds);
+        if (orderItems?.length) {
+          const orderIds = [...new Set(orderItems.map(i => i.order_id))];
+          const { data: orders } = await supabase
+            .from('orders')
+            .select('id, status, return_status')
+            .in('id', orderIds);
+          const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
+          for (const item of orderItems) {
+            const order = orderMap.get(item.order_id);
+            if (order) {
+              if (order.status === 'completed' || order.status === 'delivered')
+                totalSales += item.product_price * item.quantity;
+              if (order.return_status === 'approved')
+                totalReturns += item.product_price * item.quantity;
             }
           }
         }
-        const netAfterReturns = totalSales - totalReturns;
-        const commissionAmount = netAfterReturns * (sellerCommissionPercent / 100);
-        const { data: transfers } = await supabase
-          .from('seller_transfers')
-          .select('amount')
-          .eq('seller_id', sellerId);
-        const totalReceived = transfers?.reduce((s, t) => s + (t.amount || 0), 0) || 0;
-        const remaining = netAfterReturns - commissionAmount - totalReceived;
-        setSellerFinance({ totalSales, totalReturns, commissionAmount, totalReceived, remaining });
-      } catch (err) {
-        console.error(err);
       }
-    };
-    fetchFinance();
+      const netAfterReturns = totalSales - totalReturns;
+      const commissionAmount = netAfterReturns * (sellerCommissionPercent / 100);
+      const { data: transfers } = await supabase
+        .from('seller_transfers')
+        .select('amount')
+        .eq('seller_id', sellerId);
+      const totalReceived = transfers?.reduce((s, t) => s + (t.amount || 0), 0) || 0;
+      const remaining = netAfterReturns - commissionAmount - totalReceived;
+      setSellerFinance({ totalSales, totalReturns, commissionAmount, totalReceived, remaining });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Recalculate finance when selectedSeller or commission percent changes
+  useEffect(() => {
+    calculateFinance();
   }, [selectedSeller, sellerCommissionPercent]);
 
   // ------------------- Fetch inquiries -------------------
@@ -545,16 +613,7 @@ export default function AdminDashboardPage() {
       setReceiptFile(null);
       document.getElementById('receiptFileInput').value = '';
       // refresh finance
-      const { data: transfers } = await supabase
-        .from('seller_transfers')
-        .select('amount')
-        .eq('seller_id', selectedSeller.id);
-      const totalReceived = transfers?.reduce((s, t) => s + (t.amount || 0), 0) || 0;
-      setSellerFinance(prev => ({
-        ...prev,
-        totalReceived,
-        remaining: (prev.totalSales - prev.totalReturns) - prev.commissionAmount - totalReceived,
-      }));
+      await calculateFinance();
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -616,6 +675,19 @@ export default function AdminDashboardPage() {
 
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || [];
   const buyerUsers = users?.filter(u => u.account_type === 'buyer') || [];
+
+  // Product status filter options
+  const productStatusOptions = [
+    { value: 'all', label: 'جميع المنتجات' },
+    { value: 'pending_payment', label: 'منتظرة الدفع' },
+    { value: 'payment_approved', label: 'تم تأكيد الدفع' },
+    { value: 'processing', label: 'قيد التجهيز' },
+    { value: 'shipped', label: 'تم الشحن' },
+    { value: 'delivered', label: 'تم التسليم' },
+    { value: 'completed', label: 'مكتمل' },
+    { value: 'cancelled', label: 'ملغي' },
+    { value: 'returned', label: 'مسترجع' },
+  ];
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -810,6 +882,7 @@ export default function AdminDashboardPage() {
                         <div><span className="font-bold">الهاتف:</span> {selectedSeller.phone || '-'}</div>
                         <div><span className="font-bold">تاريخ التسجيل:</span> {formatDate(selectedSeller.created_at)}</div>
                         <div><span className="font-bold">الحالة:</span> {selectedSeller.is_banned ? 'محظور' : 'نشط'}</div>
+                        <div><span className="font-bold">نسبة الموقع الحالية:</span> {sellerCommissionPercent}%</div>
                       </div>
                       <div className="flex flex-wrap gap-3">
                         <Button variant="danger" onClick={() => updateUserMutation({ userId: selectedSeller.id, updates: { is_banned: !selectedSeller.is_banned } })}>
@@ -841,21 +914,29 @@ export default function AdminDashboardPage() {
                           <tr><td className="py-1 font-bold">تم التسليم</td><td>{sellerStats.delivered}</td></tr>
                           <tr><td className="py-1 font-bold">غير مشتراة</td><td>{sellerStats.notPurchased}</td></tr>
                         </tbody>
-                      </table>
+                       </table>
                     </div>
                   )}
 
                   {sellerDetailTab === 'commission' && (
                     <div>
-                      <label className="block text-gold mb-2">نسبة الموقع (%)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={sellerCommissionPercent}
-                        onChange={e => setSellerCommissionPercent(parseFloat(e.target.value) || 0)}
-                        className="bg-white text-gray-900 rounded px-3 py-2 w-32"
-                      />
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1">
+                          <label className="block text-gold mb-2">نسبة الموقع (%)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={sellerCommissionPercent}
+                            onChange={e => setSellerCommissionPercent(parseFloat(e.target.value) || 0)}
+                            className="bg-white text-gray-900 rounded px-3 py-2 w-full"
+                          />
+                        </div>
+                        <Button onClick={() => calculateFinance()} className="bg-gold text-primary-blue whitespace-nowrap">
+                          تحديث النسبة
+                        </Button>
+                      </div>
+                      <p className="text-text-secondary text-sm mt-2">* سيتم إعادة حساب العمولة والمبلغ المتبقي فوراً</p>
                     </div>
                   )}
                 </div>
@@ -948,19 +1029,22 @@ export default function AdminDashboardPage() {
       {activeMainTab === 'products' && (
         <div>
           <div className="flex flex-wrap gap-3 mb-4 items-center">
-            <label className="text-gold">فلترة:</label>
-            <select value={productFilter} onChange={e => setProductFilter(e.target.value)} className="bg-white text-gray-900 rounded px-3 py-2 border border-gold/30">
-              <option value="all">الكل</option>
-              <option value="pending">قيد المراجعة</option>
-              <option value="approved">موافق عليها</option>
-              <option value="hidden">مخفية</option>
+            <label className="text-gold">فلترة حسب حالة الطلب:</label>
+            <select
+              value={productFilterStatus}
+              onChange={e => setProductFilterStatus(e.target.value)}
+              className="bg-white text-gray-900 rounded px-3 py-2 border border-gold/30"
+            >
+              {productStatusOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
             {sellerFilterId && <Button variant="secondary" onClick={() => setSellerFilterId(null)}>إلغاء فلتر البائع</Button>}
           </div>
           <div className="bg-primary-card p-4 rounded-2xl overflow-x-auto">
             <table className="w-full text-right">
               <thead>
-                <tr><th>اسم المنتج</th><th>البائع</th><th>السعر</th><th>تاريخ العملية</th><th>الحالة</th><th>إجراءات</th></tr>
+                <tr><th>اسم المنتج</th><th>البائع</th><th>السعر</th><th>تاريخ آخر عملية</th><th>آخر مشتري</th><th>الحالة</th><th>إجراءات</th></tr>
               </thead>
               <tbody>
                 {products?.map(p => (
@@ -968,12 +1052,13 @@ export default function AdminDashboardPage() {
                     <td>{p.name}</td>
                     <td>{p.seller_name}</td>
                     <td>{formatCurrency(p.price)}</td>
-                    <td>{formatDate(p.created_at)}</td>
+                    <td>{p.last_order_date ? formatDate(p.last_order_date) : '-'}</td>
+                    <td>{p.last_buyer_name || '-'}</td>
                     <td>{p.is_approved ? 'موافق' : 'قيد المراجعة'}</td>
                     <td><button onClick={() => approveProduct(p.id, !p.is_approved)} className="text-gold underline">تغيير الحالة</button></td>
                   </tr>
                 ))}
-                {(!products || products.length === 0) && <tr><td colSpan="6" className="text-center">لا توجد منتجات</td></tr>}
+                {(!products || products.length === 0) && <tr><td colSpan="7" className="text-center">لا توجد منتجات</td></tr>}
               </tbody>
             </table>
           </div>
