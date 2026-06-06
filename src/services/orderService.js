@@ -12,7 +12,7 @@
  * 6. requestReturn(orderId, reason)- طلب استرجاع المنتج
  * 7. approveReturn(orderId, approve, adminNotes) - قبول/رفض الاسترجاع
  * 8. uploadReceipt(orderId, file, transferData) - رفع إيصال الدفع
- * 9. getSellerStats(sellerId)      - إحصائيات البائع
+ * 9. getSellerStats(sellerId)      - إحصائيات البائع (معدلة لجلب بيانات حقيقية)
  * 10. getMonthlySales(sellerId)    - المبيعات الشهرية (غير مفعلة)
  */
 
@@ -265,29 +265,108 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
   return publicUrl
 }
 
-// 9️⃣ إحصائيات البائع
+// 9️⃣ إحصائيات البائع (معدلة لجلب بيانات حقيقية)
 export const getSellerStats = async (sellerId) => {
-  const { count: productsCount, error: prodCountErr } = await supabase
-    .from('products')
-    .select('*', { count: 'exact', head: true })
-    .eq('seller_id', sellerId)
-  if (prodCountErr) throw prodCountErr
+  try {
+    // 1. جلب جميع منتجات البائع
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id')
+      .eq('seller_id', sellerId);
+    if (productsError) throw productsError;
+    const productIds = products?.map(p => p.id) || [];
+    
+    // عدد المنتجات
+    const productsCount = productIds.length;
 
-  const { count: conversationsCount, error: convCountErr } = await supabase
-    .from('conversations')
-    .select('*', { count: 'exact', head: true })
-    .eq('seller_id', sellerId)
-  if (convCountErr) throw convCountErr
+    // عدد المحادثات (الاستفسارات)
+    const { count: conversationsCount, error: convCountErr } = await supabase
+      .from('conversations')
+      .select('*', { count: 'exact', head: true })
+      .eq('seller_id', sellerId);
+    if (convCountErr) throw convCountErr;
 
-  return {
-    totalSales: 0,
-    productsCount: productsCount || 0,
-    conversationsCount: conversationsCount || 0,
-    pendingOrders: 0,
-    processingOrders: 0,
-    completedOrders: 0
+    if (productIds.length === 0) {
+      return {
+        totalSales: 0,
+        productsCount,
+        conversationsCount: conversationsCount || 0,
+        pendingOrders: 0,
+        processingOrders: 0,
+        completedOrders: 0,
+      };
+    }
+
+    // 2. جلب order_items للمنتجات
+    const { data: orderItems, error: oiError } = await supabase
+      .from('order_items')
+      .select('order_id, product_price, quantity')
+      .in('product_id', productIds);
+    if (oiError) throw oiError;
+
+    if (!orderItems || orderItems.length === 0) {
+      return {
+        totalSales: 0,
+        productsCount,
+        conversationsCount: conversationsCount || 0,
+        pendingOrders: 0,
+        processingOrders: 0,
+        completedOrders: 0,
+      };
+    }
+
+    const orderIds = [...new Set(orderItems.map(oi => oi.order_id))];
+
+    // 3. جلب حالات الطلبات
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select('id, status')
+      .in('id', orderIds);
+    if (ordersError) throw ordersError;
+
+    const orderStatusMap = new Map(orders?.map(o => [o.id, o.status]) || []);
+
+    let totalSales = 0;
+    let pendingOrders = 0;
+    let processingOrders = 0;
+    let completedOrders = 0;
+
+    for (const item of orderItems) {
+      const status = orderStatusMap.get(item.order_id);
+      if (!status) continue;
+
+      const saleAmount = item.product_price * item.quantity;
+      totalSales += saleAmount;
+
+      if (status === 'pending' || status === 'pending_payment_review') {
+        pendingOrders++;
+      } else if (status === 'payment_approved' || status === 'processing' || status === 'shipped') {
+        processingOrders++;
+      } else if (status === 'delivered' || status === 'completed') {
+        completedOrders++;
+      }
+    }
+
+    return {
+      totalSales,
+      productsCount,
+      conversationsCount: conversationsCount || 0,
+      pendingOrders,
+      processingOrders,
+      completedOrders,
+    };
+  } catch (err) {
+    console.error('❌ خطأ في جلب إحصائيات البائع:', err);
+    return {
+      totalSales: 0,
+      productsCount: 0,
+      conversationsCount: 0,
+      pendingOrders: 0,
+      processingOrders: 0,
+      completedOrders: 0,
+    };
   }
-}
+};
 
 // 🔟 المبيعات الشهرية للبائع (غير مفعلة)
 export const getMonthlySales = async (sellerId) => {
