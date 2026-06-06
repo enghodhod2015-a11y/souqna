@@ -305,11 +305,23 @@ const { data: orderItems, refetch: refetchOrderItems, isLoading: orderItemsLoadi
 
         const totalCommission = yearlySales * 0.1;
 
-        const { data: topItems } = await supabase
-          .from('order_items')
-          .select('product_id, quantity, product_price')
-          .eq('order.status', 'completed')
-          .limit(200);
+        const { data: topItems, error: topItemsError } = await supabase
+  .from('order_items')
+  .select(`
+    product_id,
+    quantity,
+    product_price,
+    order:orders!inner(status)
+  `)
+  .eq('order.status', 'completed')
+  .limit(200);
+
+if (topItemsError) {
+  console.error('خطأ في جلب أفضل المنتجات:', topItemsError);
+  // في حالة الخطأ، نستخدم بيانات وهمية أو نخرج من الدالة
+} else {
+  // استمر في المعالجة مع topItems
+}
         const productSales = {};
         for (const item of topItems || []) {
           if (!productSales[item.product_id]) productSales[item.product_id] = { qty: 0, revenue: 0 };
