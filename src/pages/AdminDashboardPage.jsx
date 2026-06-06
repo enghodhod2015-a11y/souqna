@@ -707,10 +707,7 @@ const { data: orderItems, refetch: refetchOrderItems, isLoading: orderItemsLoadi
       toast.error('حدث خطأ أثناء الرد');
     } else {
       toast.success('تم إرسال الرد');
-      const inquiry = inquiries.find(i => i.id === inquiryId);
-      if (inquiry?.user_id) {
-        await sendNotificationToUser(inquiry.user_id, `تم الرد على استفسارك: ${reply}`);
-      }
+      // تحديث inquiries state مباشرة بعد الرد
       setInquiries(prev =>
         prev.map(i => (i.id === inquiryId ? { ...i, reply, replied_at: new Date().toISOString() } : i))
       );
@@ -1195,7 +1192,7 @@ const { data: orderItems, refetch: refetchOrderItems, isLoading: orderItemsLoadi
         </div>
       )}
 
-      {/* ========================== ORDERS / INQUIRIES ========================== */}
+      {/* ========================== الطلبات والاستفسارات ========================== */}
       {activeMainTab === 'orders' && (
         <div>
           <div className="flex gap-4 mb-5">
@@ -1206,21 +1203,27 @@ const { data: orderItems, refetch: refetchOrderItems, isLoading: orderItemsLoadi
             </select>
           </div>
           <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20 space-y-4">
+            {inquiries
+              .filter(i => {
+                if (filterInquiry === 'answered') return i.reply && i.reply.trim() !== '';
+                if (filterInquiry === 'unanswered') return !i.reply || i.reply.trim() === '';
+                return true;
+              })
+              .map(inq => (
+                <div key={inq.id} className="border-b border-gold/20 pb-4">
+                  <p><span className="font-bold text-gold">المستخدم:</span> <span className="text-white">{inq.user?.full_name}</span></p>
+                  <p><span className="font-bold text-gold">المنتج:</span> <span className="text-white">{inq.product?.name || 'عام'}</span></p>
+                  <p><span className="font-bold text-gold">السؤال:</span> <span className="text-white">{inq.message}</span></p>
+                  {inq.reply && <p><span className="font-bold text-green-500">الرد:</span> <span className="text-white">{inq.reply}</span> <span className="text-xs text-text-secondary">({formatDate(inq.replied_at)})</span></p>}
+                  {!inq.reply && <Button size="sm" onClick={() => handleReplyInquiry(inq.id)} className="mt-1 bg-gold text-primary-blue shadow">رد</Button>}
+                  <p className="text-xs text-text-secondary mt-1">{formatDate(inq.created_at)}</p>
+                </div>
+              ))}
             {inquiries.filter(i => {
-              if (filterInquiry === 'answered') return i.reply;
-              if (filterInquiry === 'unanswered') return !i.reply;
+              if (filterInquiry === 'answered') return i.reply && i.reply.trim() !== '';
+              if (filterInquiry === 'unanswered') return !i.reply || i.reply.trim() === '';
               return true;
-            }).map(inq => (
-              <div key={inq.id} className="border-b border-gold/20 pb-4">
-                <p><span className="font-bold text-gold">المستخدم:</span> <span className="text-white">{inq.user?.full_name}</span></p>
-                <p><span className="font-bold text-gold">المنتج:</span> <span className="text-white">{inq.product?.name || 'عام'}</span></p>
-                <p><span className="font-bold text-gold">السؤال:</span> <span className="text-white">{inq.message}</span></p>
-                {inq.reply && <p><span className="font-bold text-green-500">الرد:</span> <span className="text-white">{inq.reply}</span> <span className="text-xs text-text-secondary">({formatDate(inq.replied_at)})</span></p>}
-                {!inq.reply && <Button size="sm" onClick={() => handleReplyInquiry(inq.id)} className="mt-1 bg-gold text-primary-blue shadow">رد</Button>}
-                <p className="text-xs text-text-secondary mt-1">{formatDate(inq.created_at)}</p>
-              </div>
-            ))}
-            {inquiries.length === 0 && <div className="text-center text-text-secondary">لا توجد استفسارات</div>}
+            }).length === 0 && <div className="text-center text-text-secondary">لا توجد استفسارات</div>}
           </div>
         </div>
       )}
@@ -1299,6 +1302,4 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS admin_notes TEXT;
 -- ✅ إضافة عمود نسبة الموقع (commission_percent) إلى profiles
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS commission_percent INTEGER DEFAULT 10;
 */
-
-
 
