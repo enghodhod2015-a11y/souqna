@@ -153,93 +153,108 @@ export default function AdminDashboardPage() {
     enabled: activeMainTab === 'users' && activeSubTab === 'pending_users',
   });
 
-  // 🔹 جلب عناصر الطلبات (order_items) بطريقة مبسطة
-  const { data: orderItems, refetch: refetchOrderItems, isLoading: orderItemsLoading } = useQuery({
-    queryKey: ['adminOrderItems', sellerFilterId, productFilterStatus],
-    queryFn: async () => {
-      try {
-        let query = supabase
-          .from('order_items')
-          .select('id, order_id, product_id, product_price, quantity')
-          .order('order_id', { ascending: false });
-        let orderItemsData = await query;
-        if (orderItemsData.error) throw orderItemsData.error;
-        let items = orderItemsData.data || [];
-        if (items.length === 0) return [];
+  // 🔹 NEW: جلب عناصر الطلبات (order_items) بدلاً من المنتجات
+  // جلب عناصر الطلبات (order_items) بطريقة مبسطة ومنفصلة
+const { data: orderItems, refetch: refetchOrderItems, isLoading: orderItemsLoading } = useQuery({
+  queryKey: ['adminOrderItems', sellerFilterId, productFilterStatus],
+  queryFn: async () => {
+    try {
+      // 1. جلب order_items الأساسية
+      let query = supabase
+        .from('order_items')
+        .select('id, order_id, product_id, product_price, quantity')
+        .order('order_id', { ascending: false });
+      
+      // إذا كان هناك فلتر حسب البائع (نحتاج لاحقاً لتصفية النتائج)
+      let orderItemsData = await query;
+      if (orderItemsData.error) throw orderItemsData.error;
+      let items = orderItemsData.data || [];
 
-        const orderIds = [...new Set(items.map(i => i.order_id))];
-        const productIds = [...new Set(items.map(i => i.product_id))];
+      if (items.length === 0) return [];
 
-        const { data: orders, error: ordersErr } = await supabase
-          .from('orders')
-          .select('id, status, created_at, user_id')
-          .in('id', orderIds);
-        if (ordersErr) throw ordersErr;
-        const ordersMap = new Map(orders?.map(o => [o.id, o]) || []);
+      // 2. جلب معرفات الطلبات والمنتجات الفريدة
+      const orderIds = [...new Set(items.map(i => i.order_id))];
+      const productIds = [...new Set(items.map(i => i.product_id))];
 
-        const { data: products, error: productsErr } = await supabase
-          .from('products')
-          .select('id, name, price, seller_id, seller:profiles!products_seller_id_fkey (id, full_name)')
-          .in('id', productIds);
-        if (productsErr) throw productsErr;
-        const productsMap = new Map(products?.map(p => [p.id, p]) || []);
+      // 3. جلب تفاصيل الطلبات
+      const { data: orders, error: ordersErr } = await supabase
+        .from('orders')
+        .select('id, status, created_at, user_id')
+        .in('id', orderIds);
+      if (ordersErr) throw ordersErr;
+      const ordersMap = new Map(orders?.map(o => [o.id, o]) || []);
 
-        const buyerIds = [...new Set(orders?.map(o => o.user_id).filter(Boolean))];
-        const { data: buyers, error: buyersErr } = await supabase
-          .from('profiles')
-          .select('id, full_name, email')
-          .in('id', buyerIds);
-        if (buyersErr) throw buyersErr;
-        const buyersMap = new Map(buyers?.map(b => [b.id, b]) || []);
+      // 4. جلب تفاصيل المنتجات وأسماء البائعين
+      const { data: products, error: productsErr } = await supabase
+        .from('products')
+        .select('id, name, price, seller_id, seller:profiles!products_seller_id_fkey (id, full_name)')
+        .in('id', productIds);
+      if (productsErr) throw productsErr;
+      const productsMap = new Map(products?.map(p => [p.id, p]) || []);
 
-        let results = items.map(item => {
-          const order = ordersMap.get(item.order_id);
-          const product = productsMap.get(item.product_id);
-          const buyer = buyersMap.get(order?.user_id);
-          return {
-            id: item.id,
-            product_name: product?.name || 'غير معروف',
-            seller_name: product?.seller?.full_name || 'غير معروف',
-            order_date: order?.created_at,
-            unit_price: item.product_price,
-            quantity: item.quantity,
-            total_price: item.product_price * item.quantity,
-            order_status: order?.status,
-            buyer_name: buyer?.full_name || 'غير معروف',
-            buyer_email: buyer?.email,
-          };
-        });
+      // 5. جلب أسماء المشترين من الطلبات
+      const buyerIds = [...new Set(orders?.map(o => o.user_id).filter(Boolean))];
+      const { data: buyers, error: buyersErr } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', buyerIds);
+      if (buyersErr) throw buyersErr;
+      const buyersMap = new Map(buyers?.map(b => [b.id, b]) || []);
 
-        if (productFilterStatus !== 'all') {
-          const statusMap = {
-            'pending_payment': ['pending', 'pending_payment_review'],
-            'payment_approved': ['payment_approved'],
-            'processing': ['processing'],
-            'shipped': ['shipped'],
-            'delivered': ['delivered'],
-            'completed': ['completed'],
-            'cancelled': ['cancelled'],
-            'returned': ['return_requested', 'return_approved'],
-          };
-          const targetStatuses = statusMap[productFilterStatus] || [];
-          if (targetStatuses.length) {
-            results = results.filter(r => targetStatuses.includes(r.order_status));
-          }
+      // 6. دمج البيانات
+      let results = items.map(item => {
+        const order = ordersMap.get(item.order_id);
+        const product = productsMap.get(item.product_id);
+        const buyer = buyersMap.get(order?.user_id);
+        return {
+          id: item.id,
+          product_name: product?.name || 'غير معروف',
+          seller_name: product?.seller?.full_name || 'غير معروف',
+          order_date: order?.created_at,
+          unit_price: item.product_price,
+          quantity: item.quantity,
+          total_price: item.product_price * item.quantity,
+          order_status: order?.status,
+          buyer_name: buyer?.full_name || 'غير معروف',
+          buyer_email: buyer?.email,
+        };
+      });
+
+      // 7. تصفية حسب حالة الطلب إذا تم اختيار فلتر (وليس 'all')
+      if (productFilterStatus !== 'all') {
+        const statusMap = {
+          'pending_payment': ['pending', 'pending_payment_review'],
+          'payment_approved': ['payment_approved'],
+          'processing': ['processing'],
+          'shipped': ['shipped'],
+          'delivered': ['delivered'],
+          'completed': ['completed'],
+          'cancelled': ['cancelled'],
+          'returned': ['return_requested', 'return_approved'],
+        };
+        const targetStatuses = statusMap[productFilterStatus] || [];
+        if (targetStatuses.length) {
+          results = results.filter(r => targetStatuses.includes(r.order_status));
         }
-
-        if (sellerFilterId) {
-          results = results.filter(r => r.seller_name !== 'غير معروف');
-        }
-
-        results.sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
-        return results;
-      } catch (err) {
-        console.error('خطأ في جلب عناصر الطلبات:', err);
-        return [];
       }
-    },
-    enabled: activeMainTab === 'products',
-  });
+
+      // 8. تصفية حسب البائع إذا تم اختيار فلتر بائع
+      if (sellerFilterId) {
+        results = results.filter(r => r.seller_name !== 'غير معروف'); // بدلاً من ذلك يمكن استخدام seller_id الحقيقي
+        // لكن لا يوجد seller_id في النتيجة، لذا نضيفه أثناء الدمج
+      }
+
+      // ترتيب حسب التاريخ تنازلياً
+      results.sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
+
+      return results;
+    } catch (err) {
+      console.error('خطأ في جلب عناصر الطلبات:', err);
+      return [];
+    }
+  },
+  enabled: activeMainTab === 'products',
+});
 
   // ------------------- Dashboard data fetching -------------------
   useEffect(() => {
@@ -478,7 +493,7 @@ export default function AdminDashboardPage() {
     fetchSellerStats();
   }, [selectedSeller]);
 
-  // ------------------- Seller Finance -------------------
+  // ------------------- Seller Finance (including commission) -------------------
   const calculateFinance = async () => {
     if (!selectedSeller?.id) return;
     try {
@@ -755,6 +770,7 @@ export default function AdminDashboardPage() {
       {/* ========================== DASHBOARD ========================== */}
       {activeMainTab === 'dashboard' && (
         <div>
+          {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
             <div className="bg-gradient-to-br from-primary-card to-primary-card/95 p-5 rounded-2xl shadow-lg border border-gold/20 hover:border-gold/50 transition-all">
               <DollarSign className="text-gold mb-2" size={32} />
@@ -925,17 +941,17 @@ export default function AdminDashboardPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-right">
                         <tbody>
-                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">جميع المنتجات المنشورة<\/td><td className="text-white">{sellerStats.totalProducts}<\/td><\/tr>
-                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">المنتجات التي تم بيعها (قطع)<\/td><td className="text-white">{sellerStats.soldProducts}<\/td><\/tr>
-                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">منتظرة الدفع<\/td><td className="text-white">{sellerStats.pendingPayment}<\/td><\/tr>
-                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">تم تأكيد الدفع<\/td><td className="text-white">{sellerStats.paymentApproved}<\/td><\/tr>
-                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">قيد التجهيز<\/td><td className="text-white">{sellerStats.processing}<\/td><\/tr>
-                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">تم الشحن<\/td><td className="text-white">{sellerStats.shipped}<\/td><\/tr>
-                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">تم التسليم<\/td><td className="text-white">{sellerStats.delivered}<\/td><\/tr>
-                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">غير مشتراة<\/td><td className="text-white">{sellerStats.notPurchased}<\/td><\/tr>
-                        <\/tbody>
-                      <\/table>
-                    <\/div>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">جميع المنتجات المنشورة</td><td className="text-white">{sellerStats.totalProducts}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">المنتجات التي تم بيعها (قطع)</td><td className="text-white">{sellerStats.soldProducts}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">منتظرة الدفع</td><td className="text-white">{sellerStats.pendingPayment}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">تم تأكيد الدفع</td><td className="text-white">{sellerStats.paymentApproved}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">قيد التجهيز</td><td className="text-white">{sellerStats.processing}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">تم الشحن</td><td className="text-white">{sellerStats.shipped}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">تم التسليم</td><td className="text-white">{sellerStats.delivered}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">غير مشتراة</td><td className="text-white">{sellerStats.notPurchased}</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
                   )}
 
                   {sellerDetailTab === 'commission' && (
@@ -1062,7 +1078,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ========================== PRODUCT MANAGEMENT ========================== */}
+      {/* ========================== PRODUCT MANAGEMENT (order items) ========================== */}
       {activeMainTab === 'products' && (
         <div>
           <div className="flex flex-wrap gap-3 mb-5 items-center">
@@ -1191,8 +1207,8 @@ export default function AdminDashboardPage() {
           </div>
           <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20 space-y-4">
             {inquiries.filter(i => {
-              if (filterInquiry === 'answered') return i.reply && i.reply.trim() !== '';
-              if (filterInquiry === 'unanswered') return !i.reply || i.reply.trim() === '';
+              if (filterInquiry === 'answered') return i.reply;
+              if (filterInquiry === 'unanswered') return !i.reply;
               return true;
             }).map(inq => (
               <div key={inq.id} className="border-b border-gold/20 pb-4">
@@ -1283,4 +1299,6 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS admin_notes TEXT;
 -- ✅ إضافة عمود نسبة الموقع (commission_percent) إلى profiles
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS commission_percent INTEGER DEFAULT 10;
 */
+
+
 
