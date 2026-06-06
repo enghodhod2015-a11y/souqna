@@ -93,10 +93,10 @@ export default function AdminDashboardPage() {
   });
   const [salesChartData, setSalesChartData] = useState([]);
 
-  // Product filter
+  // Product filter (now used for order items)
   const [productFilterStatus, setProductFilterStatus] = useState('all');
-  const productStatusOptions = [
-    { value: 'all', label: 'جميع المنتجات' },
+  const orderStatusOptions = [
+    { value: 'all', label: 'جميع الطلبات' },
     { value: 'pending_payment', label: 'منتظرة الدفع' },
     { value: 'payment_approved', label: 'تم تأكيد الدفع' },
     { value: 'processing', label: 'قيد التجهيز' },
@@ -153,62 +153,69 @@ export default function AdminDashboardPage() {
     enabled: activeMainTab === 'users' && activeSubTab === 'pending_users',
   });
 
-  const { data: products, refetch: refetchProducts, isLoading: productsLoading } = useQuery({
-    queryKey: ['adminProducts', sellerFilterId, productFilterStatus],
+  // 🔹 NEW: جلب عناصر الطلبات (order_items) بدلاً من المنتجات
+  const { data: orderItems, refetch: refetchOrderItems, isLoading: orderItemsLoading } = useQuery({
+    queryKey: ['adminOrderItems', sellerFilterId, productFilterStatus],
     queryFn: async () => {
       try {
         let query = supabase
-          .from('products')
+          .from('order_items')
           .select(`
             *,
-            seller:profiles!products_seller_id_fkey (id, full_name, email)
+            product:products (
+              id,
+              name,
+              price,
+              seller:profiles!products_seller_id_fkey ( id, full_name )
+            ),
+            order:orders (
+              id,
+              status,
+              created_at,
+              user_id,
+              buyer:profiles!orders_user_id_fkey ( id, full_name, email )
+            )
           `)
-          .order('created_at', { ascending: false });
-        if (sellerFilterId) query = query.eq('seller_id', sellerFilterId);
-        const { data: allProducts, error } = await query;
-        if (error) throw error;
+          .order('order.created_at', { ascending: false });
 
-        if (productFilterStatus === 'all') {
-          return allProducts.map(p => ({ ...p, seller_name: p.seller?.full_name || 'غير معروف', last_buyer_name: null, last_order_date: null }));
+        if (sellerFilterId) {
+          query = query.eq('product.seller_id', sellerFilterId);
         }
 
-        const { data: orderItems, error: oiError } = await supabase
-          .from('order_items')
-          .select(`product_id, order:orders(id, status, user_id, created_at)`);
-        if (oiError) throw oiError;
-
-        const statusMap = {
-          'pending_payment': ['pending', 'pending_payment_review'],
-          'payment_approved': ['payment_approved'],
-          'processing': ['processing'],
-          'shipped': ['shipped'],
-          'delivered': ['delivered'],
-          'completed': ['completed'],
-          'cancelled': ['cancelled'],
-          'returned': ['return_requested', 'return_approved'],
-        };
-        const targetStatuses = statusMap[productFilterStatus] || [];
-        const productIdsWithStatus = new Set();
-        const productLastBuyer = new Map();
-        for (const item of orderItems || []) {
-          const order = item.order;
-          if (order && targetStatuses.includes(order.status)) {
-            productIdsWithStatus.add(item.product_id);
-            if (!productLastBuyer.has(item.product_id) || new Date(order.created_at) > new Date(productLastBuyer.get(item.product_id).last_order_date)) {
-              const { data: buyer } = await supabase.from('profiles').select('full_name').eq('id', order.user_id).single();
-              productLastBuyer.set(item.product_id, { buyer_name: buyer?.full_name || 'مستخدم', last_order_date: order.created_at });
-            }
+        if (productFilterStatus !== 'all') {
+          const statusMap = {
+            'pending_payment': ['pending', 'pending_payment_review'],
+            'payment_approved': ['payment_approved'],
+            'processing': ['processing'],
+            'shipped': ['shipped'],
+            'delivered': ['delivered'],
+            'completed': ['completed'],
+            'cancelled': ['cancelled'],
+            'returned': ['return_requested', 'return_approved'],
+          };
+          const targetStatuses = statusMap[productFilterStatus] || [];
+          if (targetStatuses.length) {
+            query = query.in('order.status', targetStatuses);
           }
         }
-        const filtered = allProducts.filter(p => productIdsWithStatus.has(p.id));
-        return filtered.map(p => ({
-          ...p,
-          seller_name: p.seller?.full_name || 'غير معروف',
-          last_buyer_name: productLastBuyer.get(p.id)?.buyer_name || '-',
-          last_order_date: productLastBuyer.get(p.id)?.last_order_date || null,
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        return data.map(item => ({
+          id: item.id,
+          product_name: item.product?.name || 'غير معروف',
+          seller_name: item.product?.seller?.full_name || 'غير معروف',
+          order_date: item.order?.created_at,
+          unit_price: item.product_price,
+          quantity: item.quantity,
+          total_price: item.product_price * item.quantity,
+          order_status: item.order?.status,
+          buyer_name: item.order?.buyer?.full_name || 'غير معروف',
+          buyer_email: item.order?.buyer?.email,
         }));
       } catch (err) {
-        console.error(err);
+        console.error('خطأ في جلب عناصر الطلبات:', err);
         return [];
       }
     },
@@ -264,13 +271,13 @@ export default function AdminDashboardPage() {
 
         const totalCommission = yearlySales * 0.1;
 
-        const { data: orderItems } = await supabase
+        const { data: topItems } = await supabase
           .from('order_items')
           .select('product_id, quantity, product_price')
           .eq('order.status', 'completed')
           .limit(200);
         const productSales = {};
-        for (const item of orderItems || []) {
+        for (const item of topItems || []) {
           if (!productSales[item.product_id]) productSales[item.product_id] = { qty: 0, revenue: 0 };
           productSales[item.product_id].qty += item.quantity;
           productSales[item.product_id].revenue += item.product_price * item.quantity;
@@ -347,122 +354,110 @@ export default function AdminDashboardPage() {
   }, [activeMainTab]);
 
   // ------------------- Seller stats (when selected) -------------------
-    // جلب إحصائيات البائع المحدد (نسخة نهائية 100%)
-useEffect(() => {
-  if (!selectedSeller?.id) return;
-  const fetchSellerStats = async () => {
-    try {
-      const sellerId = selectedSeller.id;
-      
-      // 1. جلب جميع منتجات البائع
-      const { data: productsList, error: prodErr } = await supabase
-        .from('products')
-        .select('id')
-        .eq('seller_id', sellerId);
-      if (prodErr) throw prodErr;
-      const totalProducts = productsList?.length || 0;
-      const productIds = productsList?.map(p => p.id) || [];
+  useEffect(() => {
+    if (!selectedSeller?.id) return;
+    const fetchSellerStats = async () => {
+      try {
+        const sellerId = selectedSeller.id;
+        const { data: productsList, error: prodErr } = await supabase
+          .from('products')
+          .select('id')
+          .eq('seller_id', sellerId);
+        if (prodErr) throw prodErr;
+        const totalProducts = productsList?.length || 0;
+        const productIds = productsList?.map(p => p.id) || [];
 
-      if (productIds.length === 0) {
-        setSellerStats({
-          totalProducts: 0,
-          soldProducts: 0,
-          pendingPayment: 0,
-          paymentApproved: 0,
-          processing: 0,
-          shipped: 0,
-          delivered: 0,
-          notPurchased: 0,
-          shippingProducts: 0,
-          notShippedWithReceipt: 0,
-          noReceiptPurchased: 0,
-        });
-        return;
-      }
+        if (productIds.length === 0) {
+          setSellerStats({
+            totalProducts: 0,
+            soldProducts: 0,
+            pendingPayment: 0,
+            paymentApproved: 0,
+            processing: 0,
+            shipped: 0,
+            delivered: 0,
+            notPurchased: 0,
+            shippingProducts: 0,
+            notShippedWithReceipt: 0,
+            noReceiptPurchased: 0,
+          });
+          return;
+        }
 
-      // 2. جلب order_items للمنتجات
-      const { data: orderItems, error: oiErr } = await supabase
-        .from('order_items')
-        .select('order_id, product_id, quantity')
-        .in('product_id', productIds);
-      if (oiErr) throw oiErr;
+        const { data: orderItemsData, error: oiErr } = await supabase
+          .from('order_items')
+          .select('order_id, product_id, quantity')
+          .in('product_id', productIds);
+        if (oiErr) throw oiErr;
 
-      if (!orderItems || orderItems.length === 0) {
+        if (!orderItemsData || orderItemsData.length === 0) {
+          setSellerStats({
+            totalProducts,
+            soldProducts: 0,
+            pendingPayment: 0,
+            paymentApproved: 0,
+            processing: 0,
+            shipped: 0,
+            delivered: 0,
+            notPurchased: totalProducts,
+            shippingProducts: 0,
+            notShippedWithReceipt: 0,
+            noReceiptPurchased: 0,
+          });
+          return;
+        }
+
+        const orderIds = [...new Set(orderItemsData.map(oi => oi.order_id))];
+        const { data: orders, error: ordErr } = await supabase
+          .from('orders')
+          .select('id, status')
+          .in('id', orderIds);
+        if (ordErr) throw ordErr;
+        const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
+
+        let soldProducts = 0;
+        const productSoldSet = new Set();
+        const statusCount = {
+          pending_payment_review: new Set(),
+          payment_approved: new Set(),
+          processing: new Set(),
+          shipped: new Set(),
+          delivered: new Set(),
+        };
+
+        for (const item of orderItemsData) {
+          const order = orderMap.get(item.order_id);
+          if (!order) continue;
+          productSoldSet.add(item.product_id);
+          if (order.status === 'completed' || order.status === 'delivered') {
+            soldProducts += item.quantity;
+          }
+          if (statusCount[order.status]) {
+            statusCount[order.status].add(order.id);
+          }
+        }
+
+        const notPurchased = totalProducts - productSoldSet.size;
         setSellerStats({
           totalProducts,
-          soldProducts: 0,
-          pendingPayment: 0,
-          paymentApproved: 0,
-          processing: 0,
-          shipped: 0,
-          delivered: 0,
-          notPurchased: totalProducts,
+          soldProducts,
+          pendingPayment: statusCount.pending_payment_review.size,
+          paymentApproved: statusCount.payment_approved.size,
+          processing: statusCount.processing.size,
+          shipped: statusCount.shipped.size,
+          delivered: statusCount.delivered.size,
+          notPurchased,
           shippingProducts: 0,
           notShippedWithReceipt: 0,
           noReceiptPurchased: 0,
         });
-        return;
+      } catch (err) {
+        console.error(err);
+        toast.error('فشل تحميل إحصائيات البائع');
       }
-
-      // 3. جلب الطلبات المرتبطة
-      const orderIds = [...new Set(orderItems.map(oi => oi.order_id))];
-      const { data: orders, error: ordErr } = await supabase
-        .from('orders')
-        .select('id, status')
-        .in('id', orderIds);
-      if (ordErr) throw ordErr;
-      const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
-
-      // 4. حساب الإحصائيات
-      let soldProducts = 0;
-      const productSoldSet = new Set();
-      const statusCount = {
-        pending_payment_review: new Set(),
-        payment_approved: new Set(),
-        processing: new Set(),
-        shipped: new Set(),
-        delivered: new Set(),
-      };
-
-      for (const item of orderItems) {
-        const order = orderMap.get(item.order_id);
-        if (!order) continue;
-        
-        productSoldSet.add(item.product_id);
-        
-        // ✅ القطع المباعة فقط للطلبات المكتملة أو المسلمة
-        if (order.status === 'completed' || order.status === 'delivered') {
-          soldProducts += item.quantity;
-        }
-        
-        // تسجيل الطلب في مجموعته حسب الحالة
-        if (statusCount[order.status]) {
-          statusCount[order.status].add(order.id);
-        }
-      }
-
-      const notPurchased = totalProducts - productSoldSet.size;
-
-      setSellerStats({
-        totalProducts,
-        soldProducts,
-        pendingPayment: statusCount.pending_payment_review.size,
-        paymentApproved: statusCount.payment_approved.size,
-        processing: statusCount.processing.size,
-        shipped: statusCount.shipped.size,
-        delivered: statusCount.delivered.size,
-        notPurchased,
-        shippingProducts: 0,
-        notShippedWithReceipt: 0,
-        noReceiptPurchased: 0,
-      });
-    } catch (err) {
-      console.error('❌ خطأ في جلب إحصائيات البائع:', err);
-      toast.error('فشل تحميل إحصائيات البائع');
-    }
-  };
-  fetchSellerStats();
-}, [selectedSeller]);
+    };
+    fetchSellerStats();
+  }, [selectedSeller]);
 
   // ------------------- Seller Finance (including commission) -------------------
   const calculateFinance = async () => {
@@ -477,18 +472,18 @@ useEffect(() => {
       let totalSales = 0,
         totalReturns = 0;
       if (productIds.length) {
-        const { data: orderItems } = await supabase
+        const { data: orderItemsData } = await supabase
           .from('order_items')
           .select('order_id, product_price, quantity')
           .in('product_id', productIds);
-        if (orderItems?.length) {
-          const orderIds = [...new Set(orderItems.map(i => i.order_id))];
+        if (orderItemsData?.length) {
+          const orderIds = [...new Set(orderItemsData.map(i => i.order_id))];
           const { data: orders } = await supabase
             .from('orders')
             .select('id, status, return_status')
             .in('id', orderIds);
           const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
-          for (const item of orderItems) {
+          for (const item of orderItemsData) {
             const order = orderMap.get(item.order_id);
             if (order) {
               if (order.status === 'completed' || order.status === 'delivered')
@@ -513,14 +508,12 @@ useEffect(() => {
     }
   };
 
-  // Recalculate finance when selectedSeller or commission percent changes
   useEffect(() => {
     if (selectedSeller) {
       calculateFinance();
     }
   }, [selectedSeller, sellerCommissionPercent]);
 
-  // ------------------- Sync seller commission from database when seller is selected -------------------
   useEffect(() => {
     if (selectedSeller) {
       const savedPercent = selectedSeller.commission_percent;
@@ -550,7 +543,7 @@ useEffect(() => {
     await Promise.all([
       refetchUsers(),
       refetchPendingSellers(),
-      refetchProducts(),
+      refetchOrderItems(),
     ]);
     toast.success('تم تحديث جميع البيانات');
   };
@@ -690,22 +683,10 @@ useEffect(() => {
     }
   };
 
-  const approveProduct = async (productId, approve) => {
-    const { error } = await supabase
-      .from('products')
-      .update({ is_approved: approve })
-      .eq('id', productId);
-    if (error) toast.error('فشل تحديث المنتج');
-    else {
-      toast.success('تم تحديث حالة المنتج');
-      refetchProducts();
-    }
-  };
-
   // ------------------- Render -------------------
   const isLoading = (activeMainTab === 'dashboard') ||
     (activeMainTab === 'users' && usersLoading) ||
-    (activeMainTab === 'products' && productsLoading);
+    (activeMainTab === 'products' && orderItemsLoading);
   if (isLoading && activeMainTab !== 'dashboard') {
     return <div className="flex justify-center items-center h-64"><Loader className="animate-spin text-gold" size={40} /></div>;
   }
@@ -755,6 +736,7 @@ useEffect(() => {
       {/* ========================== DASHBOARD ========================== */}
       {activeMainTab === 'dashboard' && (
         <div>
+          {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
             <div className="bg-gradient-to-br from-primary-card to-primary-card/95 p-5 rounded-2xl shadow-lg border border-gold/20 hover:border-gold/50 transition-all">
               <DollarSign className="text-gold mb-2" size={32} />
@@ -954,13 +936,11 @@ useEffect(() => {
                         </div>
                         <Button 
                           onClick={async () => {
-                            // حفظ النسبة في قاعدة البيانات
                             await updateUserMutation({ 
                               userId: selectedSeller.id, 
                               updates: { commission_percent: sellerCommissionPercent } 
                             });
                             toast.success('تم حفظ نسبة الموقع');
-                            // إعادة حساب المالية بالنسبة الجديدة
                             await calculateFinance();
                           }} 
                           className="bg-gold text-primary-blue shadow-md rounded-lg px-5 py-2 hover:bg-gold/90 transition-all whitespace-nowrap"
@@ -978,73 +958,73 @@ useEffect(() => {
 
           {/* ---------- Buyers ---------- */}
           {activeSubTab === 'buyers' && (
-  <div>
-    <div className="flex gap-4 mb-5">
-      <Input
-        placeholder="ابحث عن مشتري بالاسم أو البريد"
-        value={searchTerm}
-        onChange={e => setSearchTerm(e.target.value)}
-        className="flex-1 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold"
-      />
-      <Button variant="secondary" onClick={() => refetchUsers()} className="bg-gray-700 hover:bg-gray-600 text-white shadow-md rounded-lg px-5 py-2 transition-all flex items-center gap-1">
-        <Search size={16} /> بحث
-      </Button>
-    </div>
-    <div className="overflow-x-auto rounded-xl border border-gold/20">
-      <table className="w-full text-right border-collapse">
-        <thead>
-          <tr className="bg-secondary-blue/40 border-b border-gold/30">
-            <th className="p-3 text-gold">الاسم</th>
-            <th className="p-3 text-gold">البريد</th>
-            <th className="p-3 text-gold">عدد الطلبات</th>
-            <th className="p-3 text-gold">إجمالي الإنفاق</th>
-            <th className="p-3 text-gold">الإجراءات</th>
-           </tr>
-        </thead>
-        <tbody>
-          {buyerUsers.map(u => (
-            <tr key={u.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
-              <td className="p-3 text-white">{u.full_name}</td>
-              <td className="p-3 text-white">{u.email}</td>
-              <td className="p-3 text-white">{u.order_count || 0}</td>
-              <td className="p-3 text-white">{formatCurrency(u.total_spent || 0)}</td>
-              <td className="p-3 flex gap-2">
-                <button onClick={() => updateUserMutation({ userId: u.id, updates: { is_banned: !u.is_banned } })} className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs shadow">حظر</button>
-                <button onClick={() => setSelectedBuyer(u)} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs shadow">تفاصيل</button>
-                <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(u.id, msg); }} className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs shadow"><Send size={12} /></button>
-                <button onClick={() => {
-                  const newType = u.account_type === 'seller' ? 'buyer' : 'seller';
-                  if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
-                    updateUserMutation({ userId: u.id, updates: { account_type: newType } });
-                }} className="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs shadow">🔄 تغيير</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-    {selectedBuyer && (
-      <Modal onClose={() => setSelectedBuyer(null)} title="ملف المشتري">
-        <div className="space-y-2 text-gray-800">
-          <div><strong>الاسم:</strong> {selectedBuyer.full_name}</div>
-          <div><strong>البريد:</strong> {selectedBuyer.email}</div>
-          <div><strong>الهاتف:</strong> {selectedBuyer.phone || '-'}</div>
-          <div><strong>عدد الطلبات:</strong> {selectedBuyer.order_count || 0}</div>
-          <div><strong>إجمالي الإنفاق:</strong> {formatCurrency(selectedBuyer.total_spent || 0)}</div>
-          <div className="flex gap-2 mt-4">
-            <Button variant="danger" onClick={() => updateUserMutation({ userId: selectedBuyer.id, updates: { is_banned: !selectedBuyer.is_banned } })} className="bg-red-600 text-white">{selectedBuyer.is_banned ? 'إلغاء الحظر' : 'حظر'}</Button>
-            <Button variant="secondary" onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(selectedBuyer.id, msg); }}>إرسال إشعار</Button>
-            <Button onClick={() => {
-              const newType = selectedBuyer.account_type === 'seller' ? 'buyer' : 'seller';
-              if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
-                updateUserMutation({ userId: selectedBuyer.id, updates: { account_type: newType } });
-            }} className="bg-amber-600 text-white">تغيير نوع الحساب</Button>
-          </div>
-        </div>
-      </Modal>
-    )}
-  </div>
-)}
+            <div>
+              <div className="flex gap-4 mb-5">
+                <Input
+                  placeholder="ابحث عن مشتري بالاسم أو البريد"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="flex-1 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold"
+                />
+                <Button variant="secondary" onClick={() => refetchUsers()} className="bg-gray-700 hover:bg-gray-600 text-white shadow-md rounded-lg px-5 py-2 transition-all flex items-center gap-1">
+                  <Search size={16} /> بحث
+                </Button>
+              </div>
+              <div className="overflow-x-auto rounded-xl border border-gold/20">
+                <table className="w-full text-right border-collapse">
+                  <thead>
+                    <tr className="bg-secondary-blue/40 border-b border-gold/30">
+                      <th className="p-3 text-gold">الاسم</th>
+                      <th className="p-3 text-gold">البريد</th>
+                      <th className="p-3 text-gold">عدد الطلبات</th>
+                      <th className="p-3 text-gold">إجمالي الإنفاق</th>
+                      <th className="p-3 text-gold">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {buyerUsers.map(u => (
+                      <tr key={u.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
+                        <td className="p-3 text-white">{u.full_name}</td>
+                        <td className="p-3 text-white">{u.email}</td>
+                        <td className="p-3 text-white">{u.order_count || 0}</td>
+                        <td className="p-3 text-white">{formatCurrency(u.total_spent || 0)}</td>
+                        <td className="p-3 flex gap-2">
+                          <button onClick={() => updateUserMutation({ userId: u.id, updates: { is_banned: !u.is_banned } })} className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs shadow">حظر</button>
+                          <button onClick={() => setSelectedBuyer(u)} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs shadow">تفاصيل</button>
+                          <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(u.id, msg); }} className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs shadow"><Send size={12} /></button>
+                          <button onClick={() => {
+                            const newType = u.account_type === 'seller' ? 'buyer' : 'seller';
+                            if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
+                              updateUserMutation({ userId: u.id, updates: { account_type: newType } });
+                          }} className="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs shadow">🔄 تغيير</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {selectedBuyer && (
+                <Modal onClose={() => setSelectedBuyer(null)} title="ملف المشتري">
+                  <div className="space-y-2 text-gray-800">
+                    <div><strong>الاسم:</strong> {selectedBuyer.full_name}</div>
+                    <div><strong>البريد:</strong> {selectedBuyer.email}</div>
+                    <div><strong>الهاتف:</strong> {selectedBuyer.phone || '-'}</div>
+                    <div><strong>عدد الطلبات:</strong> {selectedBuyer.order_count || 0}</div>
+                    <div><strong>إجمالي الإنفاق:</strong> {formatCurrency(selectedBuyer.total_spent || 0)}</div>
+                    <div className="flex gap-2 mt-4">
+                      <Button variant="danger" onClick={() => updateUserMutation({ userId: selectedBuyer.id, updates: { is_banned: !selectedBuyer.is_banned } })} className="bg-red-600 text-white">{selectedBuyer.is_banned ? 'إلغاء الحظر' : 'حظر'}</Button>
+                      <Button variant="secondary" onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(selectedBuyer.id, msg); }}>إرسال إشعار</Button>
+                      <Button onClick={() => {
+                        const newType = selectedBuyer.account_type === 'seller' ? 'buyer' : 'seller';
+                        if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
+                          updateUserMutation({ userId: selectedBuyer.id, updates: { account_type: newType } });
+                      }} className="bg-amber-600 text-white">تغيير نوع الحساب</Button>
+                    </div>
+                  </div>
+                </Modal>
+              )}
+            </div>
+          )}
 
           {/* ---------- Pending Registrations ---------- */}
           {activeSubTab === 'pending_users' && (
@@ -1064,7 +1044,7 @@ useEffect(() => {
         </div>
       )}
 
-      {/* ========================== PRODUCT MANAGEMENT ========================== */}
+      {/* ========================== PRODUCT MANAGEMENT (order items) ========================== */}
       {activeMainTab === 'products' && (
         <div>
           <div className="flex flex-wrap gap-3 mb-5 items-center">
@@ -1074,7 +1054,7 @@ useEffect(() => {
               onChange={e => setProductFilterStatus(e.target.value)}
               className="bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-gold focus:border-gold"
             >
-              {productStatusOptions.map(opt => (
+              {orderStatusOptions.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
@@ -1086,26 +1066,39 @@ useEffect(() => {
                 <tr className="border-b border-gold/30 bg-secondary-blue/30">
                   <th className="p-3 text-gold">اسم المنتج</th>
                   <th className="p-3 text-gold">البائع</th>
-                  <th className="p-3 text-gold">السعر</th>
-                  <th className="p-3 text-gold">تاريخ آخر عملية</th>
-                  <th className="p-3 text-gold">آخر مشتري</th>
-                  <th className="p-3 text-gold">الحالة</th>
-                  <th className="p-3 text-gold">إجراءات</th>
+                  <th className="p-3 text-gold">تاريخ العملية</th>
+                  <th className="p-3 text-gold">سعر الوحدة</th>
+                  <th className="p-3 text-gold">الكمية</th>
+                  <th className="p-3 text-gold">الإجمالي</th>
+                  <th className="p-3 text-gold">المشتري</th>
+                  <th className="p-3 text-gold">حالة الطلب</th>
                 </tr>
               </thead>
               <tbody>
-                {products?.map(p => (
-                  <tr key={p.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
-                    <td className="p-3 text-white">{p.name}</td>
-                    <td className="p-3 text-white">{p.seller_name}</td>
-                    <td className="p-3 text-white">{formatCurrency(p.price)}</td>
-                    <td className="p-3 text-white">{p.last_order_date ? formatDate(p.last_order_date) : '-'}</td>
-                    <td className="p-3 text-white">{p.last_buyer_name || '-'}</td>
-                    <td className="p-3 text-white">{p.is_approved ? 'موافق' : 'قيد المراجعة'}</td>
-                    <td className="p-3"><button onClick={() => approveProduct(p.id, !p.is_approved)} className="text-gold underline hover:text-gold/80 transition">تغيير الحالة</button></td>
+                {orderItems?.map(item => (
+                  <tr key={item.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
+                    <td className="p-3 text-white">{item.product_name}</td>
+                    <td className="p-3 text-white">{item.seller_name}</td>
+                    <td className="p-3 text-white">{item.order_date ? formatDate(item.order_date) : '-'}</td>
+                    <td className="p-3 text-white">{formatCurrency(item.unit_price)}</td>
+                    <td className="p-3 text-white">{item.quantity}</td>
+                    <td className="p-3 text-white">{formatCurrency(item.total_price)}</td>
+                    <td className="p-3 text-white">{item.buyer_name}</td>
+                    <td className="p-3 text-white">
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        item.order_status === 'completed' ? 'bg-green-600' :
+                        item.order_status === 'processing' ? 'bg-yellow-600' :
+                        item.order_status === 'pending_payment_review' ? 'bg-orange-600' :
+                        item.order_status === 'cancelled' ? 'bg-red-600' : 'bg-gray-600'
+                      }`}>
+                        {item.order_status}
+                      </span>
+                    </td>
                   </tr>
                 ))}
-                {(!products || products.length === 0) && <tr><td colSpan="7" className="text-center p-6 text-text-secondary">لا توجد منتجات</td></tr>}
+                {(!orderItems || orderItems.length === 0) && (
+                  <tr><td colSpan="8" className="text-center p-6 text-text-secondary">لا توجد عناصر طلبات</td></tr>
+                )}
               </tbody>
             </table>
           </div>
