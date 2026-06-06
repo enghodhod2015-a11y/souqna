@@ -52,7 +52,7 @@ export default function AdminDashboardPage() {
   const [transferNote, setTransferNote] = useState('');
   const [receiptFile, setReceiptFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [sellerCommissionPercent, setSellerCommissionPercent] = useState(10); // default site commission %
+  const [sellerCommissionPercent, setSellerCommissionPercent] = useState(10);
   const [sellerFinance, setSellerFinance] = useState({
     totalSales: 0,
     totalReturns: 0,
@@ -93,14 +93,25 @@ export default function AdminDashboardPage() {
   });
   const [salesChartData, setSalesChartData] = useState([]);
 
-  // Product filter (status based on order status)
-  const [productFilterStatus, setProductFilterStatus] = useState('all'); // 'all', 'pending_payment', 'payment_approved', 'processing', 'shipped', 'delivered', 'completed', 'cancelled', 'returned'
+  // Product filter
+  const [productFilterStatus, setProductFilterStatus] = useState('all');
+  const productStatusOptions = [
+    { value: 'all', label: 'جميع المنتجات' },
+    { value: 'pending_payment', label: 'منتظرة الدفع' },
+    { value: 'payment_approved', label: 'تم تأكيد الدفع' },
+    { value: 'processing', label: 'قيد التجهيز' },
+    { value: 'shipped', label: 'تم الشحن' },
+    { value: 'delivered', label: 'تم التسليم' },
+    { value: 'completed', label: 'مكتمل' },
+    { value: 'cancelled', label: 'ملغي' },
+    { value: 'returned', label: 'مسترجع' },
+  ];
 
   // Inquiries/Orders tab
   const [inquiries, setInquiries] = useState([]);
-  const [filterInquiry, setFilterInquiry] = useState('all'); // 'all', 'answered', 'unanswered'
+  const [filterInquiry, setFilterInquiry] = useState('all');
 
-  // Queries from adminService (using direct supabase calls for simplicity)
+  // Queries
   const { data: users, refetch: refetchUsers, isLoading: usersLoading } = useQuery({
     queryKey: ['adminUsers', searchTerm],
     queryFn: async () => {
@@ -110,7 +121,6 @@ export default function AdminDashboardPage() {
       }
       const { data, error } = await query;
       if (error) throw error;
-      // add computed fields (order_count, total_spent) for buyers
       for (const user of data) {
         const { count: orderCount } = await supabase
           .from('orders')
@@ -143,12 +153,10 @@ export default function AdminDashboardPage() {
     enabled: activeMainTab === 'users' && activeSubTab === 'pending_users',
   });
 
-  // Fetch products with advanced filtering by order status and buyer name
   const { data: products, refetch: refetchProducts, isLoading: productsLoading } = useQuery({
     queryKey: ['adminProducts', sellerFilterId, productFilterStatus],
     queryFn: async () => {
       try {
-        // First, get all products (optionally filtered by seller)
         let query = supabase
           .from('products')
           .select(`
@@ -157,29 +165,18 @@ export default function AdminDashboardPage() {
           `)
           .order('created_at', { ascending: false });
         if (sellerFilterId) query = query.eq('seller_id', sellerFilterId);
-        const { data: allProducts, error: productsError } = await query;
-        if (productsError) throw productsError;
+        const { data: allProducts, error } = await query;
+        if (error) throw error;
 
         if (productFilterStatus === 'all') {
-          // Return all products with seller name
-          return allProducts.map(p => ({
-            ...p,
-            seller_name: p.seller?.full_name || 'غير معروف',
-            last_buyer_name: null, // will be filled later if needed
-            last_order_date: null,
-          }));
+          return allProducts.map(p => ({ ...p, seller_name: p.seller?.full_name || 'غير معروف', last_buyer_name: null, last_order_date: null }));
         }
 
-        // For filtering by order status, we need to get products that have orders with that status
         const { data: orderItems, error: oiError } = await supabase
           .from('order_items')
-          .select(`
-            product_id,
-            order:orders(id, status, user_id, created_at)
-          `);
+          .select(`product_id, order:orders(id, status, user_id, created_at)`);
         if (oiError) throw oiError;
 
-        // Map order status filter to actual status string
         const statusMap = {
           'pending_payment': ['pending', 'pending_payment_review'],
           'payment_approved': ['payment_approved'],
@@ -191,31 +188,18 @@ export default function AdminDashboardPage() {
           'returned': ['return_requested', 'return_approved'],
         };
         const targetStatuses = statusMap[productFilterStatus] || [];
-
-        // Collect product IDs that have orders with target status
         const productIdsWithStatus = new Set();
-        const productLastBuyer = new Map(); // product_id -> { buyer_name, last_order_date }
+        const productLastBuyer = new Map();
         for (const item of orderItems || []) {
           const order = item.order;
           if (order && targetStatuses.includes(order.status)) {
             productIdsWithStatus.add(item.product_id);
-            // Get buyer name for this product (latest order)
             if (!productLastBuyer.has(item.product_id) || new Date(order.created_at) > new Date(productLastBuyer.get(item.product_id).last_order_date)) {
-              // Fetch buyer profile
-              const { data: buyer } = await supabase
-                .from('profiles')
-                .select('full_name')
-                .eq('id', order.user_id)
-                .single();
-              productLastBuyer.set(item.product_id, {
-                buyer_name: buyer?.full_name || 'مستخدم',
-                last_order_date: order.created_at,
-              });
+              const { data: buyer } = await supabase.from('profiles').select('full_name').eq('id', order.user_id).single();
+              productLastBuyer.set(item.product_id, { buyer_name: buyer?.full_name || 'مستخدم', last_order_date: order.created_at });
             }
           }
         }
-
-        // Filter products
         const filtered = allProducts.filter(p => productIdsWithStatus.has(p.id));
         return filtered.map(p => ({
           ...p,
@@ -243,7 +227,6 @@ export default function AdminDashboardPage() {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        // sales
         const { data: dailyOrders } = await supabase
           .from('orders')
           .select('total_amount')
@@ -265,12 +248,10 @@ export default function AdminDashboardPage() {
           .gte('created_at', startOfYear.toISOString());
         const yearlySales = yearlyOrders?.reduce((s, o) => s + o.total_amount, 0) || 0;
 
-        // total orders
         const { count: totalOrders } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true });
 
-        // new users & sellers
         const { count: newUsers } = await supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
@@ -281,10 +262,8 @@ export default function AdminDashboardPage() {
           .eq('account_type', 'seller')
           .gte('created_at', thirtyDaysAgo.toISOString());
 
-        // total commission (10% of completed sales)
         const totalCommission = yearlySales * 0.1;
 
-        // top 5 products by revenue
         const { data: orderItems } = await supabase
           .from('order_items')
           .select('product_id, quantity, product_price')
@@ -307,7 +286,6 @@ export default function AdminDashboardPage() {
           .sort((a, b) => b.revenue - a.revenue)
           .slice(0, 5);
 
-        // top 5 sellers by rating (dummy for now)
         const topSellers = [
           { name: 'محمد علي', rating: 4.8 },
           { name: 'أحمد حسن', rating: 4.7 },
@@ -316,7 +294,6 @@ export default function AdminDashboardPage() {
           { name: 'نورة سعيد', rating: 4.4 },
         ];
 
-        // pending counts
         const { count: pendingOrders } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
@@ -345,7 +322,6 @@ export default function AdminDashboardPage() {
           newDisputes: newDisputes || 0,
         });
 
-        // chart data (last 7 days sales)
         const last7Days = [];
         for (let i = 6; i >= 0; i--) {
           const date = new Date();
@@ -370,20 +346,17 @@ export default function AdminDashboardPage() {
     fetchDashboard();
   }, [activeMainTab]);
 
-  // ------------------- Seller stats (when selected) - FIXED -------------------
+  // ------------------- Seller stats (when selected) -------------------
   useEffect(() => {
     if (!selectedSeller?.id) return;
     const fetchSellerStats = async () => {
       try {
         const sellerId = selectedSeller.id;
-        // all products
         const { data: productsList } = await supabase
           .from('products')
           .select('id')
           .eq('seller_id', sellerId);
         const totalProducts = productsList?.length || 0;
-
-        // get order_items for these products
         const productIds = productsList?.map(p => p.id) || [];
         let soldProducts = 0;
         let pendingPayment = 0,
@@ -404,7 +377,6 @@ export default function AdminDashboardPage() {
             .select('id, status')
             .in('id', orderIds);
           const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
-
           const productSoldSet = new Set();
           for (const item of orderItems || []) {
             const order = orderMap.get(item.order_id);
@@ -419,7 +391,6 @@ export default function AdminDashboardPage() {
           }
           notPurchased = totalProducts - productSoldSet.size;
         }
-
         setSellerStats({
           totalProducts,
           soldProducts,
@@ -491,8 +462,22 @@ export default function AdminDashboardPage() {
 
   // Recalculate finance when selectedSeller or commission percent changes
   useEffect(() => {
-    calculateFinance();
+    if (selectedSeller) {
+      calculateFinance();
+    }
   }, [selectedSeller, sellerCommissionPercent]);
+
+  // ------------------- Sync seller commission from database when seller is selected -------------------
+  useEffect(() => {
+    if (selectedSeller) {
+      const savedPercent = selectedSeller.commission_percent;
+      if (savedPercent !== undefined && savedPercent !== null) {
+        setSellerCommissionPercent(savedPercent);
+      } else {
+        setSellerCommissionPercent(10);
+      }
+    }
+  }, [selectedSeller]);
 
   // ------------------- Fetch inquiries -------------------
   useEffect(() => {
@@ -612,7 +597,6 @@ export default function AdminDashboardPage() {
       setTransferNote('');
       setReceiptFile(null);
       document.getElementById('receiptFileInput').value = '';
-      // refresh finance
       await calculateFinance();
     } catch (err) {
       toast.error(err.message);
@@ -676,19 +660,6 @@ export default function AdminDashboardPage() {
   const sellerUsers = users?.filter(u => u.account_type === 'seller') || [];
   const buyerUsers = users?.filter(u => u.account_type === 'buyer') || [];
 
-  // Product status filter options
-  const productStatusOptions = [
-    { value: 'all', label: 'جميع المنتجات' },
-    { value: 'pending_payment', label: 'منتظرة الدفع' },
-    { value: 'payment_approved', label: 'تم تأكيد الدفع' },
-    { value: 'processing', label: 'قيد التجهيز' },
-    { value: 'shipped', label: 'تم الشحن' },
-    { value: 'delivered', label: 'تم التسليم' },
-    { value: 'completed', label: 'مكتمل' },
-    { value: 'cancelled', label: 'ملغي' },
-    { value: 'returned', label: 'مسترجع' },
-  ];
-
   return (
     <div className="container mx-auto px-4 py-8 font-tajawal">
       {/* Header */}
@@ -731,7 +702,6 @@ export default function AdminDashboardPage() {
       {/* ========================== DASHBOARD ========================== */}
       {activeMainTab === 'dashboard' && (
         <div>
-          {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
             <div className="bg-gradient-to-br from-primary-card to-primary-card/95 p-5 rounded-2xl shadow-lg border border-gold/20 hover:border-gold/50 transition-all">
               <DollarSign className="text-gold mb-2" size={32} />
@@ -765,7 +735,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Alerts */}
           <div className="grid md:grid-cols-3 gap-5 mb-8">
             <div className="bg-yellow-900/20 border border-yellow-600/50 rounded-2xl p-4 text-center backdrop-blur-sm">
               <Clock className="mx-auto text-yellow-500 mb-2" size={28} />
@@ -784,7 +753,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Top Products & Top Sellers */}
           <div className="grid md:grid-cols-2 gap-8 mb-8">
             <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20">
               <h2 className="text-xl font-bold mb-4 text-gold">⭐ أفضل المنتجات مبيعاً</h2>
@@ -812,7 +780,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Sales Chart */}
           <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20">
             <h2 className="text-xl font-bold mb-4"><LineChartIcon className="inline ml-2 text-gold" /> المبيعات اليومية (آخر 7 أيام)</h2>
             <ResponsiveContainer width="100%" height={300}>
@@ -831,7 +798,6 @@ export default function AdminDashboardPage() {
       {/* ========================== USERS ========================== */}
       {activeMainTab === 'users' && (
         <div>
-          {/* Send to all button */}
           <div className="flex justify-end mb-5">
             <Button onClick={sendToAllUsers} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md rounded-lg px-5 py-2 transition-all flex items-center gap-2">
               <Send size={16} /> إرسال إشعار لجميع المستخدمين
@@ -913,7 +879,7 @@ export default function AdminDashboardPage() {
                           <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">قيد التجهيز</td><td className="text-white">{sellerStats.processing}</td></tr>
                           <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">تم الشحن</td><td className="text-white">{sellerStats.shipped}</td></tr>
                           <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">تم التسليم</td><td className="text-white">{sellerStats.delivered}</td></tr>
-                          <tr><td className="py-2 font-bold text-gold">غير مشتراة</td><td className="text-white">{sellerStats.notPurchased}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">غير مشتراة</td><td className="text-white">{sellerStats.notPurchased}</td></tr>
                         </tbody>
                       </table>
                     </div>
@@ -933,7 +899,19 @@ export default function AdminDashboardPage() {
                             className="w-full bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-gold focus:border-gold"
                           />
                         </div>
-                        <Button onClick={() => calculateFinance()} className="bg-gold text-primary-blue shadow-md rounded-lg px-5 py-2 hover:bg-gold/90 transition-all whitespace-nowrap">
+                        <Button 
+                          onClick={async () => {
+                            // حفظ النسبة في قاعدة البيانات
+                            await updateUserMutation({ 
+                              userId: selectedSeller.id, 
+                              updates: { commission_percent: sellerCommissionPercent } 
+                            });
+                            toast.success('تم حفظ نسبة الموقع');
+                            // إعادة حساب المالية بالنسبة الجديدة
+                            await calculateFinance();
+                          }} 
+                          className="bg-gold text-primary-blue shadow-md rounded-lg px-5 py-2 hover:bg-gold/90 transition-all whitespace-nowrap"
+                        >
                           تحديث النسبة
                         </Button>
                       </div>
@@ -968,7 +946,7 @@ export default function AdminDashboardPage() {
                       <th className="p-3 text-gold">عدد الطلبات</th>
                       <th className="p-3 text-gold">إجمالي الإنفاق</th>
                       <th className="p-3 text-gold">الإجراءات</th>
-                    </tr>
+                    </table>
                   </thead>
                   <tbody>
                     {buyerUsers.map(u => (
@@ -1100,7 +1078,6 @@ export default function AdminDashboardPage() {
           </div>
           {selectedSeller ? (
             <div className="grid md:grid-cols-2 gap-6">
-              {/* Left: Add transfer */}
               <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20">
                 <h3 className="text-lg font-bold text-gold mb-4">تسديد حساب البائع</h3>
                 <div className="space-y-3">
@@ -1113,7 +1090,6 @@ export default function AdminDashboardPage() {
                   <Button onClick={handleAddTransfer} disabled={uploading} className="w-full bg-gold text-primary-blue shadow-md hover:bg-gold/90 transition-all">{uploading ? 'جاري الرفع...' : 'إدخال'}</Button>
                 </div>
               </div>
-              {/* Right: Financial summary */}
               <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="text-lg font-bold text-gold">ملخص حسابات البائع</h3>
@@ -1239,6 +1215,8 @@ CREATE TABLE IF NOT EXISTS disputes (
 -- إضافة عمود is_verified إلى profiles إذا لم يكن موجوداً
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS admin_notes TEXT;
-*/
 
+-- ✅ إضافة عمود نسبة الموقع (commission_percent) إلى profiles
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS commission_percent INTEGER DEFAULT 10;
+*/
 
