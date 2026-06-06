@@ -925,73 +925,73 @@ export default function AdminDashboardPage() {
 
           {/* ---------- Buyers ---------- */}
           {activeSubTab === 'buyers' && (
-            <div>
-              <div className="flex gap-4 mb-5">
-                <Input
-                  placeholder="ابحث عن مشتري بالاسم أو البريد"
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  className="flex-1 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold"
-                />
-                <Button variant="secondary" onClick={() => refetchUsers()} className="bg-gray-700 hover:bg-gray-600 text-white shadow-md rounded-lg px-5 py-2 transition-all flex items-center gap-1">
-                  <Search size={16} /> بحث
-                </Button>
-              </div>
-              <div className="overflow-x-auto rounded-xl border border-gold/20">
-                <table className="w-full text-right border-collapse">
-                  <thead>
-                    <tr className="bg-secondary-blue/40 border-b border-gold/30">
-                      <th className="p-3 text-gold">الاسم</th>
-                      <th className="p-3 text-gold">البريد</th>
-                      <th className="p-3 text-gold">عدد الطلبات</th>
-                      <th className="p-3 text-gold">إجمالي الإنفاق</th>
-                      <th className="p-3 text-gold">الإجراءات</th>
-                    </table>
-                  </thead>
-                  <tbody>
-                    {buyerUsers.map(u => (
-                      <tr key={u.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
-                        <td className="p-3 text-white">{u.full_name}</td>
-                        <td className="p-3 text-white">{u.email}</td>
-                        <td className="p-3 text-white">{u.order_count || 0}</td>
-                        <td className="p-3 text-white">{formatCurrency(u.total_spent || 0)}</td>
-                        <td className="p-3 flex gap-2">
-                          <button onClick={() => updateUserMutation({ userId: u.id, updates: { is_banned: !u.is_banned } })} className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs shadow">حظر</button>
-                          <button onClick={() => setSelectedBuyer(u)} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs shadow">تفاصيل</button>
-                          <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(u.id, msg); }} className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs shadow"><Send size={12} /></button>
-                          <button onClick={() => {
-                            const newType = u.account_type === 'seller' ? 'buyer' : 'seller';
-                            if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
-                              updateUserMutation({ userId: u.id, updates: { account_type: newType } });
-                          }} className="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs shadow">🔄 تغيير</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {selectedBuyer && (
-                <Modal onClose={() => setSelectedBuyer(null)} title="ملف المشتري">
-                  <div className="space-y-2 text-gray-800">
-                    <div><strong>الاسم:</strong> {selectedBuyer.full_name}</div>
-                    <div><strong>البريد:</strong> {selectedBuyer.email}</div>
-                    <div><strong>الهاتف:</strong> {selectedBuyer.phone || '-'}</div>
-                    <div><strong>عدد الطلبات:</strong> {selectedBuyer.order_count || 0}</div>
-                    <div><strong>إجمالي الإنفاق:</strong> {formatCurrency(selectedBuyer.total_spent || 0)}</div>
-                    <div className="flex gap-2 mt-4">
-                      <Button variant="danger" onClick={() => updateUserMutation({ userId: selectedBuyer.id, updates: { is_banned: !selectedBuyer.is_banned } })} className="bg-red-600 text-white">{selectedBuyer.is_banned ? 'إلغاء الحظر' : 'حظر'}</Button>
-                      <Button variant="secondary" onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(selectedBuyer.id, msg); }}>إرسال إشعار</Button>
-                      <Button onClick={() => {
-                        const newType = selectedBuyer.account_type === 'seller' ? 'buyer' : 'seller';
-                        if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
-                          updateUserMutation({ userId: selectedBuyer.id, updates: { account_type: newType } });
-                      }} className="bg-amber-600 text-white">تغيير نوع الحساب</Button>
-                    </div>
-                  </div>
-                </Modal>
-              )}
-            </div>
-          )}
+  <div>
+    <div className="flex gap-4 mb-5">
+      <Input
+        placeholder="ابحث عن مشتري بالاسم أو البريد"
+        value={searchTerm}
+        onChange={e => setSearchTerm(e.target.value)}
+        className="flex-1 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold"
+      />
+      <Button variant="secondary" onClick={() => refetchUsers()} className="bg-gray-700 hover:bg-gray-600 text-white shadow-md rounded-lg px-5 py-2 transition-all flex items-center gap-1">
+        <Search size={16} /> بحث
+      </Button>
+    </div>
+    <div className="overflow-x-auto rounded-xl border border-gold/20">
+      <table className="w-full text-right border-collapse">
+        <thead>
+          <tr className="bg-secondary-blue/40 border-b border-gold/30">
+            <th className="p-3 text-gold">الاسم</th>
+            <th className="p-3 text-gold">البريد</th>
+            <th className="p-3 text-gold">عدد الطلبات</th>
+            <th className="p-3 text-gold">إجمالي الإنفاق</th>
+            <th className="p-3 text-gold">الإجراءات</th>
+           </tr>
+        </thead>
+        <tbody>
+          {buyerUsers.map(u => (
+            <tr key={u.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
+              <td className="p-3 text-white">{u.full_name}</td>
+              <td className="p-3 text-white">{u.email}</td>
+              <td className="p-3 text-white">{u.order_count || 0}</td>
+              <td className="p-3 text-white">{formatCurrency(u.total_spent || 0)}</td>
+              <td className="p-3 flex gap-2">
+                <button onClick={() => updateUserMutation({ userId: u.id, updates: { is_banned: !u.is_banned } })} className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs shadow">حظر</button>
+                <button onClick={() => setSelectedBuyer(u)} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs shadow">تفاصيل</button>
+                <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(u.id, msg); }} className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs shadow"><Send size={12} /></button>
+                <button onClick={() => {
+                  const newType = u.account_type === 'seller' ? 'buyer' : 'seller';
+                  if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
+                    updateUserMutation({ userId: u.id, updates: { account_type: newType } });
+                }} className="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs shadow">🔄 تغيير</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    {selectedBuyer && (
+      <Modal onClose={() => setSelectedBuyer(null)} title="ملف المشتري">
+        <div className="space-y-2 text-gray-800">
+          <div><strong>الاسم:</strong> {selectedBuyer.full_name}</div>
+          <div><strong>البريد:</strong> {selectedBuyer.email}</div>
+          <div><strong>الهاتف:</strong> {selectedBuyer.phone || '-'}</div>
+          <div><strong>عدد الطلبات:</strong> {selectedBuyer.order_count || 0}</div>
+          <div><strong>إجمالي الإنفاق:</strong> {formatCurrency(selectedBuyer.total_spent || 0)}</div>
+          <div className="flex gap-2 mt-4">
+            <Button variant="danger" onClick={() => updateUserMutation({ userId: selectedBuyer.id, updates: { is_banned: !selectedBuyer.is_banned } })} className="bg-red-600 text-white">{selectedBuyer.is_banned ? 'إلغاء الحظر' : 'حظر'}</Button>
+            <Button variant="secondary" onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(selectedBuyer.id, msg); }}>إرسال إشعار</Button>
+            <Button onClick={() => {
+              const newType = selectedBuyer.account_type === 'seller' ? 'buyer' : 'seller';
+              if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
+                updateUserMutation({ userId: selectedBuyer.id, updates: { account_type: newType } });
+            }} className="bg-amber-600 text-white">تغيير نوع الحساب</Button>
+          </div>
+        </div>
+      </Modal>
+    )}
+  </div>
+)}
 
           {/* ---------- Pending Registrations ---------- */}
           {activeSubTab === 'pending_users' && (
