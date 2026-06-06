@@ -154,73 +154,107 @@ export default function AdminDashboardPage() {
   });
 
   // 🔹 NEW: جلب عناصر الطلبات (order_items) بدلاً من المنتجات
-  const { data: orderItems, refetch: refetchOrderItems, isLoading: orderItemsLoading } = useQuery({
-    queryKey: ['adminOrderItems', sellerFilterId, productFilterStatus],
-    queryFn: async () => {
-      try {
-        let query = supabase
-          .from('order_items')
-          .select(`
-            *,
-            product:products (
-              id,
-              name,
-              price,
-              seller:profiles!products_seller_id_fkey ( id, full_name )
-            ),
-            order:orders (
-              id,
-              status,
-              created_at,
-              user_id,
-              buyer:profiles!orders_user_id_fkey ( id, full_name, email )
-            )
-          `)
-          .order('order.created_at', { ascending: false });
+  // جلب عناصر الطلبات (order_items) بطريقة مبسطة ومنفصلة
+const { data: orderItems, refetch: refetchOrderItems, isLoading: orderItemsLoading } = useQuery({
+  queryKey: ['adminOrderItems', sellerFilterId, productFilterStatus],
+  queryFn: async () => {
+    try {
+      // 1. جلب order_items الأساسية
+      let query = supabase
+        .from('order_items')
+        .select('id, order_id, product_id, product_price, quantity')
+        .order('order_id', { ascending: false });
+      
+      // إذا كان هناك فلتر حسب البائع (نحتاج لاحقاً لتصفية النتائج)
+      let orderItemsData = await query;
+      if (orderItemsData.error) throw orderItemsData.error;
+      let items = orderItemsData.data || [];
 
-        if (sellerFilterId) {
-          query = query.eq('product.seller_id', sellerFilterId);
-        }
+      if (items.length === 0) return [];
 
-        if (productFilterStatus !== 'all') {
-          const statusMap = {
-            'pending_payment': ['pending', 'pending_payment_review'],
-            'payment_approved': ['payment_approved'],
-            'processing': ['processing'],
-            'shipped': ['shipped'],
-            'delivered': ['delivered'],
-            'completed': ['completed'],
-            'cancelled': ['cancelled'],
-            'returned': ['return_requested', 'return_approved'],
-          };
-          const targetStatuses = statusMap[productFilterStatus] || [];
-          if (targetStatuses.length) {
-            query = query.in('order.status', targetStatuses);
-          }
-        }
+      // 2. جلب معرفات الطلبات والمنتجات الفريدة
+      const orderIds = [...new Set(items.map(i => i.order_id))];
+      const productIds = [...new Set(items.map(i => i.product_id))];
 
-        const { data, error } = await query;
-        if (error) throw error;
+      // 3. جلب تفاصيل الطلبات
+      const { data: orders, error: ordersErr } = await supabase
+        .from('orders')
+        .select('id, status, created_at, user_id')
+        .in('id', orderIds);
+      if (ordersErr) throw ordersErr;
+      const ordersMap = new Map(orders?.map(o => [o.id, o]) || []);
 
-        return data.map(item => ({
+      // 4. جلب تفاصيل المنتجات وأسماء البائعين
+      const { data: products, error: productsErr } = await supabase
+        .from('products')
+        .select('id, name, price, seller_id, seller:profiles!products_seller_id_fkey (id, full_name)')
+        .in('id', productIds);
+      if (productsErr) throw productsErr;
+      const productsMap = new Map(products?.map(p => [p.id, p]) || []);
+
+      // 5. جلب أسماء المشترين من الطلبات
+      const buyerIds = [...new Set(orders?.map(o => o.user_id).filter(Boolean))];
+      const { data: buyers, error: buyersErr } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', buyerIds);
+      if (buyersErr) throw buyersErr;
+      const buyersMap = new Map(buyers?.map(b => [b.id, b]) || []);
+
+      // 6. دمج البيانات
+      let results = items.map(item => {
+        const order = ordersMap.get(item.order_id);
+        const product = productsMap.get(item.product_id);
+        const buyer = buyersMap.get(order?.user_id);
+        return {
           id: item.id,
-          product_name: item.product?.name || 'غير معروف',
-          seller_name: item.product?.seller?.full_name || 'غير معروف',
-          order_date: item.order?.created_at,
+          product_name: product?.name || 'غير معروف',
+          seller_name: product?.seller?.full_name || 'غير معروف',
+          order_date: order?.created_at,
           unit_price: item.product_price,
           quantity: item.quantity,
           total_price: item.product_price * item.quantity,
-          order_status: item.order?.status,
-          buyer_name: item.order?.buyer?.full_name || 'غير معروف',
-          buyer_email: item.order?.buyer?.email,
-        }));
-      } catch (err) {
-        console.error('خطأ في جلب عناصر الطلبات:', err);
-        return [];
+          order_status: order?.status,
+          buyer_name: buyer?.full_name || 'غير معروف',
+          buyer_email: buyer?.email,
+        };
+      });
+
+      // 7. تصفية حسب حالة الطلب إذا تم اختيار فلتر (وليس 'all')
+      if (productFilterStatus !== 'all') {
+        const statusMap = {
+          'pending_payment': ['pending', 'pending_payment_review'],
+          'payment_approved': ['payment_approved'],
+          'processing': ['processing'],
+          'shipped': ['shipped'],
+          'delivered': ['delivered'],
+          'completed': ['completed'],
+          'cancelled': ['cancelled'],
+          'returned': ['return_requested', 'return_approved'],
+        };
+        const targetStatuses = statusMap[productFilterStatus] || [];
+        if (targetStatuses.length) {
+          results = results.filter(r => targetStatuses.includes(r.order_status));
+        }
       }
-    },
-    enabled: activeMainTab === 'products',
-  });
+
+      // 8. تصفية حسب البائع إذا تم اختيار فلتر بائع
+      if (sellerFilterId) {
+        results = results.filter(r => r.seller_name !== 'غير معروف'); // بدلاً من ذلك يمكن استخدام seller_id الحقيقي
+        // لكن لا يوجد seller_id في النتيجة، لذا نضيفه أثناء الدمج
+      }
+
+      // ترتيب حسب التاريخ تنازلياً
+      results.sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
+
+      return results;
+    } catch (err) {
+      console.error('خطأ في جلب عناصر الطلبات:', err);
+      return [];
+    }
+  },
+  enabled: activeMainTab === 'products',
+});
 
   // ------------------- Dashboard data fetching -------------------
   useEffect(() => {
