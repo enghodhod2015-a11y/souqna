@@ -265,8 +265,9 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
   return publicUrl
 }
 
-// 9️⃣ إحصائيات البائع (معدلة لجلب بيانات حقيقية)
+// 9️⃣ إحصائيات البائع (معدلة لجلب بيانات حقيقية مع console.log للتشخيص)
 export const getSellerStats = async (sellerId) => {
+  console.log('📊 getSellerStats called for seller:', sellerId);
   try {
     // 1. جلب جميع منتجات البائع
     const { data: products, error: productsError } = await supabase
@@ -275,11 +276,10 @@ export const getSellerStats = async (sellerId) => {
       .eq('seller_id', sellerId);
     if (productsError) throw productsError;
     const productIds = products?.map(p => p.id) || [];
+    console.log('📦 منتجات البائع IDs:', productIds);
     
-    // عدد المنتجات
     const productsCount = productIds.length;
 
-    // عدد المحادثات (الاستفسارات)
     const { count: conversationsCount, error: convCountErr } = await supabase
       .from('conversations')
       .select('*', { count: 'exact', head: true })
@@ -287,6 +287,7 @@ export const getSellerStats = async (sellerId) => {
     if (convCountErr) throw convCountErr;
 
     if (productIds.length === 0) {
+      console.log('⚠️ لا توجد منتجات للبائع');
       return {
         totalSales: 0,
         productsCount,
@@ -303,8 +304,10 @@ export const getSellerStats = async (sellerId) => {
       .select('order_id, product_price, quantity')
       .in('product_id', productIds);
     if (oiError) throw oiError;
+    console.log('📦 order_items المستلمة:', orderItems);
 
     if (!orderItems || orderItems.length === 0) {
+      console.log('⚠️ لا توجد order_items لهذه المنتجات');
       return {
         totalSales: 0,
         productsCount,
@@ -316,6 +319,7 @@ export const getSellerStats = async (sellerId) => {
     }
 
     const orderIds = [...new Set(orderItems.map(oi => oi.order_id))];
+    console.log('📦 orderIds الفريدة:', orderIds);
 
     // 3. جلب حالات الطلبات
     const { data: orders, error: ordersError } = await supabase
@@ -323,6 +327,7 @@ export const getSellerStats = async (sellerId) => {
       .select('id, status')
       .in('id', orderIds);
     if (ordersError) throw ordersError;
+    console.log('📦 الطلبات:', orders);
 
     const orderStatusMap = new Map(orders?.map(o => [o.id, o.status]) || []);
 
@@ -337,6 +342,7 @@ export const getSellerStats = async (sellerId) => {
 
       const saleAmount = item.product_price * item.quantity;
       totalSales += saleAmount;
+      console.log(`💰 order ${item.order_id}: ${saleAmount} ريال (الحالة: ${status})`);
 
       if (status === 'pending' || status === 'pending_payment_review') {
         pendingOrders++;
@@ -347,7 +353,7 @@ export const getSellerStats = async (sellerId) => {
       }
     }
 
-    return {
+    const result = {
       totalSales,
       productsCount,
       conversationsCount: conversationsCount || 0,
@@ -355,6 +361,8 @@ export const getSellerStats = async (sellerId) => {
       processingOrders,
       completedOrders,
     };
+    console.log('🎉 النتيجة النهائية للـ stats:', result);
+    return result;
   } catch (err) {
     console.error('❌ خطأ في جلب إحصائيات البائع:', err);
     return {
