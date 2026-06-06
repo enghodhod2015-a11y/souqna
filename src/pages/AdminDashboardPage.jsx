@@ -690,11 +690,11 @@ export default function AdminDashboardPage() {
   ];
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 font-tajawal">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gold">لوحة تحكم الأدمن</h1>
-        <Button variant="secondary" onClick={refreshAllData} className="flex items-center gap-2">
+        <Button onClick={refreshAllData} className="bg-gray-700 hover:bg-gray-600 text-white shadow-md rounded-lg px-4 py-2 transition-all flex items-center gap-2">
           <RefreshCw size={16} /> تحديث الكل
         </Button>
       </div>
@@ -708,8 +708,10 @@ export default function AdminDashboardPage() {
               setActiveMainTab(tab);
               if (tab === 'users') setActiveSubTab('sellers');
             }}
-            className={`px-4 py-2 rounded-lg transition flex items-center gap-2 ${
-              activeMainTab === tab ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'
+            className={`px-5 py-2 rounded-t-lg transition-all duration-200 flex items-center gap-2 font-medium ${
+              activeMainTab === tab
+                ? 'bg-gradient-to-r from-gold to-amber-500 text-primary-blue shadow-md'
+                : 'bg-primary-card/60 text-text-secondary hover:bg-secondary-blue/50 hover:text-white'
             }`}
           >
             {tab === 'dashboard' && <BarChart3 size={18} />}
@@ -730,54 +732,52 @@ export default function AdminDashboardPage() {
       {activeMainTab === 'dashboard' && (
         <div>
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-primary-card p-4 rounded-2xl border-gold/30">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+            <div className="bg-gradient-to-br from-primary-card to-primary-card/95 p-5 rounded-2xl shadow-lg border border-gold/20 hover:border-gold/50 transition-all">
               <DollarSign className="text-gold mb-2" size={32} />
               <p className="text-text-secondary text-sm">مبيعات اليوم</p>
-              <p className="text-2xl font-bold">{formatCurrency(dashboardData.dailySales)}</p>
+              <p className="text-2xl font-bold text-white">{formatCurrency(dashboardData.dailySales)}</p>
             </div>
-            <div className="bg-primary-card p-4 rounded-2xl border-gold/30">
+            <div className="bg-gradient-to-br from-primary-card to-primary-card/95 p-5 rounded-2xl shadow-lg border border-gold/20 hover:border-gold/50 transition-all">
               <TrendingUp className="text-gold mb-2" size={32} />
               <p className="text-text-secondary text-sm">مبيعات الشهر</p>
-              <p className="text-2xl font-bold">{formatCurrency(dashboardData.monthlySales)}</p>
+              <p className="text-2xl font-bold text-white">{formatCurrency(dashboardData.monthlySales)}</p>
             </div>
-            <div className="bg-primary-card p-4 rounded-2xl border-gold/30">
+            <div className="bg-gradient-to-br from-primary-card to-primary-card/95 p-5 rounded-2xl shadow-lg border border-gold/20 hover:border-gold/50 transition-all">
               <Activity className="text-gold mb-2" size={32} />
               <p className="text-text-secondary text-sm">مبيعات السنة</p>
-              <p className="text-2xl font-bold">{formatCurrency(dashboardData.yearlySales)}</p>
+              <p className="text-2xl font-bold text-white">{formatCurrency(dashboardData.yearlySales)}</p>
             </div>
-            <div className="bg-primary-card p-4 rounded-2xl border-gold/30">
+            <div className="bg-gradient-to-br from-primary-card to-primary-card/95 p-5 rounded-2xl shadow-lg border border-gold/20 hover:border-gold/50 transition-all">
               <ShoppingBag className="text-gold mb-2" size={32} />
               <p className="text-text-secondary text-sm">إجمالي الطلبات</p>
-              <p className="text-2xl font-bold">{dashboardData.totalOrders}</p>
+              <p className="text-2xl font-bold text-white">{dashboardData.totalOrders}</p>
             </div>
-            <div className="bg-primary-card p-4 rounded-2xl border-gold/30">
+            <div className="bg-gradient-to-br from-primary-card to-primary-card/95 p-5 rounded-2xl shadow-lg border border-gold/20 hover:border-gold/50 transition-all">
               <Users className="text-gold mb-2" size={32} />
               <p className="text-text-secondary text-sm">مستخدمين جدد (30 يوم)</p>
-              <p className="text-2xl font-bold">
-                {dashboardData.newUsers} <span className="text-sm">/ {dashboardData.newSellers} بائع</span>
-              </p>
+              <p className="text-2xl font-bold text-white">{dashboardData.newUsers} <span className="text-sm">/ {dashboardData.newSellers} بائع</span></p>
             </div>
-            <div className="bg-primary-card p-4 rounded-2xl border-gold/30">
+            <div className="bg-gradient-to-br from-primary-card to-primary-card/95 p-5 rounded-2xl shadow-lg border border-gold/20 hover:border-gold/50 transition-all">
               <Wallet className="text-gold mb-2" size={32} />
               <p className="text-text-secondary text-sm">العمولات المستحقة</p>
-              <p className="text-2xl font-bold">{formatCurrency(dashboardData.totalCommission)}</p>
+              <p className="text-2xl font-bold text-white">{formatCurrency(dashboardData.totalCommission)}</p>
             </div>
           </div>
 
           {/* Alerts */}
-          <div className="grid md:grid-cols-3 gap-4 mb-8">
-            <div className="bg-yellow-900/20 border border-yellow-600 rounded-2xl p-4 text-center">
+          <div className="grid md:grid-cols-3 gap-5 mb-8">
+            <div className="bg-yellow-900/20 border border-yellow-600/50 rounded-2xl p-4 text-center backdrop-blur-sm">
               <Clock className="mx-auto text-yellow-500 mb-2" size={28} />
               <p className="text-text-secondary">طلبات معلقة</p>
               <p className="text-2xl font-bold text-yellow-500">{dashboardData.pendingOrders}</p>
             </div>
-            <div className="bg-red-900/20 border border-red-600 rounded-2xl p-4 text-center">
+            <div className="bg-red-900/20 border border-red-600/50 rounded-2xl p-4 text-center backdrop-blur-sm">
               <Package className="mx-auto text-red-500 mb-2" size={28} />
               <p className="text-text-secondary">منتجات تحتاج مراجعة</p>
               <p className="text-2xl font-bold text-red-500">{dashboardData.pendingProducts}</p>
             </div>
-            <div className="bg-blue-900/20 border border-blue-600 rounded-2xl p-4 text-center">
+            <div className="bg-blue-900/20 border border-blue-600/50 rounded-2xl p-4 text-center backdrop-blur-sm">
               <MessageCircle className="mx-auto text-blue-500 mb-2" size={28} />
               <p className="text-text-secondary">شكاوى جديدة</p>
               <p className="text-2xl font-bold text-blue-500">{dashboardData.newDisputes}</p>
@@ -786,26 +786,26 @@ export default function AdminDashboardPage() {
 
           {/* Top Products & Top Sellers */}
           <div className="grid md:grid-cols-2 gap-8 mb-8">
-            <div className="bg-primary-card p-4 rounded-2xl border-gold/30">
+            <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20">
               <h2 className="text-xl font-bold mb-4 text-gold">⭐ أفضل المنتجات مبيعاً</h2>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {dashboardData.topProducts.map((p, i) => (
                   <div key={i} className="flex justify-between items-center border-b border-gold/20 pb-2">
-                    <span>{p.name}</span>
-                    <span className="text-gold">{formatCurrency(p.revenue)}</span>
+                    <span className="text-white">{p.name}</span>
+                    <span className="text-gold font-medium">{formatCurrency(p.revenue)}</span>
                     <span className="text-xs text-text-secondary">{p.qty} قطعة</span>
                   </div>
                 ))}
-                {dashboardData.topProducts.length === 0 && <p className="text-text-secondary">لا توجد بيانات كافية</p>}
+                {dashboardData.topProducts.length === 0 && <p className="text-text-secondary text-center">لا توجد بيانات كافية</p>}
               </div>
             </div>
-            <div className="bg-primary-card p-4 rounded-2xl border-gold/30">
+            <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20">
               <h2 className="text-xl font-bold mb-4 text-gold">🏆 البائعين الأعلى تقييماً</h2>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {dashboardData.topSellers.map((s, i) => (
                   <div key={i} className="flex justify-between items-center border-b border-gold/20 pb-2">
-                    <span>{s.name}</span>
-                    <span className="flex items-center gap-1"><Star size={16} className="text-gold fill-gold" /> {s.rating}</span>
+                    <span className="text-white">{s.name}</span>
+                    <span className="flex items-center gap-1 text-gold"><Star size={16} className="text-gold fill-gold" /> {s.rating}</span>
                   </div>
                 ))}
               </div>
@@ -813,14 +813,14 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Sales Chart */}
-          <div className="bg-primary-card p-4 rounded-2xl border-gold/30">
+          <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20">
             <h2 className="text-xl font-bold mb-4"><LineChartIcon className="inline ml-2 text-gold" /> المبيعات اليومية (آخر 7 أيام)</h2>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={salesChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                 <XAxis dataKey="name" stroke="#ddd" />
                 <YAxis stroke="#ddd" />
-                <Tooltip contentStyle={{ backgroundColor: '#06264D', borderColor: '#D4AF37' }} formatter={(value) => formatCurrency(value)} />
+                <Tooltip contentStyle={{ backgroundColor: '#06264D', borderColor: '#D4AF37', color: '#fff' }} formatter={(value) => formatCurrency(value)} />
                 <Line type="monotone" dataKey="sales" stroke="#D4AF37" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
@@ -832,15 +832,15 @@ export default function AdminDashboardPage() {
       {activeMainTab === 'users' && (
         <div>
           {/* Send to all button */}
-          <div className="flex justify-end mb-4">
-            <Button onClick={sendToAllUsers} className="bg-blue-600 flex items-center gap-2">
+          <div className="flex justify-end mb-5">
+            <Button onClick={sendToAllUsers} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md rounded-lg px-5 py-2 transition-all flex items-center gap-2">
               <Send size={16} /> إرسال إشعار لجميع المستخدمين
             </Button>
           </div>
-          <div className="flex border-b border-gold/30 mb-4">
-            <button onClick={() => setActiveSubTab('sellers')} className={`px-4 py-2 ${activeSubTab === 'sellers' ? 'border-b-2 border-gold text-gold' : 'text-text-secondary'}`}>البائعين</button>
-            <button onClick={() => setActiveSubTab('buyers')} className={`px-4 py-2 ${activeSubTab === 'buyers' ? 'border-b-2 border-gold text-gold' : 'text-text-secondary'}`}>المشترين</button>
-            <button onClick={() => setActiveSubTab('pending_users')} className={`px-4 py-2 ${activeSubTab === 'pending_users' ? 'border-b-2 border-gold text-gold' : 'text-text-secondary'}`}>
+          <div className="flex gap-4 border-b border-gold/30 mb-6">
+            <button onClick={() => setActiveSubTab('sellers')} className={`px-5 py-2 rounded-t-lg transition-all ${activeSubTab === 'sellers' ? 'bg-gold text-primary-blue shadow-md' : 'text-text-secondary hover:text-white'}`}>البائعين</button>
+            <button onClick={() => setActiveSubTab('buyers')} className={`px-5 py-2 rounded-t-lg transition-all ${activeSubTab === 'buyers' ? 'bg-gold text-primary-blue shadow-md' : 'text-text-secondary hover:text-white'}`}>المشترين</button>
+            <button onClick={() => setActiveSubTab('pending_users')} className={`px-5 py-2 rounded-t-lg transition-all ${activeSubTab === 'pending_users' ? 'bg-gold text-primary-blue shadow-md' : 'text-text-secondary hover:text-white'}`}>
               طلبات التسجيل {pendingSellers?.length > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full ml-1">{pendingSellers.length}</span>}
             </button>
           </div>
@@ -848,8 +848,8 @@ export default function AdminDashboardPage() {
           {/* ---------- Sellers ---------- */}
           {activeSubTab === 'sellers' && (
             <div>
-              <div className="mb-4">
-                <label className="block text-gold mb-2">اختر البائع:</label>
+              <div className="mb-5">
+                <label className="block text-gold font-medium mb-2">اختر البائع:</label>
                 <Select
                   value={selectedSeller?.id || ''}
                   onChange={e => {
@@ -858,7 +858,7 @@ export default function AdminDashboardPage() {
                     setSellerDetailTab('profile');
                     setSellerFilterId(null);
                   }}
-                  className="w-full md:w-1/2 bg-white text-gray-900 border-gold/30"
+                  className="w-full md:w-1/2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold"
                 >
                   <option value="">-- اختر بائعاً --</option>
                   {sellerUsers.map(s => (
@@ -867,36 +867,37 @@ export default function AdminDashboardPage() {
                 </Select>
               </div>
               {selectedSeller && (
-                <div className="bg-primary-card rounded-2xl p-4">
-                  <div className="flex gap-2 mb-4 border-b border-gold/30 pb-2">
-                    <button onClick={() => setSellerDetailTab('profile')} className={`px-4 py-2 rounded-lg ${sellerDetailTab === 'profile' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}>الملف الشخصي</button>
-                    <button onClick={() => setSellerDetailTab('stats')} className={`px-4 py-2 rounded-lg ${sellerDetailTab === 'stats' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}>إحصائيات المنتجات</button>
-                    <button onClick={() => setSellerDetailTab('commission')} className={`px-4 py-2 rounded-lg ${sellerDetailTab === 'commission' ? 'bg-gold text-primary-blue' : 'hover:bg-secondary-blue'}`}>نسبة الموقع</button>
+                <div className="bg-primary-card rounded-2xl p-5 shadow-lg border border-gold/20">
+                  <div className="flex gap-3 mb-5 border-b border-gold/30 pb-2">
+                    <button onClick={() => setSellerDetailTab('profile')} className={`px-4 py-2 rounded-lg transition-all ${sellerDetailTab === 'profile' ? 'bg-gold text-primary-blue shadow' : 'text-text-secondary hover:text-white'}`}>الملف الشخصي</button>
+                    <button onClick={() => setSellerDetailTab('stats')} className={`px-4 py-2 rounded-lg transition-all ${sellerDetailTab === 'stats' ? 'bg-gold text-primary-blue shadow' : 'text-text-secondary hover:text-white'}`}>إحصائيات المنتجات</button>
+                    <button onClick={() => setSellerDetailTab('commission')} className={`px-4 py-2 rounded-lg transition-all ${sellerDetailTab === 'commission' ? 'bg-gold text-primary-blue shadow' : 'text-text-secondary hover:text-white'}`}>نسبة الموقع</button>
                   </div>
 
                   {sellerDetailTab === 'profile' && (
                     <div>
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div><span className="font-bold">الاسم:</span> {selectedSeller.full_name}</div>
-                        <div><span className="font-bold">البريد:</span> {selectedSeller.email}</div>
-                        <div><span className="font-bold">الهاتف:</span> {selectedSeller.phone || '-'}</div>
-                        <div><span className="font-bold">تاريخ التسجيل:</span> {formatDate(selectedSeller.created_at)}</div>
-                        <div><span className="font-bold">الحالة:</span> {selectedSeller.is_banned ? 'محظور' : 'نشط'}</div>
-                        <div><span className="font-bold">نسبة الموقع الحالية:</span> {sellerCommissionPercent}%</div>
+                      <div className="grid grid-cols-2 gap-4 mb-5 bg-secondary-blue/30 p-4 rounded-xl">
+                        <div><span className="font-bold text-gold">الاسم:</span> <span className="text-white">{selectedSeller.full_name}</span></div>
+                        <div><span className="font-bold text-gold">البريد:</span> <span className="text-white">{selectedSeller.email}</span></div>
+                        <div><span className="font-bold text-gold">الهاتف:</span> <span className="text-white">{selectedSeller.phone || '-'}</span></div>
+                        <div><span className="font-bold text-gold">تاريخ التسجيل:</span> <span className="text-white">{formatDate(selectedSeller.created_at)}</span></div>
+                        <div><span className="font-bold text-gold">الحالة:</span> <span className={selectedSeller.is_banned ? 'text-red-400' : 'text-green-400'}>{selectedSeller.is_banned ? 'محظور' : 'نشط'}</span></div>
+                        <div><span className="font-bold text-gold">نسبة الموقع الحالية:</span> <span className="text-gold">{sellerCommissionPercent}%</span></div>
                       </div>
                       <div className="flex flex-wrap gap-3">
-                        <Button variant="danger" onClick={() => updateUserMutation({ userId: selectedSeller.id, updates: { is_banned: !selectedSeller.is_banned } })}>
+                        <Button variant="danger" onClick={() => updateUserMutation({ userId: selectedSeller.id, updates: { is_banned: !selectedSeller.is_banned } })} className="bg-red-600 hover:bg-red-700 text-white shadow-md rounded-lg px-4 py-2">
                           {selectedSeller.is_banned ? 'إلغاء الحظر' : 'حظر'}
                         </Button>
-                        <Button variant="secondary" onClick={() => {
-                          const msg = prompt('أدخل نص الإشعار:');
-                          if (msg) sendNotificationToUser(selectedSeller.id, msg);
-                        }}><Send size={14} /> إرسال إشعار</Button>
+                        <Button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(selectedSeller.id, msg); }} className="bg-purple-600 hover:bg-purple-700 text-white shadow-md rounded-lg px-4 py-2 flex items-center gap-1">
+                          <Send size={14} /> إرسال إشعار
+                        </Button>
                         <Button onClick={() => {
                           const newType = selectedSeller.account_type === 'seller' ? 'buyer' : 'seller';
                           if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
                             updateUserMutation({ userId: selectedSeller.id, updates: { account_type: newType } });
-                        }} className="bg-amber-600"><UserCog size={14} /> تغيير نوع الحساب</Button>
+                        }} className="bg-amber-600 hover:bg-amber-700 text-white shadow-md rounded-lg px-4 py-2 flex items-center gap-1">
+                          <UserCog size={14} /> تغيير نوع الحساب
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -905,22 +906,22 @@ export default function AdminDashboardPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-right">
                         <tbody>
-                          <tr><td className="py-1 font-bold">جميع المنتجات المنشورة</td><td>{sellerStats.totalProducts}</td></tr>
-                          <tr><td className="py-1 font-bold">المنتجات التي تم بيعها (قطع)</td><td>{sellerStats.soldProducts}</td></tr>
-                          <tr><td className="py-1 font-bold">منتظرة الدفع</td><td>{sellerStats.pendingPayment}</td></tr>
-                          <tr><td className="py-1 font-bold">تم تأكيد الدفع</td><td>{sellerStats.paymentApproved}</td></tr>
-                          <tr><td className="py-1 font-bold">قيد التجهيز</td><td>{sellerStats.processing}</td></tr>
-                          <tr><td className="py-1 font-bold">تم الشحن</td><td>{sellerStats.shipped}</td></tr>
-                          <tr><td className="py-1 font-bold">تم التسليم</td><td>{sellerStats.delivered}</td></tr>
-                          <tr><td className="py-1 font-bold">غير مشتراة</td><td>{sellerStats.notPurchased}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">جميع المنتجات المنشورة</td><td className="text-white">{sellerStats.totalProducts}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">المنتجات التي تم بيعها (قطع)</td><td className="text-white">{sellerStats.soldProducts}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">منتظرة الدفع</td><td className="text-white">{sellerStats.pendingPayment}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">تم تأكيد الدفع</td><td className="text-white">{sellerStats.paymentApproved}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">قيد التجهيز</td><td className="text-white">{sellerStats.processing}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">تم الشحن</td><td className="text-white">{sellerStats.shipped}</td></tr>
+                          <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">تم التسليم</td><td className="text-white">{sellerStats.delivered}</td></tr>
+                          <tr><td className="py-2 font-bold text-gold">غير مشتراة</td><td className="text-white">{sellerStats.notPurchased}</td></tr>
                         </tbody>
-                       </table>
+                      </table>
                     </div>
                   )}
 
                   {sellerDetailTab === 'commission' && (
                     <div>
-                      <div className="flex items-end gap-2">
+                      <div className="flex items-end gap-3">
                         <div className="flex-1">
                           <label className="block text-gold mb-2">نسبة الموقع (%)</label>
                           <input
@@ -929,14 +930,14 @@ export default function AdminDashboardPage() {
                             max="100"
                             value={sellerCommissionPercent}
                             onChange={e => setSellerCommissionPercent(parseFloat(e.target.value) || 0)}
-                            className="bg-white text-gray-900 rounded px-3 py-2 w-full"
+                            className="w-full bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-gold focus:border-gold"
                           />
                         </div>
-                        <Button onClick={() => calculateFinance()} className="bg-gold text-primary-blue whitespace-nowrap">
+                        <Button onClick={() => calculateFinance()} className="bg-gold text-primary-blue shadow-md rounded-lg px-5 py-2 hover:bg-gold/90 transition-all whitespace-nowrap">
                           تحديث النسبة
                         </Button>
                       </div>
-                      <p className="text-text-secondary text-sm mt-2">* سيتم إعادة حساب العمولة والمبلغ المتبقي فوراً</p>
+                      <p className="text-text-secondary text-sm mt-3">* سيتم إعادة حساب العمولة والمبلغ المتبقي فوراً</p>
                     </div>
                   )}
                 </div>
@@ -947,37 +948,44 @@ export default function AdminDashboardPage() {
           {/* ---------- Buyers ---------- */}
           {activeSubTab === 'buyers' && (
             <div>
-              <div className="flex gap-4 mb-4">
+              <div className="flex gap-4 mb-5">
                 <Input
                   placeholder="ابحث عن مشتري بالاسم أو البريد"
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  className="flex-1 bg-white text-gray-900"
-                  style={{ color: '#000' }}
+                  className="flex-1 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold"
                 />
-                <Button variant="secondary" onClick={() => refetchUsers()}><Search size={16} /> بحث</Button>
+                <Button variant="secondary" onClick={() => refetchUsers()} className="bg-gray-700 hover:bg-gray-600 text-white shadow-md rounded-lg px-5 py-2 transition-all flex items-center gap-1">
+                  <Search size={16} /> بحث
+                </Button>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-xl border border-gold/20">
                 <table className="w-full text-right border-collapse">
                   <thead>
-                    <tr><th>الاسم</th><th>البريد</th><th>عدد الطلبات</th><th>إجمالي الإنفاق</th><th>الإجراءات</th></tr>
+                    <tr className="bg-secondary-blue/40 border-b border-gold/30">
+                      <th className="p-3 text-gold">الاسم</th>
+                      <th className="p-3 text-gold">البريد</th>
+                      <th className="p-3 text-gold">عدد الطلبات</th>
+                      <th className="p-3 text-gold">إجمالي الإنفاق</th>
+                      <th className="p-3 text-gold">الإجراءات</th>
+                    </tr>
                   </thead>
                   <tbody>
                     {buyerUsers.map(u => (
-                      <tr key={u.id}>
-                        <td>{u.full_name}</td>
-                        <td>{u.email}</td>
-                        <td>{u.order_count || 0}</td>
-                        <td>{formatCurrency(u.total_spent || 0)}</td>
-                        <td className="flex gap-2">
-                          <button onClick={() => updateUserMutation({ userId: u.id, updates: { is_banned: !u.is_banned } })} className="px-2 py-1 rounded bg-red-600 text-white text-xs">حظر</button>
-                          <button onClick={() => setSelectedBuyer(u)} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
-                          <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(u.id, msg); }} className="bg-purple-600 px-2 py-1 rounded text-xs"><Send size={12} /></button>
+                      <tr key={u.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
+                        <td className="p-3 text-white">{u.full_name}</td>
+                        <td className="p-3 text-white">{u.email}</td>
+                        <td className="p-3 text-white">{u.order_count || 0}</td>
+                        <td className="p-3 text-white">{formatCurrency(u.total_spent || 0)}</td>
+                        <td className="p-3 flex gap-2">
+                          <button onClick={() => updateUserMutation({ userId: u.id, updates: { is_banned: !u.is_banned } })} className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs shadow">حظر</button>
+                          <button onClick={() => setSelectedBuyer(u)} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs shadow">تفاصيل</button>
+                          <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(u.id, msg); }} className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs shadow"><Send size={12} /></button>
                           <button onClick={() => {
                             const newType = u.account_type === 'seller' ? 'buyer' : 'seller';
                             if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
                               updateUserMutation({ userId: u.id, updates: { account_type: newType } });
-                          }} className="bg-amber-600 px-2 py-1 rounded text-xs">🔄 تغيير</button>
+                          }} className="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs shadow">🔄 تغيير</button>
                         </td>
                       </tr>
                     ))}
@@ -986,21 +994,21 @@ export default function AdminDashboardPage() {
               </div>
               {selectedBuyer && (
                 <Modal onClose={() => setSelectedBuyer(null)} title="ملف المشتري">
-                  <div><strong>الاسم:</strong> {selectedBuyer.full_name}</div>
-                  <div><strong>البريد:</strong> {selectedBuyer.email}</div>
-                  <div><strong>الهاتف:</strong> {selectedBuyer.phone || '-'}</div>
-                  <div><strong>عدد الطلبات:</strong> {selectedBuyer.order_count || 0}</div>
-                  <div><strong>إجمالي الإنفاق:</strong> {formatCurrency(selectedBuyer.total_spent || 0)}</div>
-                  <div className="flex gap-2 mt-4">
-                    <Button variant="danger" onClick={() => updateUserMutation({ userId: selectedBuyer.id, updates: { is_banned: !selectedBuyer.is_banned } })}>
-                      {selectedBuyer.is_banned ? 'إلغاء الحظر' : 'حظر'}
-                    </Button>
-                    <Button variant="secondary" onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(selectedBuyer.id, msg); }}>إرسال إشعار</Button>
-                    <Button onClick={() => {
-                      const newType = selectedBuyer.account_type === 'seller' ? 'buyer' : 'seller';
-                      if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
-                        updateUserMutation({ userId: selectedBuyer.id, updates: { account_type: newType } });
-                    }} className="bg-amber-600">تغيير نوع الحساب</Button>
+                  <div className="space-y-2 text-gray-800">
+                    <div><strong>الاسم:</strong> {selectedBuyer.full_name}</div>
+                    <div><strong>البريد:</strong> {selectedBuyer.email}</div>
+                    <div><strong>الهاتف:</strong> {selectedBuyer.phone || '-'}</div>
+                    <div><strong>عدد الطلبات:</strong> {selectedBuyer.order_count || 0}</div>
+                    <div><strong>إجمالي الإنفاق:</strong> {formatCurrency(selectedBuyer.total_spent || 0)}</div>
+                    <div className="flex gap-2 mt-4">
+                      <Button variant="danger" onClick={() => updateUserMutation({ userId: selectedBuyer.id, updates: { is_banned: !selectedBuyer.is_banned } })} className="bg-red-600 text-white">{selectedBuyer.is_banned ? 'إلغاء الحظر' : 'حظر'}</Button>
+                      <Button variant="secondary" onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(selectedBuyer.id, msg); }}>إرسال إشعار</Button>
+                      <Button onClick={() => {
+                        const newType = selectedBuyer.account_type === 'seller' ? 'buyer' : 'seller';
+                        if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
+                          updateUserMutation({ userId: selectedBuyer.id, updates: { account_type: newType } });
+                      }} className="bg-amber-600 text-white">تغيير نوع الحساب</Button>
+                    </div>
                   </div>
                 </Modal>
               )}
@@ -1011,11 +1019,11 @@ export default function AdminDashboardPage() {
           {activeSubTab === 'pending_users' && (
             <div className="space-y-4">
               {pendingSellers?.map(s => (
-                <div key={s.id} className="bg-primary-card p-4 rounded-2xl">
-                  <div><h3 className="font-bold">{s.full_name}</h3><p>{s.email} | {s.phone}</p><p>تاريخ الطلب: {formatDate(s.created_at)}</p></div>
+                <div key={s.id} className="bg-primary-card p-4 rounded-2xl shadow border border-gold/20">
+                  <div><h3 className="font-bold text-gold">{s.full_name}</h3><p className="text-white">{s.email} | {s.phone}</p><p className="text-text-secondary">تاريخ الطلب: {formatDate(s.created_at)}</p></div>
                   <div className="flex gap-2 mt-2">
-                    <Button onClick={() => approveSellerMutation({ sellerId: s.id, approved: true })}>قبول</Button>
-                    <Button variant="danger" onClick={() => { const notes = prompt('سبب الرفض:'); approveSellerMutation({ sellerId: s.id, approved: false, notes }); }}>رفض</Button>
+                    <Button onClick={() => approveSellerMutation({ sellerId: s.id, approved: true })} className="bg-green-600 hover:bg-green-700 text-white shadow">قبول</Button>
+                    <Button variant="danger" onClick={() => { const notes = prompt('سبب الرفض:'); approveSellerMutation({ sellerId: s.id, approved: false, notes }); }} className="bg-red-600 hover:bg-red-700 text-white shadow">رفض</Button>
                   </div>
                 </div>
               ))}
@@ -1028,37 +1036,45 @@ export default function AdminDashboardPage() {
       {/* ========================== PRODUCT MANAGEMENT ========================== */}
       {activeMainTab === 'products' && (
         <div>
-          <div className="flex flex-wrap gap-3 mb-4 items-center">
-            <label className="text-gold">فلترة حسب حالة الطلب:</label>
+          <div className="flex flex-wrap gap-3 mb-5 items-center">
+            <label className="text-gold font-medium">فلترة حسب حالة الطلب:</label>
             <select
               value={productFilterStatus}
               onChange={e => setProductFilterStatus(e.target.value)}
-              className="bg-white text-gray-900 rounded px-3 py-2 border border-gold/30"
+              className="bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-gold focus:border-gold"
             >
               {productStatusOptions.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
-            {sellerFilterId && <Button variant="secondary" onClick={() => setSellerFilterId(null)}>إلغاء فلتر البائع</Button>}
+            {sellerFilterId && <Button variant="secondary" onClick={() => setSellerFilterId(null)} className="bg-gray-700 hover:bg-gray-600 text-white shadow">إلغاء فلتر البائع</Button>}
           </div>
-          <div className="bg-primary-card p-4 rounded-2xl overflow-x-auto">
+          <div className="bg-primary-card rounded-2xl shadow-lg border border-gold/20 overflow-x-auto">
             <table className="w-full text-right">
               <thead>
-                <tr><th>اسم المنتج</th><th>البائع</th><th>السعر</th><th>تاريخ آخر عملية</th><th>آخر مشتري</th><th>الحالة</th><th>إجراءات</th></tr>
+                <tr className="border-b border-gold/30 bg-secondary-blue/30">
+                  <th className="p-3 text-gold">اسم المنتج</th>
+                  <th className="p-3 text-gold">البائع</th>
+                  <th className="p-3 text-gold">السعر</th>
+                  <th className="p-3 text-gold">تاريخ آخر عملية</th>
+                  <th className="p-3 text-gold">آخر مشتري</th>
+                  <th className="p-3 text-gold">الحالة</th>
+                  <th className="p-3 text-gold">إجراءات</th>
+                </tr>
               </thead>
               <tbody>
                 {products?.map(p => (
-                  <tr key={p.id}>
-                    <td>{p.name}</td>
-                    <td>{p.seller_name}</td>
-                    <td>{formatCurrency(p.price)}</td>
-                    <td>{p.last_order_date ? formatDate(p.last_order_date) : '-'}</td>
-                    <td>{p.last_buyer_name || '-'}</td>
-                    <td>{p.is_approved ? 'موافق' : 'قيد المراجعة'}</td>
-                    <td><button onClick={() => approveProduct(p.id, !p.is_approved)} className="text-gold underline">تغيير الحالة</button></td>
+                  <tr key={p.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
+                    <td className="p-3 text-white">{p.name}</td>
+                    <td className="p-3 text-white">{p.seller_name}</td>
+                    <td className="p-3 text-white">{formatCurrency(p.price)}</td>
+                    <td className="p-3 text-white">{p.last_order_date ? formatDate(p.last_order_date) : '-'}</td>
+                    <td className="p-3 text-white">{p.last_buyer_name || '-'}</td>
+                    <td className="p-3 text-white">{p.is_approved ? 'موافق' : 'قيد المراجعة'}</td>
+                    <td className="p-3"><button onClick={() => approveProduct(p.id, !p.is_approved)} className="text-gold underline hover:text-gold/80 transition">تغيير الحالة</button></td>
                   </tr>
                 ))}
-                {(!products || products.length === 0) && <tr><td colSpan="7" className="text-center">لا توجد منتجات</td></tr>}
+                {(!products || products.length === 0) && <tr><td colSpan="7" className="text-center p-6 text-text-secondary">لا توجد منتجات</td></tr>}
               </tbody>
             </table>
           </div>
@@ -1069,14 +1085,14 @@ export default function AdminDashboardPage() {
       {activeMainTab === 'finance' && (
         <div>
           <div className="mb-6">
-            <label className="block text-gold mb-2">اختر البائع لتسوية حسابه:</label>
+            <label className="block text-gold font-medium mb-2">اختر البائع لتسوية حسابه:</label>
             <Select
               value={selectedSeller?.id || ''}
               onChange={e => {
                 const seller = sellerUsers.find(u => u.id === e.target.value);
                 setSelectedSeller(seller);
               }}
-              className="w-full md:w-1/2 bg-white text-gray-900 border-gold/30"
+              className="w-full md:w-1/2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold"
             >
               <option value="">-- اختر بائعاً --</option>
               {sellerUsers.map(s => <option key={s.id} value={s.id}>{s.store_name || s.full_name}</option>)}
@@ -1085,32 +1101,34 @@ export default function AdminDashboardPage() {
           {selectedSeller ? (
             <div className="grid md:grid-cols-2 gap-6">
               {/* Left: Add transfer */}
-              <div className="bg-primary-card p-4 rounded-2xl">
+              <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20">
                 <h3 className="text-lg font-bold text-gold mb-4">تسديد حساب البائع</h3>
                 <div className="space-y-3">
-                  <Input label="المبلغ (ريال يمني)" type="number" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} placeholder="أدخل المبلغ" className="text-gray-900" />
-                  <Input label="الملاحظات" value={transferNote} onChange={e => setTransferNote(e.target.value)} placeholder="اختياري" />
+                  <Input label="المبلغ (ريال يمني)" type="number" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} placeholder="أدخل المبلغ" className="bg-white text-gray-900 border-gray-300 focus:ring-gold" />
+                  <Input label="الملاحظات" value={transferNote} onChange={e => setTransferNote(e.target.value)} placeholder="اختياري" className="bg-white text-gray-900 border-gray-300" />
                   <div>
                     <label className="block mb-1 text-text-secondary">رفع سند التحويل</label>
-                    <input type="file" accept="image/*" id="receiptFileInput" onChange={e => setReceiptFile(e.target.files[0])} className="bg-white rounded px-3 py-2 w-full text-gray-900" />
+                    <input type="file" accept="image/*" id="receiptFileInput" onChange={e => setReceiptFile(e.target.files[0])} className="bg-white text-gray-900 rounded-lg px-3 py-2 w-full border border-gray-300 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:bg-gold file:text-primary-blue hover:file:bg-gold/90" />
                   </div>
-                  <Button onClick={handleAddTransfer} disabled={uploading} className="w-full">{uploading ? 'جاري الرفع...' : 'إدخال'}</Button>
+                  <Button onClick={handleAddTransfer} disabled={uploading} className="w-full bg-gold text-primary-blue shadow-md hover:bg-gold/90 transition-all">{uploading ? 'جاري الرفع...' : 'إدخال'}</Button>
                 </div>
               </div>
               {/* Right: Financial summary */}
-              <div className="bg-primary-card p-4 rounded-2xl">
+              <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="text-lg font-bold text-gold">ملخص حسابات البائع</h3>
-                  <Button variant="secondary" onClick={loadSellerReceipts}>الاستعلام عن التحويلات</Button>
+                  <Button variant="secondary" onClick={loadSellerReceipts} className="bg-gray-700 hover:bg-gray-600 text-white shadow">الاستعلام عن التحويلات</Button>
                 </div>
                 <table className="w-full text-right mt-2">
-                  <thead><tr><th>القسم</th><th>المبلغ</th><th>العملة</th></tr></thead>
+                  <thead>
+                    <tr className="border-b border-gold/30"><th className="py-2 text-gold">القسم</th><th className="py-2 text-gold">المبلغ</th><th className="py-2 text-gold">العملة</th></tr>
+                  </thead>
                   <tbody>
-                    <tr><td>إجمالي المبيعات</td><td>{formatCurrency(sellerFinance.totalSales)}</td><td>ريال يمني</td></tr>
-                    <tr><td>إجمالي المرتجعات</td><td>{formatCurrency(sellerFinance.totalReturns)}</td><td>ريال يمني</td></tr>
-                    <tr><td>نسبة الموقع ({sellerCommissionPercent}%)</td><td>{formatCurrency(sellerFinance.commissionAmount)}</td><td>ريال يمني</td></tr>
-                    <tr><td>إجمالي الاستلامات</td><td>{formatCurrency(sellerFinance.totalReceived)}</td><td>ريال يمني</td></tr>
-                    <tr className="border-t border-gold/30"><td className="font-bold">المبلغ المتبقي</td><td className="font-bold text-gold">{formatCurrency(sellerFinance.remaining)}</td><td>ريال يمني</td></tr>
+                    <tr><td className="py-2 font-bold">إجمالي المبيعات</td><td className="text-white">{formatCurrency(sellerFinance.totalSales)}</td><td className="text-white">ريال يمني</td></tr>
+                    <tr><td className="py-2 font-bold">إجمالي المرتجعات</td><td className="text-white">{formatCurrency(sellerFinance.totalReturns)}</td><td className="text-white">ريال يمني</td></tr>
+                    <tr><td className="py-2 font-bold">نسبة الموقع ({sellerCommissionPercent}%)</td><td className="text-white">{formatCurrency(sellerFinance.commissionAmount)}</td><td className="text-white">ريال يمني</td></tr>
+                    <tr><td className="py-2 font-bold">إجمالي الاستلامات</td><td className="text-white">{formatCurrency(sellerFinance.totalReceived)}</td><td className="text-white">ريال يمني</td></tr>
+                    <tr className="border-t border-gold/30"><td className="py-2 font-bold text-gold">المبلغ المتبقي</td><td className="font-bold text-gold">{formatCurrency(sellerFinance.remaining)}</td><td className="text-gold">ريال يمني</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -1124,25 +1142,25 @@ export default function AdminDashboardPage() {
       {/* ========================== ORDERS / INQUIRIES ========================== */}
       {activeMainTab === 'orders' && (
         <div>
-          <div className="flex gap-4 mb-4">
-            <select value={filterInquiry} onChange={e => setFilterInquiry(e.target.value)} className="bg-white text-gray-900 rounded px-3 py-2">
+          <div className="flex gap-4 mb-5">
+            <select value={filterInquiry} onChange={e => setFilterInquiry(e.target.value)} className="bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300">
               <option value="all">جميع الاستفسارات</option>
               <option value="unanswered">غير مجاب عنها</option>
               <option value="answered">تم الرد عليها</option>
             </select>
           </div>
-          <div className="bg-primary-card p-4 rounded-2xl space-y-4">
+          <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20 space-y-4">
             {inquiries.filter(i => {
               if (filterInquiry === 'answered') return i.reply;
               if (filterInquiry === 'unanswered') return !i.reply;
               return true;
             }).map(inq => (
-              <div key={inq.id} className="border-b border-gold/20 pb-3">
-                <p><span className="font-bold">المستخدم:</span> {inq.user?.full_name}</p>
-                <p><span className="font-bold">المنتج:</span> {inq.product?.name || 'عام'}</p>
-                <p><span className="font-bold">السؤال:</span> {inq.message}</p>
-                {inq.reply && <p><span className="font-bold text-green-500">الرد:</span> {inq.reply} <span className="text-xs text-text-secondary">({formatDate(inq.replied_at)})</span></p>}
-                {!inq.reply && <Button size="sm" onClick={() => handleReplyInquiry(inq.id)} className="mt-1">رد</Button>}
+              <div key={inq.id} className="border-b border-gold/20 pb-4">
+                <p><span className="font-bold text-gold">المستخدم:</span> <span className="text-white">{inq.user?.full_name}</span></p>
+                <p><span className="font-bold text-gold">المنتج:</span> <span className="text-white">{inq.product?.name || 'عام'}</span></p>
+                <p><span className="font-bold text-gold">السؤال:</span> <span className="text-white">{inq.message}</span></p>
+                {inq.reply && <p><span className="font-bold text-green-500">الرد:</span> <span className="text-white">{inq.reply}</span> <span className="text-xs text-text-secondary">({formatDate(inq.replied_at)})</span></p>}
+                {!inq.reply && <Button size="sm" onClick={() => handleReplyInquiry(inq.id)} className="mt-1 bg-gold text-primary-blue shadow">رد</Button>}
                 <p className="text-xs text-text-secondary mt-1">{formatDate(inq.created_at)}</p>
               </div>
             ))}
@@ -1155,17 +1173,19 @@ export default function AdminDashboardPage() {
       {showReceiptsModal && (
         <Modal onClose={() => setShowReceiptsModal(false)} title="إيصالات تحويل البائع">
           <table className="w-full text-right">
-            <thead><tr><th>المبلغ</th><th>التاريخ</th><th>الصورة</th><th>ملاحظات</th></tr></thead>
+            <thead>
+              <tr><th className="py-2 text-gold">المبلغ</th><th className="py-2 text-gold">التاريخ</th><th className="py-2 text-gold">الصورة</th><th className="py-2 text-gold">ملاحظات</th></tr>
+            </thead>
             <tbody>
               {sellerReceiptsList.map(r => (
                 <tr key={r.id}>
-                  <td>{formatCurrency(r.amount)}</td>
-                  <td>{formatDate(r.created_at)}</td>
+                  <td className="text-gray-800">{formatCurrency(r.amount)}</td>
+                  <td className="text-gray-800">{formatDate(r.created_at)}</td>
                   <td><a href={r.receipt_image} target="_blank" rel="noreferrer" className="text-blue-500 underline">عرض</a></td>
-                  <td>{r.notes || '-'}</td>
+                  <td className="text-gray-800">{r.notes || '-'}</td>
                 </tr>
               ))}
-              {sellerReceiptsList.length === 0 && <tr><td colSpan="4" className="text-center">لا توجد إيصالات</td></tr>}
+              {sellerReceiptsList.length === 0 && <tr><td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td></tr>}
             </tbody>
           </table>
           <div className="mt-4 text-left"><Button variant="secondary" onClick={() => setShowReceiptsModal(false)}>إغلاق</Button></div>
@@ -1220,4 +1240,5 @@ CREATE TABLE IF NOT EXISTS disputes (
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS admin_notes TEXT;
 */
+
 
