@@ -18,6 +18,9 @@ export const NotificationListener = ({ children }) => {
         table: 'notifications',
         filter: `user_id=eq.${user.id}`
       }, (payload) => {
+        // ✅ سجل البايلود كاملاً للمساعدة في التصحيح
+        console.log("Realtime", payload);
+
         const newNotif = payload.new;
         if (!newNotif) return;
         if (lastNotifIdRef.current === newNotif.id) return;
@@ -39,5 +42,4 @@ export const NotificationListener = ({ children }) => {
 
   return children;
 };
-
 
