@@ -189,24 +189,26 @@ export default function AdminDashboardPage() {
         const buyersMap = new Map(buyers?.map(b => [b.id, b]) || []);
 
         let results = items.map(item => {
-          const order = ordersMap.get(item.order_id);
-          const product = productsMap.get(item.product_id);
-          const buyer = buyersMap.get(order?.user_id);
-          return {
-            id: item.id,
-            product_name: product?.name || 'غير معروف',
-            seller_name: product?.seller?.full_name || 'غير معروف',
-            order_date: order?.created_at,
-            unit_price: item.product_price,
-            quantity: item.quantity,
-            total_price: item.product_price * item.quantity,
-            order_status: order?.status,
-            buyer_name: buyer?.full_name || 'غير معروف',
-            buyer_email: buyer?.email,
-            seller_id: product?.seller_id,
-            buyer_id: order?.user_id,
-          };
-        });
+  const order = ordersMap.get(item.order_id);
+  const product = productsMap.get(item.product_id);
+  const buyer = buyersMap.get(order?.user_id);
+  return {
+    id: item.id,
+    product_name: product?.name || 'غير معروف',
+    seller_name: product?.seller?.full_name || 'غير معروف',
+    order_date: order?.created_at,
+    unit_price: item.product_price,
+    quantity: item.quantity,
+    total_price: item.product_price * item.quantity,
+    order_status: order?.status || 'غير معروف',
+    buyer_name: buyer?.full_name || 'غير معروف',
+    buyer_email: buyer?.email,
+    // ✅ تأكد من إضافة order_id و seller_id
+    order_id: order?.id || item.order_id,   // استخدم item.order_id كاحتياطي
+    seller_id: product?.seller_id || null,
+    buyer_id: order?.user_id,
+  };
+});
 
         if (productFilterStatus !== 'all') {
           const statusMap = {
@@ -646,26 +648,48 @@ export default function AdminDashboardPage() {
     let conversationId = null;
 
     // 1. البحث عن محادثة موجودة بين الأدمن وهذا المستخدم
-    const { data: existing, error: findError } = await supabase
-      .from('conversations')
-      .select('id')
-      .or(`buyer_id.eq.${adminId},seller_id.eq.${userId}`)
-      .maybeSingle();
+    // 1. البحث عن محادثة موجودة بين الأدمن وهذا المستخدم (خذ أول محادثة فقط)
+const { data: existingList, error: findError } = await supabase
+  .from('conversations')
+  .select('id')
+  .or(`buyer_id.eq.${adminId},seller_id.eq.${userId}`)
+  .limit(1);   // ✅ نأخذ أول محادثة فقط، بدلاً من maybeSingle
 
-    if (findError) {
-      console.error('خطأ في البحث عن المحادثة:', findError);
-      toast.error('فشل البحث عن محادثة');
-      return;
-    }
+if (findError) {
+  console.error('خطأ في البحث عن المحادثة:', findError);
+  toast.error('فشل البحث عن محادثة');
+  return;
+}
 
-    if (existing) {
-      conversationId = existing.id;
-      // تحديث last_message في المحادثة الموجودة
-      await supabase
-        .from('conversations')
-        .update({ last_message: message, last_message_at: new Date() })
-        .eq('id', conversationId);
-    } else {
+let conversationId = null;
+if (existingList && existingList.length > 0) {
+  conversationId = existingList[0].id;
+  // تحديث last_message في المحادثة الموجودة
+  await supabase
+    .from('conversations')
+    .update({ last_message: message, last_message_at: new Date() })
+    .eq('id', conversationId);
+} else {
+  // إنشاء محادثة جديدة مع تعيين last_message فوراً
+  const { data: newConv, error: insertError } = await supabase
+    .from('conversations')
+    .insert({
+      buyer_id: adminId,
+      seller_id: userId,
+      product_id: relatedId || null,
+      last_message: message,
+      last_message_at: new Date()
+    })
+    .select()
+    .single();
+
+  if (insertError) {
+    console.error('خطأ في إنشاء المحادثة:', insertError);
+    toast.error('فشل إنشاء محادثة جديدة');
+    return;
+  }
+  conversationId = newConv.id;
+} else {
       // إنشاء محادثة جديدة مع تعيين last_message فوراً
       const { data: newConv, error: insertError } = await supabase
         .from('conversations')
