@@ -6,74 +6,73 @@ import toast from 'react-hot-toast';
 
 export const NotificationListener = ({ children }) => {
   const { user } = useAuth();
-  const audioContextRef = useRef(null);
 
   useEffect(() => {
     if (!user) return;
 
-    // طلب الإذن للإشعارات عند تحميل التطبيق (إذا لم يمنح بعد)
-    requestNotificationPermission().then(granted => {
+    let isSubscribed = true;
+    let channel = null;
+
+    const init = async () => {
+      // طلب الإذن للإشعارات (مرة واحدة عند تحميل التطبيق)
+      const granted = await requestNotificationPermission();
       if (!granted) {
-        console.warn('إذن الإشعارات لم يُمنح');
+        console.warn('⚠️ إذن الإشعارات لم يُمنح، لن تظهر إشعارات المتصفح');
       }
-    });
 
-    // الاستماع للإشعارات الجديدة الخاصة بهذا المستخدم
-    const channel = supabase
-      .channel(`user-notifications-${user.id}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${user.id}`
-      }, async (payload) => {
-        const newNotif = payload.new;
-        if (!newNotif) return;
+      if (!isSubscribed) return;
 
-        console.log('🔔 [NotificationListener] إشعار جديد:', newNotif);
+      // استخدام قناة عامة مع مرشح user_id لضمان استقبال الأحداث
+      channel = supabase
+        .channel(`public:notifications:user_id=eq.${user.id}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        }, (payload) => {
+          const newNotif = payload.new;
+          if (!newNotif) return;
 
-        // ✅ تشغيل الصوت (بنفس طريقة chatService)
-        try {
-          playNotificationSound(); // هذه الدالة تستخدم new Audio أو AudioContext
-        } catch (err) {
-          console.error('فشل تشغيل الصوت:', err);
-        }
+          console.log('🔔 [NotificationListener] تم استلام إشعار:', newNotif);
 
-        // ✅ عرض إشعار المتصفح
-        if (Notification.permission === 'granted') {
-          // نافذة الإشعار تظهر مع اسم التطبيق
-          new Notification(newNotif.title, {
-            body: newNotif.message,
-            icon: '/logo192.png',
-            silent: false, // يسمح بالصوت (لكن الصوت يعتمد على المتصفح)
-          });
-        } else {
-          // محاولة طلب الإذن مرة أخرى إذا لم يكن ممنوحًا
-          const permission = await requestNotificationPermission();
-          if (permission) {
+          // تشغيل الصوت (نفس الدالة التي تعمل عند الاستعلام)
+          playNotificationSound();
+
+          // عرض إشعار المتصفح (بشرط أن يكون الإذن ممنوحاً)
+          if (Notification.permission === 'granted') {
             new Notification(newNotif.title, {
               body: newNotif.message,
               icon: '/logo192.png',
             });
           } else {
-            // إشعار عبر toast
-            toast(`${newNotif.title}: ${newNotif.message}`, {
-              icon: '🔔',
-              duration: 5000,
+            // محاولة طلب الإذن مجدداً (في حال تم رفضه سابقاً)
+            requestNotificationPermission().then(perm => {
+              if (perm && isSubscribed) {
+                new Notification(newNotif.title, {
+                  body: newNotif.message,
+                  icon: '/logo192.png',
+                });
+              }
             });
           }
-        }
-      })
-      .subscribe();
+        })
+        .subscribe((status) => {
+          console.log(`📡 اشتراك الإشعارات: ${status}`);
+        });
+    };
+
+    init();
 
     return () => {
-      supabase.removeChannel(channel);
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
+      isSubscribed = false;
+      if (channel) {
+        supabase.removeChannel(channel);
       }
     };
   }, [user]);
 
   return children;
 };
+
 
