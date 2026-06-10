@@ -776,9 +776,24 @@ export default function AdminDashboardPage() {
 
   // ------------------- إرسال إشعار للمنتج (في إدارة المنتجات) -------------------
   const sendNotificationForOrderItem = async (item) => {
-    // التأكد من وجود بيانات كافية
-    if (!item || !item.seller_id || !item.order_id) {
-      toast.error('بيانات الطلب غير مكتملة');
+    // طباعة البيانات للمساعدة في التصحيح
+    console.log('بيانات العنصر المستلم:', item);
+
+    // التحقق من وجود العنصر والحقول الأساسية
+    if (!item) {
+      toast.error('بيانات الطلب غير موجودة');
+      return;
+    }
+
+    if (!item.seller_id) {
+      console.error('seller_id مفقود في العنصر:', item);
+      toast.error('رقم البائع غير متوفر لهذا الطلب، لا يمكن إرسال الإشعار');
+      return;
+    }
+
+    if (!item.order_id) {
+      console.error('order_id مفقود في العنصر:', item);
+      toast.error('رقم الطلب غير متوفر، لا يمكن إرسال الإشعار');
       return;
     }
 
@@ -786,63 +801,35 @@ export default function AdminDashboardPage() {
     if (!adminMessage) return;
 
     // بناء رسالة منسقة تحتوي على كل التفاصيل
-    const fullMessage = `📦 **المنتج:** ${item.product_name}\n` +
+    const fullMessage = `📦 **المنتج:** ${item.product_name || 'غير معروف'}\n` +
                         `🆔 **رقم الطلب:** ${item.order_id}\n` +
-                        `📋 **الحالة:** ${item.order_status}\n` +
+                        `📋 **الحالة:** ${item.order_status || 'غير معروفة'}\n` +
                         `✉️ **رسالة الإدارة:** ${adminMessage}`;
 
     // إرسال الإشعار والرسالة إلى البائع
     await sendNotificationToUser(
-      item.seller_id,           // ID البائع
-      fullMessage,              // نص الرسالة الكامل
-      `طلب #${item.order_id} - ${item.product_name}`,  // عنوان الإشعار
-      'order_status',           // النوع
-      item.order_id             // related_id (رقم الطلب)
+      item.seller_id,
+      fullMessage,
+      `طلب #${item.order_id} - ${item.product_name || 'منتج'}`,
+      'order_status',
+      item.order_id
     );
   };
 
   // ------------------- إرسال تذكير للمحادثة (في الطلبات والاستفسارات) -------------------
-  // ------------------- إرسال إشعار للمنتج (في إدارة المنتجات) -------------------
-const sendNotificationForOrderItem = async (item) => {
-  // طباعة البيانات للمساعدة في التصحيح
-  console.log('بيانات العنصر المستلم:', item);
-
-  // التحقق من وجود العنصر والحقول الأساسية
-  if (!item) {
-    toast.error('بيانات الطلب غير موجودة');
-    return;
-  }
-
-  if (!item.seller_id) {
-    console.error('seller_id مفقود في العنصر:', item);
-    toast.error('رقم البائع غير متوفر لهذا الطلب، لا يمكن إرسال الإشعار');
-    return;
-  }
-
-  if (!item.order_id) {
-    console.error('order_id مفقود في العنصر:', item);
-    toast.error('رقم الطلب غير متوفر، لا يمكن إرسال الإشعار');
-    return;
-  }
-
-  const adminMessage = prompt('أدخل نص الإشعار الذي سيتم إرساله إلى البائع بخصوص هذا الطلب:');
-  if (!adminMessage) return;
-
-  // بناء رسالة منسقة تحتوي على كل التفاصيل
-  const fullMessage = `📦 **المنتج:** ${item.product_name || 'غير معروف'}\n` +
-                      `🆔 **رقم الطلب:** ${item.order_id}\n` +
-                      `📋 **الحالة:** ${item.order_status || 'غير معروفة'}\n` +
-                      `✉️ **رسالة الإدارة:** ${adminMessage}`;
-
-  // إرسال الإشعار والرسالة إلى البائع
-  await sendNotificationToUser(
-    item.seller_id,
-    fullMessage,
-    `طلب #${item.order_id} - ${item.product_name || 'منتج'}`,
-    'order_status',
-    item.order_id
-  );
-};
+  const sendReminderForConversation = async (conv, targetRole) => {
+    const targetUserId = targetRole === 'seller' ? conv.seller_id : conv.buyer_id;
+    const targetName = targetRole === 'seller' ? conv.seller?.full_name : conv.buyer?.full_name;
+    const msg = prompt(`أدخل رسالة التذكير التي سيتم إرسالها إلى ${targetName || (targetRole === 'seller' ? 'البائع' : 'المشتري')}:`);
+    if (!msg) return;
+    await sendNotificationToUser(
+      targetUserId,
+      msg,
+      `تذكير بخصوص المحادثة (المنتج: ${conv.product?.title || 'غير معروف'})`,
+      'message',
+      conv.id
+    );
+  };
 
   // ------------------- Render -------------------
   const isLoading = (activeMainTab === 'dashboard') ||
@@ -1366,34 +1353,32 @@ const sendNotificationForOrderItem = async (item) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {conversations.map(conv => {
-                    return (
-                      <tr key={conv.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
-                        <td className="p-3 text-white">{conv.product?.title || conv.product?.name || 'منتج غير متوفر'}</td>
-                        <td className="p-3 text-white">{conv.buyer?.full_name || conv.buyer_name || 'غير معروف'}</td>
-                        <td className="p-3 text-white">{conv.seller?.full_name || conv.seller_name || 'غير معروف'}</td>
-                        <td className="p-3 text-white max-w-xs truncate">{conv.last_message || 'لا توجد رسائل'}</td>
-                        <td className="p-3 text-white">{conv.last_message_at ? formatDate(conv.last_message_at) : '-'}</td>
-                        <td className="p-3 text-white">
-                          <span className="text-yellow-500">في انتظار رد البائع</span>
-                        </td>
-                        <td className="p-3">
-                          <div className="flex gap-2">
-                            <Link to={`/chat/c/${conv.id}`} className="bg-gold text-primary-blue px-3 py-1 rounded-lg text-sm shadow hover:bg-gold/90 transition inline-flex items-center gap-1">
-                              <MessageCircle size={14} /> فتح المحادثة
-                            </Link>
-                            <Button
-                              onClick={() => sendReminderForConversation(conv, 'seller')}
-                              size="sm"
-                              className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1"
-                            >
-                              <Send size={12} className="inline ml-1" /> تذكير البائع
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {conversations.map(conv => (
+                    <tr key={conv.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
+                      <td className="p-3 text-white">{conv.product?.title || conv.product?.name || 'منتج غير متوفر'}</td>
+                      <td className="p-3 text-white">{conv.buyer?.full_name || conv.buyer_name || 'غير معروف'}</td>
+                      <td className="p-3 text-white">{conv.seller?.full_name || conv.seller_name || 'غير معروف'}</td>
+                      <td className="p-3 text-white max-w-xs truncate">{conv.last_message || 'لا توجد رسائل'}</td>
+                      <td className="p-3 text-white">{conv.last_message_at ? formatDate(conv.last_message_at) : '-'}</td>
+                      <td className="p-3 text-white">
+                        <span className="text-yellow-500">في انتظار رد البائع</span>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex gap-2">
+                          <Link to={`/chat/c/${conv.id}`} className="bg-gold text-primary-blue px-3 py-1 rounded-lg text-sm shadow hover:bg-gold/90 transition inline-flex items-center gap-1">
+                            <MessageCircle size={14} /> فتح المحادثة
+                          </Link>
+                          <Button
+                            onClick={() => sendReminderForConversation(conv, 'seller')}
+                            size="sm"
+                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1"
+                          >
+                            <Send size={12} className="inline ml-1" /> تذكير البائع
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
