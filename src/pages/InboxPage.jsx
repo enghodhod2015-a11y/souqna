@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserConversations } from '../services/chatService';
 import { supabase } from '../services/supabase';
@@ -8,16 +8,15 @@ import toast from 'react-hot-toast';
 
 export default function InboxPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const abortController = useAbortController();
 
-  // دالة لتحديد جميع الرسائل كمقروءة للمستخدم الحالي
   const markAllMessagesAsRead = async () => {
     if (!user) return;
 
     try {
-      // 1. جلب جميع معرفات المحادثات التي يشارك فيها المستخدم
       const { data: convs, error: convError } = await supabase
         .from('conversations')
         .select('id')
@@ -28,7 +27,6 @@ export default function InboxPage() {
 
       const conversationIds = convs.map(c => c.id);
 
-      // 2. تحديث جدول messages: جعل is_read = true لكل الرسائل التي user هو مستقبلها
       const { error: msgError } = await supabase
         .from('messages')
         .update({ is_read: true })
@@ -36,8 +34,6 @@ export default function InboxPage() {
         .in('conversation_id', conversationIds);
       if (msgError) throw msgError;
 
-      // 3. تحديث جدول conversations: إعادة تعيين العداد الخاص بالمستخدم
-      //    (buyer_unread_count إذا كان مشترياً، seller_unread_count إذا كان بائعاً)
       const updates = [];
       for (const conv of convs) {
         const updateData = {};
@@ -61,7 +57,6 @@ export default function InboxPage() {
       }
       await Promise.all(updates);
 
-      // 4. تحديث الحالة المحلية: إعادة تعيين العداد لكل محادثة
       setConversations(prev =>
         prev.map(conv => {
           const isBuyer = conv.buyer_id === user.id;
@@ -74,6 +69,12 @@ export default function InboxPage() {
 
       console.log('✅ تم تعليم جميع الرسائل كمقروءة');
     } catch (err) {
+      if (err?.code === 'PGRST303' || err?.message?.includes('JWT expired')) {
+        toast.error('انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى');
+        await supabase.auth.signOut();
+        navigate('/login');
+        return;
+      }
       console.error('خطأ في تعليم الرسائل كمقروءة:', err);
       toast.error('حدث خطأ أثناء تحديث حالة القراءة');
     }
@@ -99,7 +100,6 @@ export default function InboxPage() {
     };
   }, [user?.id, abortController]);
 
-  // عند تحميل الصفحة (بعد جلب المحادثات)، نقوم بتحديد جميع الرسائل كمقروءة
   useEffect(() => {
     if (!loading && conversations.length > 0) {
       markAllMessagesAsRead();

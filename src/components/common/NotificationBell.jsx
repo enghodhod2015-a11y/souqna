@@ -15,7 +15,18 @@ export const NotificationBell = () => {
   const dropdownRef = useRef(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
-  // دالة جلب الإشعارات وتحديث العدد
+  // دالة لمعالجة أخطاء انتهاء الجلسة
+  const handleAuthError = async (err) => {
+    if (err?.code === 'PGRST303' || err?.message?.includes('JWT expired')) {
+      console.warn('انتهت صلاحية الجلسة، تسجيل خروج...');
+      toast.error('انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى');
+      await supabase.auth.signOut();
+      navigate('/login');
+      return true;
+    }
+    return false;
+  };
+
   const loadNotifications = useCallback(async () => {
     if (!user) return;
     try {
@@ -25,11 +36,11 @@ export const NotificationBell = () => {
       setUnreadCount(count);
       console.log(`📬 تم جلب الإشعارات: ${data.length} إجمالي، ${count} غير مقروء`);
     } catch (err) {
-      console.error('خطأ في جلب الإشعارات:', err);
+      const handled = await handleAuthError(err);
+      if (!handled) console.error('خطأ في جلب الإشعارات:', err);
     }
-  }, [user]);
+  }, [user, navigate]);
 
-  // تحميل أولي وإعادة التحميل كل 30 ثانية (احتياطي)
   useEffect(() => {
     if (!user) return;
     loadNotifications();
@@ -37,10 +48,8 @@ export const NotificationBell = () => {
     return () => clearInterval(interval);
   }, [user, loadNotifications]);
 
-  // Realtime: تحديث فوري عند إدراج إشعار جديد
   useEffect(() => {
     if (!user) return;
-
     const channel = supabase
       .channel(`notifications-dropdown-${user.id}`)
       .on('postgres_changes', {
@@ -50,24 +59,16 @@ export const NotificationBell = () => {
         filter: `user_id=eq.${user.id}`
       }, (payload) => {
         console.log('🔔 [NotificationBell] حدث INSERT:', payload);
-        // إعادة جلب الإشعارات لتحديث العدد والقائمة
         loadNotifications();
       })
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [user, loadNotifications]);
 
-  // عند فتح القائمة، نعيد الجلب للتأكد من أحدث البيانات
   useEffect(() => {
-    if (dropdownOpen) {
-      loadNotifications();
-    }
+    if (dropdownOpen) loadNotifications();
   }, [dropdownOpen, loadNotifications]);
 
-  // إعادة تهيئة الصوت إذا كان الإذن ممنوحاً
   useEffect(() => {
     if (!user) return;
     const init = async () => {
@@ -79,12 +80,9 @@ export const NotificationBell = () => {
     init();
   }, [user]);
 
-  // إغلاق القائمة عند النقر خارجها
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setDropdownOpen(false);
-      }
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -103,29 +101,27 @@ export const NotificationBell = () => {
   };
 
   const handleNotificationClick = async (notif) => {
-    if (!notif.is_read) {
-      await markNotificationAsRead(notif.id);
-      // تحديث القائمة محلياً دون إعادة جلب
-      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
-      setUnreadCount(prev => Math.max(0, prev - 1));
+    try {
+      if (!notif.is_read) {
+        await markNotificationAsRead(notif.id);
+        setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+      const relatedId = notif.related_id;
+      const type = notif.type;
+      const isValidConversationUUID = (id) => {
+        if (!id) return false;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(id);
+      };
+      if (relatedId && isValidConversationUUID(relatedId)) navigate(`/chat/c/${relatedId}`);
+      else if (type === 'payment' || type === 'order_status') navigate('/orders');
+      else navigate('/inbox');
+      setDropdownOpen(false);
+    } catch (err) {
+      const handled = await handleAuthError(err);
+      if (!handled) toast.error('حدث خطأ أثناء فتح الإشعار');
     }
-
-    const relatedId = notif.related_id;
-    const type = notif.type;
-    const isValidConversationUUID = (id) => {
-      if (!id) return false;
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      return uuidRegex.test(id);
-    };
-
-    if (relatedId && isValidConversationUUID(relatedId)) {
-      navigate(`/chat/c/${relatedId}`);
-    } else if (type === 'payment' || type === 'order_status') {
-      navigate('/orders');
-    } else {
-      navigate('/inbox');
-    }
-    setDropdownOpen(false);
   };
 
   const getIcon = (type) => {
@@ -152,8 +148,6 @@ export const NotificationBell = () => {
             </span>
           )}
         </button>
-
-        {/* زر تحديث يدوي (اختياري) */}
         <button
           onClick={loadNotifications}
           className="p-2 rounded-full bg-gray-700/50 text-gray-300 hover:bg-gray-600 transition"
@@ -161,7 +155,6 @@ export const NotificationBell = () => {
         >
           <RefreshCw size={16} />
         </button>
-
         {!notificationsEnabled && user && (
           <button
             onClick={handleEnableNotifications}
