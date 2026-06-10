@@ -16,8 +16,8 @@ export default function NotificationsPage() {
   const loadNotifications = async () => {
     if (!user) return
     try {
-      const data = await getUserNotifications(user.id)
-      setNotifications(data)
+      const result = await getUserNotifications(user.id)
+      setNotifications(result.notifications)
     } catch (err) {
       console.error('خطأ في جلب الإشعارات:', err)
       toast.error('فشل تحميل الإشعارات')
@@ -55,7 +55,6 @@ export default function NotificationsPage() {
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n))
     }
 
-    // ✅ التوجيه بناءً على نوع الإشعار
     const type = notif.type
     const relatedId = notif.related_id
 
@@ -152,4 +151,5 @@ export default function NotificationsPage() {
     </div>
   )
 }
+
 

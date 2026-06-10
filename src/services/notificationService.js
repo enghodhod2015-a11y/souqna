@@ -38,7 +38,7 @@ export const playNotificationSound = async () => {
 export const addNotification = async (userId, type, title, message, relatedId = null) => {
   const insertData = {
     user_id: userId,
-    type,               // الأنواع الأصلية: message, order_status, payment, return, info
+    type,
     title,
     message,
     is_read: false,
@@ -68,7 +68,6 @@ export const getUserNotifications = async (userId) => {
     .limit(50);
   if (recentError) throw recentError;
 
-  // إرجاع كائن يحتوي على القائمة والعدد الحقيقي
   return {
     notifications: recent || [],
     unreadCount: count || 0
