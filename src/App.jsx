@@ -1,4 +1,3 @@
-// src/App.jsx
 import { Suspense } from 'react'
 import AppRoutesComponent from './routes/AppRoutes'
 import { Header } from './components/common/Header'
@@ -24,5 +23,4 @@ function App() {
 }
 
 export default App
-
 
