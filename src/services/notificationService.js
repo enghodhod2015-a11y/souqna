@@ -51,14 +51,15 @@ export const addNotification = async (userId, type, title, message, relatedId = 
 };
 
 export const getUserNotifications = async (userId) => {
-  // جلب جميع الإشعارات (بدون حد) لحساب العدد الدقيق غير المقروء
-  const { data: all, error: allError } = await supabase
+  // 1. الحصول على العدد الحقيقي للإشعارات غير المقروءة
+  const { count, error: countError } = await supabase
     .from('notifications')
-    .select('*')
-    .eq('user_id', userId);
-  if (allError) throw allError;
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+  if (countError) throw countError;
 
-  // جلب أحدث 50 إشعاراً للعرض في القائمة
+  // 2. الحصول على أحدث 50 إشعاراً لعرضها في القائمة
   const { data: recent, error: recentError } = await supabase
     .from('notifications')
     .select('*')
@@ -67,10 +68,10 @@ export const getUserNotifications = async (userId) => {
     .limit(50);
   if (recentError) throw recentError;
 
-  // إضافة خاصية unreadCount إلى الكائن المُعاد (للتغليف)
+  // إرجاع كائن يحتوي على القائمة والعدد الحقيقي
   return {
     notifications: recent || [],
-    unreadCount: (all || []).filter(n => !n.is_read).length
+    unreadCount: count || 0
   };
 };
 

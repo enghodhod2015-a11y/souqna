@@ -27,18 +27,18 @@ export const NotificationBell = () => {
   };
 
   const loadNotifications = useCallback(async () => {
-    if (!user) return;
-    try {
-      const result = await getUserNotifications(user.id);
-      // result = { notifications: [], unreadCount: number }
-      setNotifications(result.notifications.slice(0, 5));
-      setUnreadCount(result.unreadCount);
-      console.log(`📬 تم جلب الإشعارات: ${result.notifications.length} (أحدث 50)، ${result.unreadCount} غير مقروء (الحقيقي)`);
-    } catch (err) {
-      const handled = await handleAuthError(err);
-      if (!handled) console.error('خطأ في جلب الإشعارات:', err);
-    }
-  }, [user, navigate]);
+  if (!user) return;
+  try {
+    const result = await getUserNotifications(user.id);
+    // result = { notifications: [], unreadCount: number }
+    setNotifications(result.notifications.slice(0, 5));
+    setUnreadCount(result.unreadCount);
+    console.log(`📬 تم جلب الإشعارات: ${result.notifications.length} (أحدث 50)، ${result.unreadCount} غير مقروء (الحقيقي)`);
+  } catch (err) {
+    const handled = await handleAuthError(err);
+    if (!handled) console.error('خطأ في جلب الإشعارات:', err);
+  }
+}, [user, navigate]);
 
   // تحميل أولي وإعادة تحميل كل 30 ثانية
   useEffect(() => {
