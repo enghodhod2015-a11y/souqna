@@ -27,6 +27,9 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null)
   const [product, setProduct] = useState(null)
   const channelRef = useRef(null)
+  // متغيرات لتخزين أسماء الأطراف
+  const [buyerName, setBuyerName] = useState('')
+  const [sellerName, setSellerName] = useState('')
 
   useEffect(() => {
     if (user) initChat()
@@ -44,7 +47,6 @@ export default function ChatPage() {
       let currentProduct = null
 
       if (conversationId) {
-        // ✅ التحقق من صحة UUID قبل الجلب
         if (!isValidUUID(conversationId)) {
           console.error('معرف المحادثة غير صالح (ليس UUID):', conversationId)
           toast.error('رابط المحادثة غير صالح')
@@ -58,7 +60,6 @@ export default function ChatPage() {
           .single()
         if (convErr) throw convErr
         currentConv = convData
-        // ✅ جلب المنتج فقط إذا كان موجوداً (لا نجبر على وجوده)
         if (currentConv.product_id) {
           currentProduct = await getProductById(currentConv.product_id)
         }
@@ -80,6 +81,20 @@ export default function ChatPage() {
       setConversation(currentConv)
 
       if (currentConv) {
+        // جلب أسماء المشتري والبائع
+        const { data: buyerProfile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', currentConv.buyer_id)
+          .single()
+        const { data: sellerProfile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', currentConv.seller_id)
+          .single()
+        setBuyerName(buyerProfile?.full_name || 'مشتري')
+        setSellerName(sellerProfile?.full_name || 'بائع')
+
         const msgs = await getMessages(currentConv.id)
         setMessages(msgs || [])
         await markMessagesAsRead(currentConv.id, user.id)
@@ -188,7 +203,6 @@ export default function ChatPage() {
 
   if (loading) return <div className="text-center py-20 text-gray-500">جاري التحميل...</div>
   
-  // ✅ إذا كانت المحادثة موجودة ولكن المنتج غير موجود (محادثة مع الإدارة) نعرض واجهة بديلة
   const isAdminChat = conversation && !product && !productId && conversation.product_id === null
   const isBuyer = conversation?.buyer_id === user?.id
   const chatPartnerRole = isBuyer ? 'البائع' : 'المشتري المحتمل'
@@ -222,11 +236,20 @@ export default function ChatPage() {
         <div className="h-[500px] overflow-y-auto p-5 space-y-4 bg-gray-50">
           {messages.map((msg) => {
             const isOwn = msg.sender_id === user.id
+            // تحديد اسم المرسل
+            let senderDisplayName = ''
+            if (msg.sender_id === conversation?.buyer_id) senderDisplayName = buyerName
+            else if (msg.sender_id === conversation?.seller_id) senderDisplayName = sellerName
+            else senderDisplayName = 'مستخدم'
+
             return (
               <div
                 key={msg.id}
-                className={`flex ${isOwn ? 'justify-end' : 'justify-start'} animate-fadeIn`}
+                className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} animate-fadeIn`}
               >
+                <div className={`text-xs text-gray-500 mb-1 ${isOwn ? 'text-right' : 'text-left'}`}>
+                  {isOwn ? 'أنت' : senderDisplayName}
+                </div>
                 <div
                   className={`max-w-[70%] rounded-2xl px-5 py-3 shadow-sm transition-all ${
                     isOwn
@@ -271,4 +294,5 @@ export default function ChatPage() {
     </div>
   )
 }
+
 
