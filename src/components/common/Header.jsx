@@ -147,14 +147,6 @@ export const Header = () => {
 
               <NotificationBell />
 
-              {/* زر تفعيل الإشعارات */}
-              <button
-                onClick={handleEnableNotifications}
-                className="p-2 rounded-full bg-gold/20 text-gold hover:bg-gold/40 transition"
-                title="تفعيل الإشعارات والصوت"
-              >
-                🔔
-              </button>
 
               <div className="relative" ref={dropdownRef}>
                 <button 

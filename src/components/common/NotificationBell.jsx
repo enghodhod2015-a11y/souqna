@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, MessageCircle, Package, DollarSign, Info } from 'lucide-react'
+import { Bell, MessageCircle, Package, DollarSign, Info, Volume2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../services/supabase'
-import { getUserNotifications, markNotificationAsRead } from '../../services/notificationService'
+import { getUserNotifications, markNotificationAsRead, requestNotificationPermission, enableAudio, playNotificationSound } from '../../services/notificationService'
+import toast from 'react-hot-toast'
 
 export const NotificationBell = () => {
   const { user } = useAuth()
@@ -12,6 +13,14 @@ export const NotificationBell = () => {
   const [notifications, setNotifications] = useState([])
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
+
+  // التحقق من حالة الإذن عند التحميل
+  useEffect(() => {
+    if (user && Notification.permission === 'granted') {
+      setNotificationsEnabled(true)
+    }
+  }, [user])
 
   const loadNotifications = async () => {
     if (!user) return
@@ -55,39 +64,47 @@ export const NotificationBell = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const handleEnableNotifications = async () => {
+    const granted = await requestNotificationPermission()
+    if (granted) {
+      await enableAudio()
+      setNotificationsEnabled(true)
+      toast.success('✅ تم تفعيل الإشعارات والصوت')
+      // تجربة تشغيل صوت تجريبي
+      playNotificationSound()
+    } else {
+      toast.error('❌ لم يتم التفعيل، يمكنك المحاولة لاحقاً من إعدادات المتصفح')
+    }
+  }
+
   const handleNotificationClick = async (notif) => {
-  if (!notif.is_read) {
-    await markNotificationAsRead(notif.id);
-    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
-    setUnreadCount(prev => Math.max(0, prev - 1));
-  }
+    if (!notif.is_read) {
+      await markNotificationAsRead(notif.id);
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    }
 
-  const relatedId = notif.related_id;
-  const type = notif.type;
-  
-  // دالة للتحقق من أن الـ related_id هو UUID صالح لمحادثة
-  const isValidConversationUUID = (id) => {
-    if (!id) return false;
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(id);
+    const relatedId = notif.related_id;
+    const type = notif.type;
+    
+    const isValidConversationUUID = (id) => {
+      if (!id) return false;
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(id);
+    };
+
+    if (relatedId && isValidConversationUUID(relatedId)) {
+      navigate(`/chat/c/${relatedId}`);
+    }
+    else if (type === 'payment' || type === 'order_status') {
+      navigate('/orders');
+    }
+    else {
+      navigate('/inbox');
+    }
+
+    setDropdownOpen(false);
   };
-
-  // حالة خاصة: إذا كان type = order_status أو payment ولكن related_id هو UUID محادثة
-  // فهذا يعني أن الإشعار أرسل من لوحة التحكم (إدارة المنتجات) ويجب توجيهه إلى المحادثة
-  if (relatedId && isValidConversationUUID(relatedId)) {
-    navigate(`/chat/c/${relatedId}`);
-  }
-  // إذا كان type من أنواع الطلبات و related_id ليس UUID (أو null) نذهب إلى الطلبات
-  else if (type === 'payment' || type === 'order_status') {
-    navigate('/orders');
-  }
-  // باقي الأنواع (message, return, info) تذهب إلى صندوق الوارد (المحادثات العامة)
-  else {
-    navigate('/inbox');
-  }
-
-  setDropdownOpen(false);
-};
 
   const getIcon = (type) => {
     switch (type) {
@@ -100,18 +117,31 @@ export const NotificationBell = () => {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button
-        onClick={() => setDropdownOpen(!dropdownOpen)}
-        className="relative p-2 rounded-full hover:bg-primary-card transition"
-        aria-label="الإشعارات"
-      >
-        <Bell size={22} className="text-gold" />
-        {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setDropdownOpen(!dropdownOpen)}
+          className="relative p-2 rounded-full hover:bg-primary-card transition"
+          aria-label="الإشعارات"
+        >
+          <Bell size={22} className="text-gold" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {/* زر تفعيل الإشعارات يظهر فقط إذا لم تكن مفعلة */}
+        {!notificationsEnabled && user && (
+          <button
+            onClick={handleEnableNotifications}
+            className="p-2 rounded-full bg-gold/20 text-gold hover:bg-gold/40 transition"
+            title="تفعيل الإشعارات والصوت"
+          >
+            <Volume2 size={18} />
+          </button>
         )}
-      </button>
+      </div>
 
       {dropdownOpen && (
         <div className="absolute left-0 mt-2 w-80 bg-primary-card rounded-xl shadow-2xl border border-gold/30 z-50 overflow-hidden">
