@@ -30,6 +30,8 @@ export const NotificationListener = ({ children }) => {
         const newNotif = payload.new;
         if (!newNotif) return;
 
+        console.log('🔔 [NotificationListener] إشعار جديد:', newNotif);
+
         // ✅ تشغيل الصوت (بنفس طريقة chatService)
         try {
           playNotificationSound(); // هذه الدالة تستخدم new Audio أو AudioContext
@@ -74,5 +76,4 @@ export const NotificationListener = ({ children }) => {
 
   return children;
 };
-
 
