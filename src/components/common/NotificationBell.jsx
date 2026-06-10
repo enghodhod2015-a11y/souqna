@@ -29,11 +29,11 @@ export const NotificationBell = () => {
   const loadNotifications = useCallback(async () => {
     if (!user) return;
     try {
-      const data = await getUserNotifications(user.id);
-      setNotifications(data.slice(0, 5));
-      const count = data.filter(n => !n.is_read).length;
-      setUnreadCount(count);
-      console.log(`📬 تم جلب الإشعارات: ${data.length} إجمالي، ${count} غير مقروء`);
+      const result = await getUserNotifications(user.id);
+      // result = { notifications: [], unreadCount: number }
+      setNotifications(result.notifications.slice(0, 5));
+      setUnreadCount(result.unreadCount);
+      console.log(`📬 تم جلب الإشعارات: ${result.notifications.length} (أحدث 50)، ${result.unreadCount} غير مقروء (الحقيقي)`);
     } catch (err) {
       const handled = await handleAuthError(err);
       if (!handled) console.error('خطأ في جلب الإشعارات:', err);

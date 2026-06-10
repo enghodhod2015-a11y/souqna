@@ -51,14 +51,27 @@ export const addNotification = async (userId, type, title, message, relatedId = 
 };
 
 export const getUserNotifications = async (userId) => {
-  const { data, error } = await supabase
+  // جلب جميع الإشعارات (بدون حد) لحساب العدد الدقيق غير المقروء
+  const { data: all, error: allError } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId);
+  if (allError) throw allError;
+
+  // جلب أحدث 50 إشعاراً للعرض في القائمة
+  const { data: recent, error: recentError } = await supabase
     .from('notifications')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(50);
-  if (error) throw error;
-  return data || [];
+  if (recentError) throw recentError;
+
+  // إضافة خاصية unreadCount إلى الكائن المُعاد (للتغليف)
+  return {
+    notifications: recent || [],
+    unreadCount: (all || []).filter(n => !n.is_read).length
+  };
 };
 
 export const markNotificationAsRead = async (notificationId) => {
