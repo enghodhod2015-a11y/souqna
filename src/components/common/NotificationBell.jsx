@@ -56,31 +56,38 @@ export const NotificationBell = () => {
   }, [])
 
   const handleNotificationClick = async (notif) => {
-    if (!notif.is_read) {
-      await markNotificationAsRead(notif.id)
-      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n))
-      setUnreadCount(prev => Math.max(0, prev - 1))
-    }
-
-    // ✅ التوجيه بناءً على نوع الإشعار
-    const type = notif.type
-    const relatedId = notif.related_id
-
-    if (type === 'message' || type === 'return' || type === 'info') {
-      // إشعارات الرسائل والاسترجاعات تذهب إلى المحادثة (related_id هو معرف المحادثة)
-      if (relatedId) {
-        navigate(`/chat/c/${relatedId}`)
-      } else {
-        navigate('/inbox')
-      }
-    } else if (type === 'payment' || type === 'order_status') {
-      // إشعارات الدفع وحالة الطلب تذهب إلى صفحة الطلبات
-      navigate('/orders')
-    } else {
-      navigate('/inbox')
-    }
-    setDropdownOpen(false)
+  if (!notif.is_read) {
+    await markNotificationAsRead(notif.id);
+    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+    setUnreadCount(prev => Math.max(0, prev - 1));
   }
+
+  const relatedId = notif.related_id;
+  const type = notif.type;
+  
+  // دالة للتحقق من أن الـ related_id هو UUID صالح لمحادثة
+  const isValidConversationUUID = (id) => {
+    if (!id) return false;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(id);
+  };
+
+  // حالة خاصة: إذا كان type = order_status أو payment ولكن related_id هو UUID محادثة
+  // فهذا يعني أن الإشعار أرسل من لوحة التحكم (إدارة المنتجات) ويجب توجيهه إلى المحادثة
+  if (relatedId && isValidConversationUUID(relatedId)) {
+    navigate(`/chat/c/${relatedId}`);
+  }
+  // إذا كان type من أنواع الطلبات و related_id ليس UUID (أو null) نذهب إلى الطلبات
+  else if (type === 'payment' || type === 'order_status') {
+    navigate('/orders');
+  }
+  // باقي الأنواع (message, return, info) تذهب إلى صندوق الوارد (المحادثات العامة)
+  else {
+    navigate('/inbox');
+  }
+
+  setDropdownOpen(false);
+};
 
   const getIcon = (type) => {
     switch (type) {
