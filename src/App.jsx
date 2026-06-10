@@ -4,7 +4,7 @@ import { Header } from './components/common/Header'
 import { Footer } from './components/common/Footer'
 import { requestNotificationPermission } from './services/notificationService'
 import { useAuth } from './contexts/AuthContext'
-import { NotificationListener } from './components/NotificationListener'  // ✅ إضافة المستمع
+import { NotificationListener } from './components/NotificationListener'   // <-- أضف هذا الاستيراد
 
 const AppRoutes = AppRoutesComponent.AppRoutes || AppRoutesComponent;
 
@@ -17,10 +17,8 @@ function App() {
     }
   }, [user])
 
-  // CHANGED: تم إزالة إعادة التوجيه التلقائي للهاش لأن ResetPasswordPage يتعامل معه مباشرة
-
   return (
-    <NotificationListener>  {/* ✅ تغليف التطبيق بالمستمع */}
+    <NotificationListener>   {/* <-- غلف التطبيق */}
       <div className="min-h-screen flex flex-col">
         <Header />
         <main className="flex-grow">
