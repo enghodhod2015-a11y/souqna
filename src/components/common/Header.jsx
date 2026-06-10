@@ -5,11 +5,13 @@ import {
   LogOut, 
   ChevronDown,
   MessageCircle,
-  Search // CHANGED: إضافة أيقونة البحث
+  Search
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
 import { NotificationBell } from './NotificationBell'
+import { requestNotificationPermission, enableAudio } from '../../services/notificationService'
+import toast from 'react-hot-toast'
 
 export const Header = () => {
   const { user, profile, logout } = useAuth()
@@ -64,13 +66,23 @@ export const Header = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // دالة تفعيل الإشعارات
+  const handleEnableNotifications = async () => {
+    const granted = await requestNotificationPermission()
+    if (granted) {
+      await enableAudio()
+      toast.success('✅ تم تفعيل الإشعارات والصوت')
+    } else {
+      toast.error('❌ لم يتم التفعيل، يمكنك المحاولة لاحقاً من إعدادات المتصفح')
+    }
+  }
+
   return (
     <header className="bg-header-blue border-b-2 border-gold py-4 px-6 md:px-12">
       <div className="container mx-auto flex justify-between items-center">
         <Link to="/" className="text-2xl font-bold text-gold">سوقنا</Link>
 
         <div className="flex items-center gap-3">
-          {/* CHANGED: زر البحث الجديد */}
           <Link 
             to="/search" 
             className="flex items-center gap-2 bg-gold/10 border border-gold text-gold px-4 py-2 rounded-lg font-bold hover:bg-gold hover:text-primary-blue transition text-sm"
@@ -135,6 +147,15 @@ export const Header = () => {
 
               <NotificationBell />
 
+              {/* زر تفعيل الإشعارات */}
+              <button
+                onClick={handleEnableNotifications}
+                className="p-2 rounded-full bg-gold/20 text-gold hover:bg-gold/40 transition"
+                title="تفعيل الإشعارات والصوت"
+              >
+                🔔
+              </button>
+
               <div className="relative" ref={dropdownRef}>
                 <button 
                   onClick={() => setDropdownOpen(!dropdownOpen)} 
@@ -179,4 +200,5 @@ export const Header = () => {
     </header>
   )
 }
+
 

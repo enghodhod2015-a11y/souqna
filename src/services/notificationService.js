@@ -10,44 +10,26 @@ export const requestNotificationPermission = async () => {
   return permission === 'granted'
 }
 
-// تهيئة السياق الصوتي (لن يُنشأ إلا عند تفعيله بنقرة)
-const initAudioContext = () => {
-  if (audioCtx) return audioCtx
-  const AudioContext = window.AudioContext || window.webkitAudioContext
-  if (!AudioContext) return null
-  audioCtx = new AudioContext()
-  return audioCtx
-}
-
-// تشغيل الصوت – يعمل فقط إذا كان السياق قد فُعِّل بنقرة سابقة
-export const playNotificationSound = () => {
-  try {
-    const ctx = initAudioContext()
-    if (!ctx) return
-    // نستأنف السياق (آمن بعد تفعيل المستخدم)
-    ctx.resume().then(() => {
-      const gain = ctx.createGain()
-      gain.gain.value = 0.3
-      gain.connect(ctx.destination)
-      const osc = ctx.createOscillator()
-      osc.connect(gain)
-      osc.frequency.value = 800
-      osc.start()
-      osc.stop(ctx.currentTime + 0.3)
-    }).catch(e => console.log('صوت:', e))
-  } catch (err) {
-    console.log('خطأ في تشغيل الصوت:', err)
-  }
-}
-
-// استدعاء هذه الدالة بعد تفعيل المستخدم (مرة واحدة)
 export const enableAudio = async () => {
-  const ctx = initAudioContext()
-  if (ctx && ctx.state !== 'running') {
-    await ctx.resume()
-    return true
-  }
-  return false
+  const AudioContext = window.AudioContext || window.webkitAudioContext
+  if (!AudioContext) return false
+  if (!audioCtx) audioCtx = new AudioContext()
+  await audioCtx.resume()
+  return audioCtx.state === 'running'
+}
+
+export const playNotificationSound = () => {
+  if (!audioCtx) return
+  audioCtx.resume().then(() => {
+    const osc = audioCtx.createOscillator()
+    const gain = audioCtx.createGain()
+    gain.gain.value = 0.3
+    osc.connect(gain)
+    gain.connect(audioCtx.destination)
+    osc.frequency.value = 800
+    osc.start()
+    osc.stop(audioCtx.currentTime + 0.3)
+  }).catch(() => {})
 }
 
 const mapType = (type) => {
