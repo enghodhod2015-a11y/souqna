@@ -8,7 +8,6 @@ import { Button } from '../components/ui/Button'
 import { Send, CheckCheck, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-// دالة للتحقق من صحة UUID
 const isValidUUID = (id) => {
   if (!id) return false
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -27,9 +26,9 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null)
   const [product, setProduct] = useState(null)
   const channelRef = useRef(null)
-  // متغيرات لتخزين أسماء الأطراف
-  const [buyerName, setBuyerName] = useState('')
-  const [sellerName, setSellerName] = useState('')
+  // متغيرات لتخزين أسماء الأطراف مع الدور
+  const [buyerDisplay, setBuyerDisplay] = useState('')
+  const [sellerDisplay, setSellerDisplay] = useState('')
 
   useEffect(() => {
     if (user) initChat()
@@ -81,19 +80,23 @@ export default function ChatPage() {
       setConversation(currentConv)
 
       if (currentConv) {
-        // جلب أسماء المشتري والبائع
+        // جلب بيانات المشتري والبائع (الاسم ونوع الحساب)
         const { data: buyerProfile } = await supabase
           .from('profiles')
-          .select('full_name')
+          .select('full_name, account_type')
           .eq('id', currentConv.buyer_id)
           .single()
         const { data: sellerProfile } = await supabase
           .from('profiles')
-          .select('full_name')
+          .select('full_name, account_type')
           .eq('id', currentConv.seller_id)
           .single()
-        setBuyerName(buyerProfile?.full_name || 'مشتري')
-        setSellerName(sellerProfile?.full_name || 'بائع')
+        
+        const buyerRole = buyerProfile?.account_type === 'seller' ? 'بائع' : (buyerProfile?.account_type === 'admin' ? 'أدمن' : 'مشتري')
+        const sellerRole = sellerProfile?.account_type === 'seller' ? 'بائع' : (sellerProfile?.account_type === 'admin' ? 'أدمن' : 'مشتري')
+        
+        setBuyerDisplay(`${buyerProfile?.full_name || 'مشتري'} (${buyerRole})`)
+        setSellerDisplay(`${sellerProfile?.full_name || 'بائع'} (${sellerRole})`)
 
         const msgs = await getMessages(currentConv.id)
         setMessages(msgs || [])
@@ -236,10 +239,9 @@ export default function ChatPage() {
         <div className="h-[500px] overflow-y-auto p-5 space-y-4 bg-gray-50">
           {messages.map((msg) => {
             const isOwn = msg.sender_id === user.id
-            // تحديد اسم المرسل
             let senderDisplayName = ''
-            if (msg.sender_id === conversation?.buyer_id) senderDisplayName = buyerName
-            else if (msg.sender_id === conversation?.seller_id) senderDisplayName = sellerName
+            if (msg.sender_id === conversation?.buyer_id) senderDisplayName = buyerDisplay
+            else if (msg.sender_id === conversation?.seller_id) senderDisplayName = sellerDisplay
             else senderDisplayName = 'مستخدم'
 
             return (
