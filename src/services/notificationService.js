@@ -38,7 +38,7 @@ export const playNotificationSound = async () => {
 export const addNotification = async (userId, type, title, message, relatedId = null) => {
   const insertData = {
     user_id: userId,
-    type,               // ✅ الأنواع الأصلية: message, order_status, payment, return, info
+    type,               // الأنواع الأصلية: message, order_status, payment, return, info
     title,
     message,
     is_read: false,

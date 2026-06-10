@@ -18,7 +18,6 @@ export const NotificationListener = ({ children }) => {
         table: 'notifications',
         filter: `user_id=eq.${user.id}`
       }, async (payload) => {
-        console.log("Realtime", payload);
         const newNotif = payload.new;
         if (!newNotif) return;
         if (lastNotifIdRef.current === newNotif.id) return;
@@ -28,7 +27,7 @@ export const NotificationListener = ({ children }) => {
         console.log('🎵 audioCtx state:', audioCtx ? audioCtx.state : 'null');
         console.log('🔔 Notification.permission:', Notification.permission);
 
-        // ✅ محاولة إعادة تفعيل الصوت إذا كان مفقوداً ولكن الإذن ممنوح
+        // محاولة إعادة تفعيل الصوت إذا كان مفقوداً ولكن الإذن ممنوح
         if (!audioCtx && Notification.permission === 'granted') {
           await enableAudio();
         }

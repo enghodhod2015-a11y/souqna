@@ -15,7 +15,6 @@ export const NotificationBell = () => {
   const dropdownRef = useRef(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
-  // دالة لمعالجة أخطاء انتهاء الجلسة
   const handleAuthError = async (err) => {
     if (err?.code === 'PGRST303' || err?.message?.includes('JWT expired')) {
       console.warn('انتهت صلاحية الجلسة، تسجيل خروج...');
@@ -41,6 +40,7 @@ export const NotificationBell = () => {
     }
   }, [user, navigate]);
 
+  // تحميل أولي وإعادة تحميل كل 30 ثانية
   useEffect(() => {
     if (!user) return;
     loadNotifications();
@@ -48,6 +48,7 @@ export const NotificationBell = () => {
     return () => clearInterval(interval);
   }, [user, loadNotifications]);
 
+  // Realtime
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -65,10 +66,12 @@ export const NotificationBell = () => {
     return () => { supabase.removeChannel(channel); };
   }, [user, loadNotifications]);
 
+  // عند فتح القائمة نعيد الجلب
   useEffect(() => {
     if (dropdownOpen) loadNotifications();
   }, [dropdownOpen, loadNotifications]);
 
+  // إعادة تهيئة الصوت إذا كان الإذن ممنوحاً
   useEffect(() => {
     if (!user) return;
     const init = async () => {
@@ -80,6 +83,7 @@ export const NotificationBell = () => {
     init();
   }, [user]);
 
+  // إغلاق القائمة عند النقر خارجها
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false);
@@ -170,12 +174,7 @@ export const NotificationBell = () => {
         <div className="absolute left-0 mt-2 w-80 bg-primary-card rounded-xl shadow-2xl border border-gold/30 z-50 overflow-hidden">
           <div className="p-3 border-b border-gold/30 flex justify-between items-center">
             <h3 className="font-bold text-gold">الإشعارات</h3>
-            <button
-              onClick={() => { navigate('/notifications'); setDropdownOpen(false); }}
-              className="text-xs text-gold underline"
-            >
-              عرض الكل
-            </button>
+            <button onClick={() => { navigate('/notifications'); setDropdownOpen(false); }} className="text-xs text-gold underline">عرض الكل</button>
           </div>
           <div className="max-h-96 overflow-y-auto">
             {notifications.length === 0 ? (
@@ -207,5 +206,4 @@ export const NotificationBell = () => {
     </div>
   );
 };
-
 
