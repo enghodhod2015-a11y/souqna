@@ -203,6 +203,8 @@ export default function AdminDashboardPage() {
             order_status: order?.status,
             buyer_name: buyer?.full_name || 'غير معروف',
             buyer_email: buyer?.email,
+            seller_id: product?.seller_id,
+            buyer_id: order?.user_id,
           };
         });
 
@@ -606,8 +608,7 @@ export default function AdminDashboardPage() {
     refetchUsers();
   };
 
-  const sendNotificationToUser = async (userId, message) => {
-    const title = 'إشعار من الإدارة';
+  const sendNotificationToUser = async (userId, message, title = 'إشعار من الإدارة', type = 'info', relatedId = null) => {
     const { data: { user: adminUser } } = await supabase.auth.getUser();
     const adminId = adminUser.id;
     let conversationId = null;
@@ -620,7 +621,7 @@ export default function AdminDashboardPage() {
     else {
       const { data: newConv, error } = await supabase
         .from('conversations')
-        .insert({ buyer_id: adminId, seller_id: userId, product_id: null })
+        .insert({ buyer_id: adminId, seller_id: userId, product_id: relatedId || null })
         .select()
         .single();
       if (error) throw error;
@@ -628,7 +629,7 @@ export default function AdminDashboardPage() {
     }
     await supabase.from('notifications').insert({
       user_id: userId,
-      type: 'info',
+      type: type,
       title,
       message,
       related_id: conversationId.toString(),
@@ -698,6 +699,35 @@ export default function AdminDashboardPage() {
       .order('created_at', { ascending: false });
     setSellerReceiptsList(data || []);
     setShowReceiptsModal(true);
+  };
+
+  // ------------------- إرسال إشعار للمنتج (في إدارة المنتجات) -------------------
+  const sendNotificationForOrderItem = async (item) => {
+    const msg = prompt('أدخل نص الإشعار الذي سيتم إرساله إلى البائع بخصوص هذا الطلب:');
+    if (!msg) return;
+    // إرسال إلى البائع (seller_id)
+    await sendNotificationToUser(
+      item.seller_id,
+      msg,
+      `إشعار بخصوص طلب #${item.order_id} (منتج: ${item.product_name})`,
+      'order_status',
+      item.order_id
+    );
+  };
+
+  // ------------------- إرسال تذكير للمحادثة (في الطلبات والاستفسارات) -------------------
+  const sendReminderForConversation = async (conv, targetRole) => {
+    const targetUserId = targetRole === 'seller' ? conv.seller_id : conv.buyer_id;
+    const targetName = targetRole === 'seller' ? conv.seller?.full_name : conv.buyer?.full_name;
+    const msg = prompt(`أدخل رسالة التذكير التي سيتم إرسالها إلى ${targetName || (targetRole === 'seller' ? 'البائع' : 'المشتري')}:`);
+    if (!msg) return;
+    await sendNotificationToUser(
+      targetUserId,
+      msg,
+      `تذكير بخصوص المحادثة (المنتج: ${conv.product?.title || 'غير معروف'})`,
+      'message',
+      conv.id
+    );
   };
 
   // ------------------- Render -------------------
@@ -1090,6 +1120,7 @@ export default function AdminDashboardPage() {
                   <th className="p-3 text-gold">الإجمالي</th>
                   <th className="p-3 text-gold">المشتري</th>
                   <th className="p-3 text-gold">حالة الطلب</th>
+                  <th className="p-3 text-gold">إجراءات</th>
                 </tr>
               </thead>
               <tbody>
@@ -1112,10 +1143,19 @@ export default function AdminDashboardPage() {
                         {item.order_status}
                       </span>
                     </td>
+                    <td className="p-3">
+                      <Button
+                        onClick={() => sendNotificationForOrderItem(item)}
+                        size="sm"
+                        className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1"
+                      >
+                        <Send size={12} className="inline ml-1" /> إرسال إشعار للبائع
+                      </Button>
+                    </td>
                   </tr>
                 ))}
                 {(!orderItems || orderItems.length === 0) && (
-                  <td><td colSpan="8" className="text-center p-6 text-text-secondary">لا توجد عناصر طلبات</td></tr>
+                  <tr><td colSpan="9" className="text-center p-6 text-text-secondary">لا توجد عناصر طلبات</td></tr>
                 )}
               </tbody>
             </table>
@@ -1207,24 +1247,42 @@ export default function AdminDashboardPage() {
                     <th className="p-3 text-gold">البائع</th>
                     <th className="p-3 text-gold">آخر رسالة</th>
                     <th className="p-3 text-gold">التاريخ</th>
+                    <th className="p-3 text-gold">الحالة</th>
                     <th className="p-3 text-gold">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {conversations.map(conv => (
-                    <tr key={conv.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
-                      <td className="p-3 text-white">{conv.product?.title || conv.product?.name || 'منتج غير متوفر'}</td>
-                      <td className="p-3 text-white">{conv.buyer?.full_name || conv.buyer_name || 'غير معروف'}</td>
-                      <td className="p-3 text-white">{conv.seller?.full_name || conv.seller_name || 'غير معروف'}</td>
-                      <td className="p-3 text-white max-w-xs truncate">{conv.last_message || 'لا توجد رسائل'}</td>
-                      <td className="p-3 text-white">{conv.last_message_at ? formatDate(conv.last_message_at) : '-'}</td>
-                      <td className="p-3">
-                        <Link to={`/chat/c/${conv.id}`} className="bg-gold text-primary-blue px-3 py-1 rounded-lg text-sm shadow hover:bg-gold/90 transition inline-flex items-center gap-1">
-                          <MessageCircle size={14} /> فتح المحادثة
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
+                  {conversations.map(conv => {
+                    // تحديد ما إذا كانت آخر رسالة من المشتري ولم يرد البائع (بسيط: افتراض عدم وجود رد إذا كانت آخر رسالة من المشتري)
+                    // لكننا سنضيف زر إرسال تذكير للبائع دائماً.
+                    return (
+                      <tr key={conv.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
+                        <td className="p-3 text-white">{conv.product?.title || conv.product?.name || 'منتج غير متوفر'}</td>
+                        <td className="p-3 text-white">{conv.buyer?.full_name || conv.buyer_name || 'غير معروف'}</td>
+                        <td className="p-3 text-white">{conv.seller?.full_name || conv.seller_name || 'غير معروف'}</td>
+                        <td className="p-3 text-white max-w-xs truncate">{conv.last_message || 'لا توجد رسائل'}</td>
+                        <td className="p-3 text-white">{conv.last_message_at ? formatDate(conv.last_message_at) : '-'}</td>
+                        <td className="p-3 text-white">
+                          {/* يمكن إضافة حالة بسيطة: إذا لم يرد البائع بعد */}
+                          <span className="text-yellow-500">في انتظار رد البائع</span>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex gap-2">
+                            <Link to={`/chat/c/${conv.id}`} className="bg-gold text-primary-blue px-3 py-1 rounded-lg text-sm shadow hover:bg-gold/90 transition inline-flex items-center gap-1">
+                              <MessageCircle size={14} /> فتح المحادثة
+                            </Link>
+                            <Button
+                              onClick={() => sendReminderForConversation(conv, 'seller')}
+                              size="sm"
+                              className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1"
+                            >
+                              <Send size={12} className="inline ml-1" /> تذكير البائع
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1248,7 +1306,9 @@ export default function AdminDashboardPage() {
                   <td className="text-gray-800">{r.notes || '-'}</td>
                 </tr>
               ))}
-              {sellerReceiptsList.length === 0 && <td><td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td></tr>}
+              {sellerReceiptsList.length === 0 && (
+                <tr><td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td></tr>
+              )}
             </tbody>
           </table>
           <div className="mt-4 text-left"><Button variant="secondary" onClick={() => setShowReceiptsModal(false)}>إغلاق</Button></div>
