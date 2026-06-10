@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 
-let audioCtx = null
+export let audioCtx = null;   // تم التصدير للاختبار
 
 export const requestNotificationPermission = async () => {
   if (!('Notification' in window)) return false

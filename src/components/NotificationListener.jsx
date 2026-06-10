@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase';
-import { playNotificationSound } from '../services/notificationService';
+import { playNotificationSound, audioCtx } from '../services/notificationService';
 
 export const NotificationListener = ({ children }) => {
   const { user } = useAuth();
@@ -18,15 +18,17 @@ export const NotificationListener = ({ children }) => {
         table: 'notifications',
         filter: `user_id=eq.${user.id}`
       }, (payload) => {
-        // ✅ سجل البايلود كاملاً للمساعدة في التصحيح
         console.log("Realtime", payload);
-
         const newNotif = payload.new;
         if (!newNotif) return;
         if (lastNotifIdRef.current === newNotif.id) return;
         lastNotifIdRef.current = newNotif.id;
 
         console.log('🔔 إشعار جديد:', newNotif);
+
+        // ✅ اختبار حالة الصوت والإذن
+        console.log('🎵 audioCtx state:', audioCtx ? audioCtx.state : 'null');
+        console.log('🔔 Notification.permission:', Notification.permission);
 
         if (Notification.permission === 'granted') {
           new Notification(newNotif.title, { body: newNotif.message, icon: '/logo192.png' });
