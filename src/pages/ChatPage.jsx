@@ -5,7 +5,7 @@ import { getOrCreateConversation, sendMessage, getMessages, markMessagesAsRead }
 import { getProductById } from '../services/productService'
 import { supabase } from '../services/supabase' 
 import { Button } from '../components/ui/Button'
-import { Send, CheckCheck } from 'lucide-react'
+import { Send, CheckCheck, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 // دالة للتحقق من صحة UUID
@@ -181,6 +181,11 @@ export default function ChatPage() {
     }
   }
 
+  const handleClose = () => {
+    if (window.history.length > 1) navigate(-1)
+    else navigate('/inbox')
+  }
+
   if (loading) return <div className="text-center py-20 text-gray-500">جاري التحميل...</div>
   
   // ✅ إذا كانت المحادثة موجودة ولكن المنتج غير موجود (محادثة مع الإدارة) نعرض واجهة بديلة
@@ -193,16 +198,25 @@ export default function ChatPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="bg-white rounded-2xl border border-gold/40 shadow-xl overflow-hidden">
-        <div className="p-5 border-b border-gold/30 bg-gradient-to-r from-gray-50 to-white">
-          <h2 className="text-2xl font-bold text-gold flex items-center gap-2">
-            {pageTitle}
-          </h2>
-          {productInfo && (
-            <p className="text-sm text-gray-600 mt-1">بخصوص منتج: <span className="text-gold font-medium">{productInfo.title}</span></p>
-          )}
-          {isAdminChat && (
-            <p className="text-sm text-gray-600 mt-1">هذه محادثة مع فريق الدعم والإدارة</p>
-          )}
+        <div className="p-5 border-b border-gold/30 bg-gradient-to-r from-gray-50 to-white flex justify-between items-center">
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-gold flex items-center gap-2">
+              {pageTitle}
+            </h2>
+            {productInfo && (
+              <p className="text-sm text-gray-600 mt-1">بخصوص منتج: <span className="text-gold font-medium">{productInfo.title}</span></p>
+            )}
+            {isAdminChat && (
+              <p className="text-sm text-gray-600 mt-1">هذه محادثة مع فريق الدعم والإدارة</p>
+            )}
+          </div>
+          <button
+            onClick={handleClose}
+            className="p-2 rounded-full hover:bg-gray-200 transition-colors text-gray-600"
+            title="إغلاق"
+          >
+            <X size={24} />
+          </button>
         </div>
 
         <div className="h-[500px] overflow-y-auto p-5 space-y-4 bg-gray-50">
@@ -257,5 +271,4 @@ export default function ChatPage() {
     </div>
   )
 }
-
 

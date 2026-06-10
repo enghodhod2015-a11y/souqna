@@ -806,19 +806,25 @@ export default function AdminDashboardPage() {
 
   // ------------------- إرسال تذكير للمحادثة (في الطلبات والاستفسارات) -------------------
   // ------------------- إرسال تذكير للمحادثة (في الطلبات والاستفسارات) -------------------
+// ------------------- إرسال تذكير للمحادثة (في الطلبات والاستفسارات) -------------------
 const sendReminderForConversation = async (conv, targetRole) => {
   const targetUserId = targetRole === 'seller' ? conv.seller_id : conv.buyer_id;
   const targetName = targetRole === 'seller' ? conv.seller?.full_name : conv.buyer?.full_name;
 
-  // 1. جلب آخر رسالة في المحادثة
+  // 1. جلب آخر رسالة في هذه المحادثة (مع اسم المرسل)
   const { data: lastMessageData, error: msgError } = await supabase
     .from('messages')
-    .select('message, created_at, sender_id, profiles!messages_sender_id_fkey(full_name)')
+    .select(`
+      message,
+      created_at,
+      sender_id,
+      profiles!messages_sender_id_fkey ( full_name )
+    `)
     .eq('conversation_id', conv.id)
     .order('created_at', { ascending: false })
     .limit(1);
 
-  let lastMessageText = 'لا توجد رسائل سابقة';
+  let lastMessageText = 'لا توجد رسائل سابقة في هذه المحادثة';
   if (!msgError && lastMessageData && lastMessageData.length > 0) {
     const lastMsg = lastMessageData[0];
     const senderName = lastMsg.profiles?.full_name || 'مستخدم';
@@ -832,15 +838,15 @@ const sendReminderForConversation = async (conv, targetRole) => {
     lastMessageText = `📝 ${senderName} (${formattedDate}): ${lastMsg.message}`;
   }
 
-  // 2. عرض نافذة لإدخال رسالة التذكير مع إظهار آخر رسالة للمسؤول (للمساعدة فقط)
+  // 2. نافذة إدخال رسالة التذكير مع عرض آخر رسالة
   const adminMessage = prompt(
-    `📢 تذكير إلى: ${targetName || (targetRole === 'seller' ? 'البائع' : 'المشتري')}\n\n` +
-    `آخر رسالة في المحادثة:\n${lastMessageText}\n\n` +
-    `✏️ أدخل رسالة التذكير الخاصة بك:`
+    `📢 إرسال تذكير إلى: ${targetName || (targetRole === 'seller' ? 'البائع' : 'المشتري')}\n\n` +
+    `🔄 آخر رسالة في هذه المحادثة:\n${lastMessageText}\n\n` +
+    `✏️ رسالة التذكير (اكتب هنا):`
   );
   if (!adminMessage) return;
 
-  // 3. بناء الرسالة الكاملة التي ستُرسل
+  // 3. بناء الرسالة الكاملة
   const fullReminderMessage = `📌 **تذكير من الإدارة**\n\n` +
                               `🔄 **آخر رسالة في المحادثة:**\n${lastMessageText}\n\n` +
                               `✉️ **رسالة الإدارة:** ${adminMessage}`;
