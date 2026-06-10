@@ -558,17 +558,49 @@ export default function AdminDashboardPage() {
     queryKey: ['adminConversations'],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase
+        // 1. جلب جميع المحادثات
+        const { data: conversations, error: convError } = await supabase
           .from('conversations')
-          .select(`
-            *,
-            product:products(id, name, title),
-            buyer:profiles!conversations_buyer_id_fkey(id, full_name, email),
-            seller:profiles!conversations_seller_id_fkey(id, full_name, email)
-          `)
+          .select('*')
           .order('last_message_at', { ascending: false });
-        if (error) throw error;
-        return data || [];
+
+        if (convError) throw convError;
+        if (!conversations || conversations.length === 0) return [];
+
+        // 2. جلب المنتجات المرتبطة (حتى لو كانت null)
+        const productIds = [...new Set(conversations.map(c => c.product_id).filter(Boolean))];
+        let productsMap = new Map();
+        if (productIds.length) {
+          const { data: products, error: prodError } = await supabase
+            .from('products')
+            .select('id, name, title')
+            .in('id', productIds);
+          if (!prodError) productsMap = new Map(products.map(p => [p.id, p]));
+        }
+
+        // 3. جلب بيانات المستخدمين
+        const userIds = [...new Set([
+          ...conversations.map(c => c.buyer_id),
+          ...conversations.map(c => c.seller_id)
+        ].filter(Boolean))];
+        let profilesMap = new Map();
+        if (userIds.length) {
+          const { data: profiles, error: profError } = await supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .in('id', userIds);
+          if (!profError) profilesMap = new Map(profiles.map(p => [p.id, p]));
+        }
+
+        // 4. دمج البيانات
+        const enrichedConversations = conversations.map(conv => ({
+          ...conv,
+          product: productsMap.get(conv.product_id) || null,
+          buyer: profilesMap.get(conv.buyer_id) || null,
+          seller: profilesMap.get(conv.seller_id) || null
+        }));
+
+        return enrichedConversations;
       } catch (err) {
         console.error('خطأ في جلب المحادثات:', err);
         return [];
@@ -612,35 +644,76 @@ export default function AdminDashboardPage() {
     const { data: { user: adminUser } } = await supabase.auth.getUser();
     const adminId = adminUser.id;
     let conversationId = null;
-    const { data: existing } = await supabase
+
+    // 1. البحث عن محادثة موجودة بين الأدمن وهذا المستخدم
+    const { data: existing, error: findError } = await supabase
       .from('conversations')
       .select('id')
       .or(`buyer_id.eq.${adminId},seller_id.eq.${userId}`)
       .maybeSingle();
-    if (existing) conversationId = existing.id;
-    else {
-      const { data: newConv, error } = await supabase
+
+    if (findError) {
+      console.error('خطأ في البحث عن المحادثة:', findError);
+      toast.error('فشل البحث عن محادثة');
+      return;
+    }
+
+    if (existing) {
+      conversationId = existing.id;
+      // تحديث last_message في المحادثة الموجودة
+      await supabase
         .from('conversations')
-        .insert({ buyer_id: adminId, seller_id: userId, product_id: relatedId || null })
+        .update({ last_message: message, last_message_at: new Date() })
+        .eq('id', conversationId);
+    } else {
+      // إنشاء محادثة جديدة مع تعيين last_message فوراً
+      const { data: newConv, error: insertError } = await supabase
+        .from('conversations')
+        .insert({
+          buyer_id: adminId,
+          seller_id: userId,
+          product_id: relatedId || null,
+          last_message: message,
+          last_message_at: new Date()
+        })
         .select()
         .single();
-      if (error) throw error;
+
+      if (insertError) {
+        console.error('خطأ في إنشاء المحادثة:', insertError);
+        toast.error('فشل إنشاء محادثة جديدة');
+        return;
+      }
       conversationId = newConv.id;
     }
-    await supabase.from('notifications').insert({
-      user_id: userId,
-      type: type,
-      title,
-      message,
-      related_id: conversationId.toString(),
-    });
-    await supabase.from('messages').insert({
+
+    // 2. إدراج الإشعار (حتى لو فشل لا نوقف التنفيذ)
+    try {
+      await supabase.from('notifications').insert({
+        user_id: userId,
+        type: type,
+        title,
+        message,
+        related_id: conversationId.toString(),
+      });
+    } catch (notifErr) {
+      console.error('خطأ في إدراج الإشعار:', notifErr);
+    }
+
+    // 3. إدراج الرسالة
+    const { error: msgError } = await supabase.from('messages').insert({
       conversation_id: conversationId,
       sender_id: adminId,
       receiver_id: userId,
       message,
     });
-    toast.success('تم إرسال الإشعار');
+
+    if (msgError) {
+      console.error('خطأ في إدراج الرسالة:', msgError);
+      toast.error('فشل إرسال الرسالة، لكن الإشعار قد يصل');
+    } else {
+      toast.success('تم إرسال الإشعار والرسالة بنجاح');
+    }
   };
 
   const sendToAllUsers = async () => {
@@ -703,15 +776,28 @@ export default function AdminDashboardPage() {
 
   // ------------------- إرسال إشعار للمنتج (في إدارة المنتجات) -------------------
   const sendNotificationForOrderItem = async (item) => {
-    const msg = prompt('أدخل نص الإشعار الذي سيتم إرساله إلى البائع بخصوص هذا الطلب:');
-    if (!msg) return;
-    // إرسال إلى البائع (seller_id)
+    // التأكد من وجود بيانات كافية
+    if (!item || !item.seller_id || !item.order_id) {
+      toast.error('بيانات الطلب غير مكتملة');
+      return;
+    }
+
+    const adminMessage = prompt('أدخل نص الإشعار الذي سيتم إرساله إلى البائع بخصوص هذا الطلب:');
+    if (!adminMessage) return;
+
+    // بناء رسالة منسقة تحتوي على كل التفاصيل
+    const fullMessage = `📦 **المنتج:** ${item.product_name}\n` +
+                        `🆔 **رقم الطلب:** ${item.order_id}\n` +
+                        `📋 **الحالة:** ${item.order_status}\n` +
+                        `✉️ **رسالة الإدارة:** ${adminMessage}`;
+
+    // إرسال الإشعار والرسالة إلى البائع
     await sendNotificationToUser(
-      item.seller_id,
-      msg,
-      `إشعار بخصوص طلب #${item.order_id} (منتج: ${item.product_name})`,
-      'order_status',
-      item.order_id
+      item.seller_id,           // ID البائع
+      fullMessage,              // نص الرسالة الكامل
+      `طلب #${item.order_id} - ${item.product_name}`,  // عنوان الإشعار
+      'order_status',           // النوع
+      item.order_id             // related_id (رقم الطلب)
     );
   };
 
@@ -1253,8 +1339,6 @@ export default function AdminDashboardPage() {
                 </thead>
                 <tbody>
                   {conversations.map(conv => {
-                    // تحديد ما إذا كانت آخر رسالة من المشتري ولم يرد البائع (بسيط: افتراض عدم وجود رد إذا كانت آخر رسالة من المشتري)
-                    // لكننا سنضيف زر إرسال تذكير للبائع دائماً.
                     return (
                       <tr key={conv.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
                         <td className="p-3 text-white">{conv.product?.title || conv.product?.name || 'منتج غير متوفر'}</td>
@@ -1263,7 +1347,6 @@ export default function AdminDashboardPage() {
                         <td className="p-3 text-white max-w-xs truncate">{conv.last_message || 'لا توجد رسائل'}</td>
                         <td className="p-3 text-white">{conv.last_message_at ? formatDate(conv.last_message_at) : '-'}</td>
                         <td className="p-3 text-white">
-                          {/* يمكن إضافة حالة بسيطة: إذا لم يرد البائع بعد */}
                           <span className="text-yellow-500">في انتظار رد البائع</span>
                         </td>
                         <td className="p-3">
