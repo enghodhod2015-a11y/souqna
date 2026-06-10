@@ -7,40 +7,36 @@ import toast from 'react-hot-toast';
 export const NotificationListener = ({ children }) => {
   const { user } = useAuth();
   const lastNotifIdRef = useRef(null);
-  const notifAllowedRef = useRef(localStorage.getItem('notif_allowed') === 'true');
-  const audioAllowedRef = useRef(localStorage.getItem('audio_allowed') === 'true');
-
-  const setNotifAllowed = (val) => {
-    notifAllowedRef.current = val;
-    localStorage.setItem('notif_allowed', val);
+  
+  // استخدم دالة مساعدة لقراءة localStorage بأمان
+  const isActivated = () => {
+    try {
+      return localStorage.getItem('notifications_activated') === 'true';
+    } catch(e) { return false; }
   };
-  const setAudioAllowed = (val) => {
-    audioAllowedRef.current = val;
-    localStorage.setItem('audio_allowed', val);
+  const setActivated = () => {
+    try {
+      localStorage.setItem('notifications_activated', 'true');
+    } catch(e) {}
   };
+  
+  const activatedRef = useRef(isActivated());
 
   const handleActivation = async (notif) => {
-    // طلب إذن الإشعارات
-    if (!notifAllowedRef.current) {
-      const granted = await requestNotificationPermission();
-      if (granted) {
-        setNotifAllowed(true);
-        toast.success('✅ تم تفعيل الإشعارات');
+    // طلب الإذن للإشعارات
+    const granted = await requestNotificationPermission();
+    if (granted) {
+      // تفعيل الصوت
+      await enableAudio();
+      setActivated();
+      activatedRef.current = true;
+      toast.success('✅ تم تفعيل الإشعارات والصوت');
+      if (notif && Notification.permission === 'granted') {
         new Notification(notif.title, { body: notif.message, icon: '/logo192.png' });
-      } else {
-        toast.error('❌ لا يمكن عرض الإشعارات');
       }
-    }
-    // تفعيل الصوت
-    if (!audioAllowedRef.current) {
-      const enabled = await enableAudio();
-      if (enabled) {
-        setAudioAllowed(true);
-        toast.success('🔊 تم تفعيل الصوت');
-        playNotificationSound(); // تشغيل تجريبي
-      } else {
-        toast.error('❌ تعذر تفعيل الصوت');
-      }
+      playNotificationSound();
+    } else {
+      toast.error('❌ لم يتم تفعيل الإشعارات، يمكنك المحاولة لاحقاً من إعدادات المتصفح');
     }
   };
 
@@ -62,15 +58,13 @@ export const NotificationListener = ({ children }) => {
 
         console.log('🔔 إشعار جديد:', newNotif);
 
-        // إذا كان كل شيء مفعلاً مسبقاً -> شغل مباشرة
-        if (notifAllowedRef.current && audioAllowedRef.current) {
+        if (activatedRef.current) {
+          // مفعل مسبقاً -> شغل الصوت والإشعار
           if (Notification.permission === 'granted')
             new Notification(newNotif.title, { body: newNotif.message, icon: '/logo192.png' });
           playNotificationSound();
-        }
-        // إذا لم يفعّل بعد -> أظهر زر التفعيل (مرة واحدة فقط في العمر)
-        else if (!notifAllowedRef.current || !audioAllowedRef.current) {
-          // نعرض رسالة تطلب التفعيل – لن تظهر بعد التفعيل لأنه سيتم حفظ الحالة في localStorage
+        } else {
+          // لم يفعّل بعد -> أظهر زر التفعيل (مرة واحدة فقط)
           toast(
             (t) => (
               <div className="flex flex-col gap-2 rtl">
@@ -81,10 +75,11 @@ export const NotificationListener = ({ children }) => {
                     toast.dismiss(t.id);
                     await handleActivation(newNotif);
                     // بعد التفعيل، حاول إظهار إشعار هذه الرسالة
-                    if (notifAllowedRef.current) {
-                      new Notification(newNotif.title, { body: newNotif.message, icon: '/logo192.png' });
+                    if (activatedRef.current) {
+                      if (Notification.permission === 'granted')
+                        new Notification(newNotif.title, { body: newNotif.message, icon: '/logo192.png' });
+                      playNotificationSound();
                     }
-                    if (audioAllowedRef.current) playNotificationSound();
                   }}
                   className="mt-1 px-4 py-2 bg-gold text-primary-blue rounded-lg font-bold"
                 >
