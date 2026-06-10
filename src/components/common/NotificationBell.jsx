@@ -1,42 +1,46 @@
-import { useEffect, useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Bell, MessageCircle, Package, DollarSign, Info, Volume2 } from 'lucide-react'
-import { useAuth } from '../../contexts/AuthContext'
-import { supabase } from '../../services/supabase'
-import { getUserNotifications, markNotificationAsRead, requestNotificationPermission, enableAudio, playNotificationSound } from '../../services/notificationService'
-import toast from 'react-hot-toast'
+import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, MessageCircle, Package, DollarSign, Info, Volume2 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../services/supabase';
+import { getUserNotifications, markNotificationAsRead, requestNotificationPermission, enableAudio, playNotificationSound, audioCtx } from '../../services/notificationService';
+import toast from 'react-hot-toast';
 
 export const NotificationBell = () => {
-  const { user } = useAuth()
-  const navigate = useNavigate()
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [notifications, setNotifications] = useState([])
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const dropdownRef = useRef(null)
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState([]);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
-  // التحقق من حالة الإذن عند التحميل
+  // ✅ التعديل الأساسي: إعادة تهيئة الصوت عند تحميل الصفحة إذا كان الإذن ممنوحاً
   useEffect(() => {
-    if (user && Notification.permission === 'granted') {
-      setNotificationsEnabled(true)
-    }
-  }, [user])
+    if (!user) return;
+    const init = async () => {
+      if (Notification.permission === 'granted') {
+        await enableAudio();          // يعيد إنشاء audioCtx إذا فُقد
+        setNotificationsEnabled(true);
+      }
+    };
+    init();
+  }, [user]);
 
   const loadNotifications = async () => {
-    if (!user) return
+    if (!user) return;
     try {
-      const data = await getUserNotifications(user.id)
-      setNotifications(data.slice(0, 5))
-      setUnreadCount(data.filter(n => !n.is_read).length)
+      const data = await getUserNotifications(user.id);
+      setNotifications(data.slice(0, 5));
+      setUnreadCount(data.filter(n => !n.is_read).length);
     } catch (err) {
-      console.error('خطأ في جلب الإشعارات:', err)
+      console.error('خطأ في جلب الإشعارات:', err);
     }
-  }
+  };
 
   useEffect(() => {
-    if (!user) return
-    loadNotifications()
-
+    if (!user) return;
+    loadNotifications();
     const channel = supabase
       .channel(`notifications-dropdown-${user.id}`)
       .on('postgres_changes', {
@@ -45,37 +49,31 @@ export const NotificationBell = () => {
         table: 'notifications',
         filter: `user_id=eq.${user.id}`
       }, () => {
-        loadNotifications()
+        loadNotifications();
       })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [user])
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setDropdownOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleEnableNotifications = async () => {
-    const granted = await requestNotificationPermission()
+    const granted = await requestNotificationPermission();
     if (granted) {
-      await enableAudio()
-      setNotificationsEnabled(true)
-      toast.success('✅ تم تفعيل الإشعارات والصوت')
-      // تجربة تشغيل صوت تجريبي
-      playNotificationSound()
+      await enableAudio();
+      setNotificationsEnabled(true);
+      toast.success('✅ تم تفعيل الإشعارات والصوت');
+      playNotificationSound();
     } else {
-      toast.error('❌ لم يتم التفعيل، يمكنك المحاولة لاحقاً من إعدادات المتصفح')
+      toast.error('❌ لم يتم التفعيل، يمكنك المحاولة لاحقاً من إعدادات المتصفح');
     }
-  }
+  };
 
   const handleNotificationClick = async (notif) => {
     if (!notif.is_read) {
@@ -83,37 +81,31 @@ export const NotificationBell = () => {
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
       setUnreadCount(prev => Math.max(0, prev - 1));
     }
-
     const relatedId = notif.related_id;
     const type = notif.type;
-    
     const isValidConversationUUID = (id) => {
       if (!id) return false;
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       return uuidRegex.test(id);
     };
-
     if (relatedId && isValidConversationUUID(relatedId)) {
       navigate(`/chat/c/${relatedId}`);
-    }
-    else if (type === 'payment' || type === 'order_status') {
+    } else if (type === 'payment' || type === 'order_status') {
       navigate('/orders');
-    }
-    else {
+    } else {
       navigate('/inbox');
     }
-
     setDropdownOpen(false);
   };
 
   const getIcon = (type) => {
     switch (type) {
-      case 'message': return <MessageCircle size={16} className="text-blue-500" />
-      case 'order_status': return <Package size={16} className="text-green-500" />
-      case 'payment': return <DollarSign size={16} className="text-yellow-500" />
-      default: return <Info size={16} className="text-gold" />
+      case 'message': return <MessageCircle size={16} className="text-blue-500" />;
+      case 'order_status': return <Package size={16} className="text-green-500" />;
+      case 'payment': return <DollarSign size={16} className="text-yellow-500" />;
+      default: return <Info size={16} className="text-gold" />;
     }
-  }
+  };
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -130,8 +122,6 @@ export const NotificationBell = () => {
             </span>
           )}
         </button>
-
-        {/* زر تفعيل الإشعارات يظهر فقط إذا لم تكن مفعلة */}
         {!notificationsEnabled && user && (
           <button
             onClick={handleEnableNotifications}
@@ -142,39 +132,24 @@ export const NotificationBell = () => {
           </button>
         )}
       </div>
-
       {dropdownOpen && (
         <div className="absolute left-0 mt-2 w-80 bg-primary-card rounded-xl shadow-2xl border border-gold/30 z-50 overflow-hidden">
           <div className="p-3 border-b border-gold/30 flex justify-between items-center">
             <h3 className="font-bold text-gold">الإشعارات</h3>
-            <button
-              onClick={() => { navigate('/notifications'); setDropdownOpen(false); }}
-              className="text-xs text-gold underline"
-            >
-              عرض الكل
-            </button>
+            <button onClick={() => { navigate('/notifications'); setDropdownOpen(false); }} className="text-xs text-gold underline">عرض الكل</button>
           </div>
           <div className="max-h-96 overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="p-4 text-center text-text-secondary">لا توجد إشعارات</div>
             ) : (
               notifications.map(notif => (
-                <div
-                  key={notif.id}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleNotificationClick(notif)
-                  }}
-                  className={`p-3 border-b border-gold/20 cursor-pointer hover:bg-secondary-blue/30 transition ${!notif.is_read ? 'bg-secondary-blue/10' : ''}`}
-                >
+                <div key={notif.id} onClick={(e) => { e.stopPropagation(); handleNotificationClick(notif); }} className={`p-3 border-b border-gold/20 cursor-pointer hover:bg-secondary-blue/30 transition ${!notif.is_read ? 'bg-secondary-blue/10' : ''}`}>
                   <div className="flex items-start gap-2">
                     <div className="mt-1">{getIcon(notif.type)}</div>
                     <div className="flex-1">
                       <p className={`text-sm font-bold ${!notif.is_read ? 'text-gold' : 'text-white'}`}>{notif.title}</p>
                       <p className="text-xs text-text-secondary line-clamp-2">{notif.message}</p>
-                      <p className="text-xs text-text-secondary mt-1">
-                        {new Date(notif.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
+                      <p className="text-xs text-text-secondary mt-1">{new Date(notif.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                     {!notif.is_read && <div className="w-2 h-2 bg-gold rounded-full mt-2"></div>}
                   </div>
@@ -185,7 +160,7 @@ export const NotificationBell = () => {
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
 

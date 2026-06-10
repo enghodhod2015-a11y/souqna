@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase';
-import { playNotificationSound, audioCtx } from '../services/notificationService';
+import { playNotificationSound, audioCtx, enableAudio } from '../services/notificationService';
 
 export const NotificationListener = ({ children }) => {
   const { user } = useAuth();
@@ -17,7 +17,7 @@ export const NotificationListener = ({ children }) => {
         schema: 'public',
         table: 'notifications',
         filter: `user_id=eq.${user.id}`
-      }, (payload) => {
+      }, async (payload) => {
         console.log("Realtime", payload);
         const newNotif = payload.new;
         if (!newNotif) return;
@@ -25,15 +25,27 @@ export const NotificationListener = ({ children }) => {
         lastNotifIdRef.current = newNotif.id;
 
         console.log('🔔 إشعار جديد:', newNotif);
-
-        // ✅ اختبار حالة الصوت والإذن
         console.log('🎵 audioCtx state:', audioCtx ? audioCtx.state : 'null');
         console.log('🔔 Notification.permission:', Notification.permission);
 
-        if (Notification.permission === 'granted') {
-          new Notification(newNotif.title, { body: newNotif.message, icon: '/logo192.png' });
+        // ✅ محاولة إعادة تفعيل الصوت إذا كان مفقوداً ولكن الإذن ممنوح
+        if (!audioCtx && Notification.permission === 'granted') {
+          await enableAudio();
         }
-        playNotificationSound();
+
+        if (Notification.permission === 'granted') {
+          const notification = new Notification(newNotif.title, {
+            body: newNotif.message,
+            icon: '/logo192.png'
+          });
+          notification.onclick = () => {
+            window.focus();
+            if (newNotif.related_id) {
+              window.location.href = `/chat/c/${newNotif.related_id}`;
+            }
+          };
+        }
+        await playNotificationSound();
       })
       .subscribe();
 
@@ -44,4 +56,5 @@ export const NotificationListener = ({ children }) => {
 
   return children;
 };
+
 
