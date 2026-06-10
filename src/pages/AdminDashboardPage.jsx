@@ -802,19 +802,47 @@ export default function AdminDashboardPage() {
   };
 
   // ------------------- إرسال تذكير للمحادثة (في الطلبات والاستفسارات) -------------------
-  const sendReminderForConversation = async (conv, targetRole) => {
-    const targetUserId = targetRole === 'seller' ? conv.seller_id : conv.buyer_id;
-    const targetName = targetRole === 'seller' ? conv.seller?.full_name : conv.buyer?.full_name;
-    const msg = prompt(`أدخل رسالة التذكير التي سيتم إرسالها إلى ${targetName || (targetRole === 'seller' ? 'البائع' : 'المشتري')}:`);
-    if (!msg) return;
-    await sendNotificationToUser(
-      targetUserId,
-      msg,
-      `تذكير بخصوص المحادثة (المنتج: ${conv.product?.title || 'غير معروف'})`,
-      'message',
-      conv.id
-    );
-  };
+  // ------------------- إرسال إشعار للمنتج (في إدارة المنتجات) -------------------
+const sendNotificationForOrderItem = async (item) => {
+  // طباعة البيانات للمساعدة في التصحيح
+  console.log('بيانات العنصر المستلم:', item);
+
+  // التحقق من وجود العنصر والحقول الأساسية
+  if (!item) {
+    toast.error('بيانات الطلب غير موجودة');
+    return;
+  }
+
+  if (!item.seller_id) {
+    console.error('seller_id مفقود في العنصر:', item);
+    toast.error('رقم البائع غير متوفر لهذا الطلب، لا يمكن إرسال الإشعار');
+    return;
+  }
+
+  if (!item.order_id) {
+    console.error('order_id مفقود في العنصر:', item);
+    toast.error('رقم الطلب غير متوفر، لا يمكن إرسال الإشعار');
+    return;
+  }
+
+  const adminMessage = prompt('أدخل نص الإشعار الذي سيتم إرساله إلى البائع بخصوص هذا الطلب:');
+  if (!adminMessage) return;
+
+  // بناء رسالة منسقة تحتوي على كل التفاصيل
+  const fullMessage = `📦 **المنتج:** ${item.product_name || 'غير معروف'}\n` +
+                      `🆔 **رقم الطلب:** ${item.order_id}\n` +
+                      `📋 **الحالة:** ${item.order_status || 'غير معروفة'}\n` +
+                      `✉️ **رسالة الإدارة:** ${adminMessage}`;
+
+  // إرسال الإشعار والرسالة إلى البائع
+  await sendNotificationToUser(
+    item.seller_id,
+    fullMessage,
+    `طلب #${item.order_id} - ${item.product_name || 'منتج'}`,
+    'order_status',
+    item.order_id
+  );
+};
 
   // ------------------- Render -------------------
   const isLoading = (activeMainTab === 'dashboard') ||
