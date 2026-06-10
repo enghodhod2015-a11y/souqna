@@ -1,9 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, MessageCircle, Package, DollarSign, Info, Volume2 } from 'lucide-react';
+import { Bell, MessageCircle, Package, DollarSign, Info, Volume2, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
-import { getUserNotifications, markNotificationAsRead, requestNotificationPermission, enableAudio, playNotificationSound, audioCtx } from '../../services/notificationService';
+import { getUserNotifications, markNotificationAsRead, requestNotificationPermission, enableAudio, playNotificationSound } from '../../services/notificationService';
 import toast from 'react-hot-toast';
 
 export const NotificationBell = () => {
@@ -15,32 +15,32 @@ export const NotificationBell = () => {
   const dropdownRef = useRef(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
-  // ✅ التعديل الأساسي: إعادة تهيئة الصوت عند تحميل الصفحة إذا كان الإذن ممنوحاً
-  useEffect(() => {
-    if (!user) return;
-    const init = async () => {
-      if (Notification.permission === 'granted') {
-        await enableAudio();          // يعيد إنشاء audioCtx إذا فُقد
-        setNotificationsEnabled(true);
-      }
-    };
-    init();
-  }, [user]);
-
-  const loadNotifications = async () => {
+  // دالة جلب الإشعارات وتحديث العدد
+  const loadNotifications = useCallback(async () => {
     if (!user) return;
     try {
       const data = await getUserNotifications(user.id);
       setNotifications(data.slice(0, 5));
-      setUnreadCount(data.filter(n => !n.is_read).length);
+      const count = data.filter(n => !n.is_read).length;
+      setUnreadCount(count);
+      console.log(`📬 تم جلب الإشعارات: ${data.length} إجمالي، ${count} غير مقروء`);
     } catch (err) {
       console.error('خطأ في جلب الإشعارات:', err);
     }
-  };
+  }, [user]);
 
+  // تحميل أولي وإعادة التحميل كل 30 ثانية (احتياطي)
   useEffect(() => {
     if (!user) return;
     loadNotifications();
+    const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [user, loadNotifications]);
+
+  // Realtime: تحديث فوري عند إدراج إشعار جديد
+  useEffect(() => {
+    if (!user) return;
+
     const channel = supabase
       .channel(`notifications-dropdown-${user.id}`)
       .on('postgres_changes', {
@@ -48,16 +48,43 @@ export const NotificationBell = () => {
         schema: 'public',
         table: 'notifications',
         filter: `user_id=eq.${user.id}`
-      }, () => {
+      }, (payload) => {
+        console.log('🔔 [NotificationBell] حدث INSERT:', payload);
+        // إعادة جلب الإشعارات لتحديث العدد والقائمة
         loadNotifications();
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, loadNotifications]);
+
+  // عند فتح القائمة، نعيد الجلب للتأكد من أحدث البيانات
+  useEffect(() => {
+    if (dropdownOpen) {
+      loadNotifications();
+    }
+  }, [dropdownOpen, loadNotifications]);
+
+  // إعادة تهيئة الصوت إذا كان الإذن ممنوحاً
+  useEffect(() => {
+    if (!user) return;
+    const init = async () => {
+      if (Notification.permission === 'granted') {
+        await enableAudio();
+        setNotificationsEnabled(true);
+      }
+    };
+    init();
   }, [user]);
 
+  // إغلاق القائمة عند النقر خارجها
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false);
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -78,9 +105,11 @@ export const NotificationBell = () => {
   const handleNotificationClick = async (notif) => {
     if (!notif.is_read) {
       await markNotificationAsRead(notif.id);
+      // تحديث القائمة محلياً دون إعادة جلب
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
       setUnreadCount(prev => Math.max(0, prev - 1));
     }
+
     const relatedId = notif.related_id;
     const type = notif.type;
     const isValidConversationUUID = (id) => {
@@ -88,6 +117,7 @@ export const NotificationBell = () => {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       return uuidRegex.test(id);
     };
+
     if (relatedId && isValidConversationUUID(relatedId)) {
       navigate(`/chat/c/${relatedId}`);
     } else if (type === 'payment' || type === 'order_status') {
@@ -122,6 +152,16 @@ export const NotificationBell = () => {
             </span>
           )}
         </button>
+
+        {/* زر تحديث يدوي (اختياري) */}
+        <button
+          onClick={loadNotifications}
+          className="p-2 rounded-full bg-gray-700/50 text-gray-300 hover:bg-gray-600 transition"
+          title="تحديث الإشعارات"
+        >
+          <RefreshCw size={16} />
+        </button>
+
         {!notificationsEnabled && user && (
           <button
             onClick={handleEnableNotifications}
@@ -132,24 +172,36 @@ export const NotificationBell = () => {
           </button>
         )}
       </div>
+
       {dropdownOpen && (
         <div className="absolute left-0 mt-2 w-80 bg-primary-card rounded-xl shadow-2xl border border-gold/30 z-50 overflow-hidden">
           <div className="p-3 border-b border-gold/30 flex justify-between items-center">
             <h3 className="font-bold text-gold">الإشعارات</h3>
-            <button onClick={() => { navigate('/notifications'); setDropdownOpen(false); }} className="text-xs text-gold underline">عرض الكل</button>
+            <button
+              onClick={() => { navigate('/notifications'); setDropdownOpen(false); }}
+              className="text-xs text-gold underline"
+            >
+              عرض الكل
+            </button>
           </div>
           <div className="max-h-96 overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="p-4 text-center text-text-secondary">لا توجد إشعارات</div>
             ) : (
               notifications.map(notif => (
-                <div key={notif.id} onClick={(e) => { e.stopPropagation(); handleNotificationClick(notif); }} className={`p-3 border-b border-gold/20 cursor-pointer hover:bg-secondary-blue/30 transition ${!notif.is_read ? 'bg-secondary-blue/10' : ''}`}>
+                <div
+                  key={notif.id}
+                  onClick={(e) => { e.stopPropagation(); handleNotificationClick(notif); }}
+                  className={`p-3 border-b border-gold/20 cursor-pointer hover:bg-secondary-blue/30 transition ${!notif.is_read ? 'bg-secondary-blue/10' : ''}`}
+                >
                   <div className="flex items-start gap-2">
                     <div className="mt-1">{getIcon(notif.type)}</div>
                     <div className="flex-1">
                       <p className={`text-sm font-bold ${!notif.is_read ? 'text-gold' : 'text-white'}`}>{notif.title}</p>
                       <p className="text-xs text-text-secondary line-clamp-2">{notif.message}</p>
-                      <p className="text-xs text-text-secondary mt-1">{new Date(notif.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}</p>
+                      <p className="text-xs text-text-secondary mt-1">
+                        {new Date(notif.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
                     </div>
                     {!notif.is_read && <div className="w-2 h-2 bg-gold rounded-full mt-2"></div>}
                   </div>
