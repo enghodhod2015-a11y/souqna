@@ -11,25 +11,29 @@ export const requestNotificationPermission = async () => {
   return permission === 'granted'
 }
 
+// سيتم تشغيل هذه الدالة بعد تفعيل الصوت (عبر نقرة المستخدم)
+let audioContext = null;
 export const playNotificationSound = () => {
   try {
-    const audio = new Audio('/notification.mp3')
-    audio.volume = 0.5
-    audio.play().catch(() => {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-      const oscillator = audioContext.createOscillator()
-      const gain = audioContext.createGain()
-      oscillator.connect(gain)
-      gain.connect(audioContext.destination)
-      oscillator.frequency.value = 800
-      gain.gain.value = 0.3
-      oscillator.start()
-      gain.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5)
-      oscillator.stop(audioContext.currentTime + 0.5)
-      audioContext.close()
-    })
-  } catch (err) { console.log('خطأ في تشغيل الصوت:', err) }
-}
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    // نستأنف السياق (مطلوب بعد تفعيل المستخدم)
+    audioContext.resume().then(() => {
+      const gain = audioContext.createGain();
+      gain.gain.value = 0.3;
+      gain.connect(audioContext.destination);
+      const oscillator = audioContext.createOscillator();
+      oscillator.connect(gain);
+      oscillator.frequency.value = 800;
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.3);
+      // لا نغلق السياق، نتركه مفتوحاً للإشعارات القادمة
+    }).catch(err => console.log('خطأ في استئناف السياق الصوتي:', err));
+  } catch (err) {
+    console.log('خطأ في تشغيل الصوت:', err);
+  }
+};
 
 const mapType = (type) => {
   switch (type) {
@@ -55,9 +59,8 @@ export const addNotification = async (userId, type, title, message, relatedId = 
     is_read: false,
     created_at: new Date().toISOString()
   }
-  // ✅ تخزين related_id كما هو (نص أو رقم) دون تحويل
   if (relatedId !== null) {
-    insertData.related_id = String(relatedId) // تخزين كنص لتجنب مشاكل UUID
+    insertData.related_id = String(relatedId)
   }
   const { data, error } = await supabase
     .from('notifications')
@@ -86,4 +89,5 @@ export const markNotificationAsRead = async (notificationId) => {
     .eq('id', notificationId)
   if (error) throw error
 }
+
 
