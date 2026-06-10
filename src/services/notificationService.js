@@ -1,51 +1,60 @@
 import { supabase } from './supabase'
 
+let audioCtx = null
+
 export const requestNotificationPermission = async () => {
-  if (!('Notification' in window)) {
-    console.log('المتصفح لا يدعم الإشعارات')
-    return false
-  }
+  if (!('Notification' in window)) return false
   if (Notification.permission === 'granted') return true
   if (Notification.permission === 'denied') return false
   const permission = await Notification.requestPermission()
   return permission === 'granted'
 }
 
-// سيتم تشغيل هذه الدالة بعد تفعيل الصوت (عبر نقرة المستخدم)
-let audioContext = null;
+// تهيئة السياق الصوتي (لن يُنشأ إلا عند تفعيله بنقرة)
+const initAudioContext = () => {
+  if (audioCtx) return audioCtx
+  const AudioContext = window.AudioContext || window.webkitAudioContext
+  if (!AudioContext) return null
+  audioCtx = new AudioContext()
+  return audioCtx
+}
+
+// تشغيل الصوت – يعمل فقط إذا كان السياق قد فُعِّل بنقرة سابقة
 export const playNotificationSound = () => {
   try {
-    if (!audioContext) {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    // نستأنف السياق (مطلوب بعد تفعيل المستخدم)
-    audioContext.resume().then(() => {
-      const gain = audioContext.createGain();
-      gain.gain.value = 0.3;
-      gain.connect(audioContext.destination);
-      const oscillator = audioContext.createOscillator();
-      oscillator.connect(gain);
-      oscillator.frequency.value = 800;
-      oscillator.start();
-      oscillator.stop(audioContext.currentTime + 0.3);
-      // لا نغلق السياق، نتركه مفتوحاً للإشعارات القادمة
-    }).catch(err => console.log('خطأ في استئناف السياق الصوتي:', err));
+    const ctx = initAudioContext()
+    if (!ctx) return
+    // نستأنف السياق (آمن بعد تفعيل المستخدم)
+    ctx.resume().then(() => {
+      const gain = ctx.createGain()
+      gain.gain.value = 0.3
+      gain.connect(ctx.destination)
+      const osc = ctx.createOscillator()
+      osc.connect(gain)
+      osc.frequency.value = 800
+      osc.start()
+      osc.stop(ctx.currentTime + 0.3)
+    }).catch(e => console.log('صوت:', e))
   } catch (err) {
-    console.log('خطأ في تشغيل الصوت:', err);
+    console.log('خطأ في تشغيل الصوت:', err)
   }
-};
+}
+
+// استدعاء هذه الدالة بعد تفعيل المستخدم (مرة واحدة)
+export const enableAudio = async () => {
+  const ctx = initAudioContext()
+  if (ctx && ctx.state !== 'running') {
+    await ctx.resume()
+    return true
+  }
+  return false
+}
 
 const mapType = (type) => {
   switch (type) {
-    case 'message':
-    case 'inquiry':
-      return 'info'
-    case 'payment':
-    case 'order_status':
-    case 'return':
-      return 'success'
-    default:
-      return 'info'
+    case 'message': case 'inquiry': return 'info'
+    case 'payment': case 'order_status': case 'return': return 'success'
+    default: return 'info'
   }
 }
 
@@ -59,14 +68,8 @@ export const addNotification = async (userId, type, title, message, relatedId = 
     is_read: false,
     created_at: new Date().toISOString()
   }
-  if (relatedId !== null) {
-    insertData.related_id = String(relatedId)
-  }
-  const { data, error } = await supabase
-    .from('notifications')
-    .insert(insertData)
-    .select()
-    .single()
+  if (relatedId !== null) insertData.related_id = String(relatedId)
+  const { data, error } = await supabase.from('notifications').insert(insertData).select().single()
   if (error) throw error
   return data
 }

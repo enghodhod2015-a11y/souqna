@@ -1,53 +1,46 @@
-// src/components/NotificationListener.jsx
 import { useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase';
-import { playNotificationSound } from '../services/notificationService';
+import { playNotificationSound, enableAudio, requestNotificationPermission } from '../services/notificationService';
 import toast from 'react-hot-toast';
 
 export const NotificationListener = ({ children }) => {
   const { user } = useAuth();
   const lastNotifIdRef = useRef(null);
-  const isAudioAllowedRef = useRef(localStorage.getItem('audio_allowed') === 'true');
-  const isNotifAllowedRef = useRef(localStorage.getItem('notif_allowed') === 'true');
+  const notifAllowedRef = useRef(localStorage.getItem('notif_allowed') === 'true');
+  const audioAllowedRef = useRef(localStorage.getItem('audio_allowed') === 'true');
 
-  // دالة لحفظ حالة التفعيل
-  const setAudioAllowed = (value) => {
-    isAudioAllowedRef.current = value;
-    localStorage.setItem('audio_allowed', value);
+  const setNotifAllowed = (val) => {
+    notifAllowedRef.current = val;
+    localStorage.setItem('notif_allowed', val);
   };
-  const setNotifAllowed = (value) => {
-    isNotifAllowedRef.current = value;
-    localStorage.setItem('notif_allowed', value);
+  const setAudioAllowed = (val) => {
+    audioAllowedRef.current = val;
+    localStorage.setItem('audio_allowed', val);
   };
 
-  const requestNotificationPermission = async (notif) => {
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      setNotifAllowed(true);
-      toast.success('✅ تم تفعيل الإشعارات');
-      if (notif) {
+  const handleActivation = async (notif) => {
+    // طلب إذن الإشعارات
+    if (!notifAllowedRef.current) {
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        setNotifAllowed(true);
+        toast.success('✅ تم تفعيل الإشعارات');
         new Notification(notif.title, { body: notif.message, icon: '/logo192.png' });
+      } else {
+        toast.error('❌ لا يمكن عرض الإشعارات');
       }
-      return true;
-    } else {
-      toast.error('❌ لم يتم تفعيل الإشعارات');
-      return false;
     }
-  };
-
-  const enableAudio = () => {
-    if (isAudioAllowedRef.current) return;
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (AudioContext) {
-      const ctx = new AudioContext();
-      ctx.resume().then(() => {
+    // تفعيل الصوت
+    if (!audioAllowedRef.current) {
+      const enabled = await enableAudio();
+      if (enabled) {
         setAudioAllowed(true);
         toast.success('🔊 تم تفعيل الصوت');
-        ctx.close();
-      }).catch(() => {});
-    } else {
-      setAudioAllowed(true);
+        playNotificationSound(); // تشغيل تجريبي
+      } else {
+        toast.error('❌ تعذر تفعيل الصوت');
+      }
     }
   };
 
@@ -69,35 +62,29 @@ export const NotificationListener = ({ children }) => {
 
         console.log('🔔 إشعار جديد:', newNotif);
 
-        // إذا كان التفعيل مسبقاً، شغل الصوت والإشعار مباشرة
-        if (isAudioAllowedRef.current && isNotifAllowedRef.current) {
-          playNotificationSound();
-          if (Notification.permission === 'granted') {
+        // إذا كان كل شيء مفعلاً مسبقاً -> شغل مباشرة
+        if (notifAllowedRef.current && audioAllowedRef.current) {
+          if (Notification.permission === 'granted')
             new Notification(newNotif.title, { body: newNotif.message, icon: '/logo192.png' });
-          }
-        } else {
-          // عرض رسالة تفعيل (مرة واحدة فقط)
+          playNotificationSound();
+        }
+        // إذا لم يفعّل بعد -> أظهر زر التفعيل (مرة واحدة فقط في العمر)
+        else if (!notifAllowedRef.current || !audioAllowedRef.current) {
+          // نعرض رسالة تطلب التفعيل – لن تظهر بعد التفعيل لأنه سيتم حفظ الحالة في localStorage
           toast(
             (t) => (
               <div className="flex flex-col gap-2 rtl">
                 <span className="font-bold text-gold">🔔 تفعيل التنبيهات</span>
-                <span className="text-sm">اضغط للسماح بالإشعارات والصوت</span>
+                <span className="text-sm">لسماع الصوت ورؤية الإشعارات</span>
                 <button
                   onClick={async () => {
                     toast.dismiss(t.id);
-                    if (!isNotifAllowedRef.current) {
-                      await requestNotificationPermission(newNotif);
-                    }
-                    if (!isAudioAllowedRef.current) {
-                      enableAudio();
-                    }
-                    // بعد التفعيل، حاول تشغيل الإشعار الحالي
-                    if (isNotifAllowedRef.current && newNotif) {
+                    await handleActivation(newNotif);
+                    // بعد التفعيل، حاول إظهار إشعار هذه الرسالة
+                    if (notifAllowedRef.current) {
                       new Notification(newNotif.title, { body: newNotif.message, icon: '/logo192.png' });
                     }
-                    if (isAudioAllowedRef.current) {
-                      playNotificationSound();
-                    }
+                    if (audioAllowedRef.current) playNotificationSound();
                   }}
                   className="mt-1 px-4 py-2 bg-gold text-primary-blue rounded-lg font-bold"
                 >
@@ -118,4 +105,5 @@ export const NotificationListener = ({ children }) => {
 
   return children;
 };
+
 
