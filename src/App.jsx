@@ -4,6 +4,7 @@ import { Header } from './components/common/Header'
 import { Footer } from './components/common/Footer'
 import { requestNotificationPermission } from './services/notificationService'
 import { useAuth } from './contexts/AuthContext'
+import { NotificationListener } from './components/NotificationListener'  // ✅ إضافة المستمع
 
 const AppRoutes = AppRoutesComponent.AppRoutes || AppRoutesComponent;
 
@@ -19,15 +20,17 @@ function App() {
   // CHANGED: تم إزالة إعادة التوجيه التلقائي للهاش لأن ResetPasswordPage يتعامل معه مباشرة
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-grow">
-        <Suspense fallback={<div className="text-center py-20">Loading...</div>}>
-          <AppRoutes />
-        </Suspense>
-      </main>
-      <Footer />
-    </div>
+    <NotificationListener>  {/* ✅ تغليف التطبيق بالمستمع */}
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-grow">
+          <Suspense fallback={<div className="text-center py-20">Loading...</div>}>
+            <AppRoutes />
+          </Suspense>
+        </main>
+        <Footer />
+      </div>
+    </NotificationListener>
   )
 }
 
