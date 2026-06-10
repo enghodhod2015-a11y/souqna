@@ -189,26 +189,25 @@ export default function AdminDashboardPage() {
         const buyersMap = new Map(buyers?.map(b => [b.id, b]) || []);
 
         let results = items.map(item => {
-  const order = ordersMap.get(item.order_id);
-  const product = productsMap.get(item.product_id);
-  const buyer = buyersMap.get(order?.user_id);
-  return {
-    id: item.id,
-    product_name: product?.name || 'غير معروف',
-    seller_name: product?.seller?.full_name || 'غير معروف',
-    order_date: order?.created_at,
-    unit_price: item.product_price,
-    quantity: item.quantity,
-    total_price: item.product_price * item.quantity,
-    order_status: order?.status || 'غير معروف',
-    buyer_name: buyer?.full_name || 'غير معروف',
-    buyer_email: buyer?.email,
-    // ✅ تأكد من إضافة order_id و seller_id
-    order_id: order?.id || item.order_id,   // استخدم item.order_id كاحتياطي
-    seller_id: product?.seller_id || null,
-    buyer_id: order?.user_id,
-  };
-});
+          const order = ordersMap.get(item.order_id);
+          const product = productsMap.get(item.product_id);
+          const buyer = buyersMap.get(order?.user_id);
+          return {
+            id: item.id,
+            product_name: product?.name || 'غير معروف',
+            seller_name: product?.seller?.full_name || 'غير معروف',
+            order_date: order?.created_at,
+            unit_price: item.product_price,
+            quantity: item.quantity,
+            total_price: item.product_price * item.quantity,
+            order_status: order?.status || 'غير معروف',
+            buyer_name: buyer?.full_name || 'غير معروف',
+            buyer_email: buyer?.email,
+            order_id: order?.id || item.order_id,
+            seller_id: product?.seller_id || null,
+            buyer_id: order?.user_id,
+          };
+        });
 
         if (productFilterStatus !== 'all') {
           const statusMap = {
@@ -560,7 +559,6 @@ export default function AdminDashboardPage() {
     queryKey: ['adminConversations'],
     queryFn: async () => {
       try {
-        // 1. جلب جميع المحادثات
         const { data: conversations, error: convError } = await supabase
           .from('conversations')
           .select('*')
@@ -569,7 +567,6 @@ export default function AdminDashboardPage() {
         if (convError) throw convError;
         if (!conversations || conversations.length === 0) return [];
 
-        // 2. جلب المنتجات المرتبطة (حتى لو كانت null)
         const productIds = [...new Set(conversations.map(c => c.product_id).filter(Boolean))];
         let productsMap = new Map();
         if (productIds.length) {
@@ -580,7 +577,6 @@ export default function AdminDashboardPage() {
           if (!prodError) productsMap = new Map(products.map(p => [p.id, p]));
         }
 
-        // 3. جلب بيانات المستخدمين
         const userIds = [...new Set([
           ...conversations.map(c => c.buyer_id),
           ...conversations.map(c => c.seller_id)
@@ -594,7 +590,6 @@ export default function AdminDashboardPage() {
           if (!profError) profilesMap = new Map(profiles.map(p => [p.id, p]));
         }
 
-        // 4. دمج البيانات
         const enrichedConversations = conversations.map(conv => ({
           ...conv,
           product: productsMap.get(conv.product_id) || null,
@@ -647,50 +642,25 @@ export default function AdminDashboardPage() {
     const adminId = adminUser.id;
     let conversationId = null;
 
-    // 1. البحث عن محادثة موجودة بين الأدمن وهذا المستخدم
-    // 1. البحث عن محادثة موجودة بين الأدمن وهذا المستخدم (خذ أول محادثة فقط)
-const { data: existingList, error: findError } = await supabase
-  .from('conversations')
-  .select('id')
-  .or(`buyer_id.eq.${adminId},seller_id.eq.${userId}`)
-  .limit(1);   // ✅ نأخذ أول محادثة فقط، بدلاً من maybeSingle
+    const { data: existingList, error: findError } = await supabase
+      .from('conversations')
+      .select('id')
+      .or(`buyer_id.eq.${adminId},seller_id.eq.${userId}`)
+      .limit(1);
 
-if (findError) {
-  console.error('خطأ في البحث عن المحادثة:', findError);
-  toast.error('فشل البحث عن محادثة');
-  return;
-}
+    if (findError) {
+      console.error('خطأ في البحث عن المحادثة:', findError);
+      toast.error('فشل البحث عن محادثة');
+      return;
+    }
 
-let conversationId = null;
-if (existingList && existingList.length > 0) {
-  conversationId = existingList[0].id;
-  // تحديث last_message في المحادثة الموجودة
-  await supabase
-    .from('conversations')
-    .update({ last_message: message, last_message_at: new Date() })
-    .eq('id', conversationId);
-} else {
-  // إنشاء محادثة جديدة مع تعيين last_message فوراً
-  const { data: newConv, error: insertError } = await supabase
-    .from('conversations')
-    .insert({
-      buyer_id: adminId,
-      seller_id: userId,
-      product_id: relatedId || null,
-      last_message: message,
-      last_message_at: new Date()
-    })
-    .select()
-    .single();
-
-  if (insertError) {
-    console.error('خطأ في إنشاء المحادثة:', insertError);
-    toast.error('فشل إنشاء محادثة جديدة');
-    return;
-  }
-  conversationId = newConv.id;
-} else {
-      // إنشاء محادثة جديدة مع تعيين last_message فوراً
+    if (existingList && existingList.length > 0) {
+      conversationId = existingList[0].id;
+      await supabase
+        .from('conversations')
+        .update({ last_message: message, last_message_at: new Date() })
+        .eq('id', conversationId);
+    } else {
       const { data: newConv, error: insertError } = await supabase
         .from('conversations')
         .insert({
@@ -711,7 +681,6 @@ if (existingList && existingList.length > 0) {
       conversationId = newConv.id;
     }
 
-    // 2. إدراج الإشعار (حتى لو فشل لا نوقف التنفيذ)
     try {
       await supabase.from('notifications').insert({
         user_id: userId,
@@ -724,7 +693,6 @@ if (existingList && existingList.length > 0) {
       console.error('خطأ في إدراج الإشعار:', notifErr);
     }
 
-    // 3. إدراج الرسالة
     const { error: msgError } = await supabase.from('messages').insert({
       conversation_id: conversationId,
       sender_id: adminId,
@@ -800,10 +768,8 @@ if (existingList && existingList.length > 0) {
 
   // ------------------- إرسال إشعار للمنتج (في إدارة المنتجات) -------------------
   const sendNotificationForOrderItem = async (item) => {
-    // طباعة البيانات للمساعدة في التصحيح
     console.log('بيانات العنصر المستلم:', item);
 
-    // التحقق من وجود العنصر والحقول الأساسية
     if (!item) {
       toast.error('بيانات الطلب غير موجودة');
       return;
@@ -824,13 +790,11 @@ if (existingList && existingList.length > 0) {
     const adminMessage = prompt('أدخل نص الإشعار الذي سيتم إرساله إلى البائع بخصوص هذا الطلب:');
     if (!adminMessage) return;
 
-    // بناء رسالة منسقة تحتوي على كل التفاصيل
     const fullMessage = `📦 **المنتج:** ${item.product_name || 'غير معروف'}\n` +
                         `🆔 **رقم الطلب:** ${item.order_id}\n` +
                         `📋 **الحالة:** ${item.order_status || 'غير معروفة'}\n` +
                         `✉️ **رسالة الإدارة:** ${adminMessage}`;
 
-    // إرسال الإشعار والرسالة إلى البائع
     await sendNotificationToUser(
       item.seller_id,
       fullMessage,
