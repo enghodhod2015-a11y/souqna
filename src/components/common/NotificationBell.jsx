@@ -171,10 +171,12 @@ export const NotificationBell = () => {
       </div>
 
       {dropdownOpen && (
-        <div className="absolute left-0 mt-2 w-80 bg-primary-card rounded-xl shadow-2xl border border-gold/30 z-50 overflow-hidden">
+        <div className="absolute left-0 mt-2 w-80 bg-[#0a2a4a] backdrop-blur-sm rounded-xl shadow-2xl border border-gold/40 z-50 overflow-hidden">
           <div className="p-3 border-b border-gold/30 flex justify-between items-center">
             <h3 className="font-bold text-gold">الإشعارات</h3>
-            <button onClick={() => { navigate('/notifications'); setDropdownOpen(false); }} className="text-xs text-gold underline">عرض الكل</button>
+            <button onClick={() => { navigate('/notifications'); setDropdownOpen(false); }} className="text-xs text-gold underline">
+              عرض الكل
+            </button>
           </div>
           <div className="max-h-96 overflow-y-auto">
             {notifications.length === 0 ? (
@@ -206,4 +208,5 @@ export const NotificationBell = () => {
     </div>
   );
 };
+
 
