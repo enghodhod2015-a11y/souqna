@@ -7,7 +7,7 @@ import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import { formatDate, formatCurrency } from '../../utils/format';
 import toast from 'react-hot-toast';
-import { Skeleton, SkeletonText, SkeletonCircle } from '../../components/ui/Skeleton';
+import { Skeleton, SkeletonText } from '../../components/ui/Skeleton';
 
 export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, navigate }) {
   const queryClient = useQueryClient();
@@ -156,7 +156,6 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
 
   const sellerUsers = users || [];
 
-  // ✅ Skeleton loading while fetching sellers list
   if (usersLoading) {
     return (
       <div className="space-y-6">
@@ -277,14 +276,32 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
             <table className="w-full text-right mt-4">
               <thead>
                 <tr className="border-b border-gold/30">
-                  <th className="py-2 text-gold">القسم</th><th className="py-2 text-gold">المبلغ</th><th className="py-2 text-gold">العملة</th>
-                <tr>
+                  <th className="py-2 text-gold">القسم</th>
+                  <th className="py-2 text-gold">المبلغ</th>
+                  <th className="py-2 text-gold">العملة</th>
+                </tr>
               </thead>
               <tbody>
-                <tr><td className="py-2 font-bold">إجمالي المبيعات</td><td className="text-white">{formatCurrency(sellerFinance.totalSales)}</td><td className="text-white">ريال يمني</td></tr>
-                <tr><td className="py-2 font-bold">إجمالي المرتجعات</td><td className="text-white">{formatCurrency(sellerFinance.totalReturns)}</td><td className="text-white">ريال يمني</td></tr>
-                <tr><td className="py-2 font-bold">نسبة الموقع ({sellerCommissionPercent}%)</td><td className="text-white">{formatCurrency(sellerFinance.commissionAmount)}</td><td className="text-white">ريال يمني</td></tr>
-                <tr><td className="py-2 font-bold">إجمالي الاستلامات</td><td className="text-white">{formatCurrency(sellerFinance.totalReceived)}</td><td className="text-white">ريال يمني</td></tr>
+                <tr>
+                  <td className="py-2 font-bold">إجمالي المبيعات</td>
+                  <td className="text-white">{formatCurrency(sellerFinance.totalSales)}</td>
+                  <td className="text-white">ريال يمني</td>
+                </tr>
+                <tr>
+                  <td className="py-2 font-bold">إجمالي المرتجعات</td>
+                  <td className="text-white">{formatCurrency(sellerFinance.totalReturns)}</td>
+                  <td className="text-white">ريال يمني</td>
+                </tr>
+                <tr>
+                  <td className="py-2 font-bold">نسبة الموقع ({sellerCommissionPercent}%)</td>
+                  <td className="text-white">{formatCurrency(sellerFinance.commissionAmount)}</td>
+                  <td className="text-white">ريال يمني</td>
+                </tr>
+                <tr>
+                  <td className="py-2 font-bold">إجمالي الاستلامات</td>
+                  <td className="text-white">{formatCurrency(sellerFinance.totalReceived)}</td>
+                  <td className="text-white">ريال يمني</td>
+                </tr>
                 <tr className="border-t border-gold/30">
                   <td className="py-2 font-bold text-gold">المبلغ المتبقي</td>
                   <td className="font-bold text-gold">{formatCurrency(sellerFinance.remaining)}</td>
@@ -302,23 +319,34 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
         <Modal onClose={() => setShowReceiptsModal(false)} title="إيصالات تحويل البائع">
           <table className="w-full text-right">
             <thead>
-              <tr><th className="py-2 text-gold">المبلغ</th><th className="py-2 text-gold">التاريخ</th><th className="py-2 text-gold">الصورة</th><th className="py-2 text-gold">ملاحظات</th></tr>
+              <tr>
+                <th className="py-2 text-gold">المبلغ</th>
+                <th className="py-2 text-gold">التاريخ</th>
+                <th className="py-2 text-gold">الصورة</th>
+                <th className="py-2 text-gold">ملاحظات</th>
+              </tr>
             </thead>
             <tbody>
               {sellerReceiptsList.map(r => (
                 <tr key={r.id}>
                   <td className="text-gray-800">{formatCurrency(r.amount)}</td>
                   <td className="text-gray-800">{formatDate(r.created_at)}</td>
-                  <td><a href={r.receipt_image} target="_blank" rel="noreferrer" className="text-blue-500 underline">عرض</a></td>
+                  <td>
+                    <a href={r.receipt_image} target="_blank" rel="noreferrer" className="text-blue-500 underline">عرض</a>
+                  </td>
                   <td className="text-gray-800">{r.notes || '-'}</td>
                 </tr>
               ))}
               {sellerReceiptsList.length === 0 && (
-                <tr><td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td></tr>
+                <tr>
+                  <td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td>
+                </tr>
               )}
             </tbody>
           </table>
-          <div className="mt-4 text-left"><Button variant="secondary" onClick={() => setShowReceiptsModal(false)}>إغلاق</Button></div>
+          <div className="mt-4 text-left">
+            <Button variant="secondary" onClick={() => setShowReceiptsModal(false)}>إغلاق</Button>
+          </div>
         </Modal>
       )}
     </div>
