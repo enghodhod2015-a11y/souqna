@@ -41,14 +41,17 @@ export default function AdminUsersTab({
     delivered: 0,
   });
 
-  // جلب المستخدمين
+  // جلب المستخدمين (كل المستخدمين)
   const { data: users = [], refetch: refetchUsers, isLoading: usersLoading } = useQuery({
     queryKey: ['adminUsers', searchTerm],
     queryFn: async () => {
       let query = supabase.from('profiles').select('*').order('created_at', { ascending: false });
-      if (searchTerm) query = query.or(`email.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%`);
+      if (searchTerm) {
+        query = query.or(`email.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%`);
+      }
       const { data, error } = await query;
       if (error) throw error;
+      // إضافة إحصائيات إضافية لكل مستخدم
       for (const user of data) {
         const { count: orderCount } = await supabase
           .from('orders')
@@ -68,6 +71,7 @@ export default function AdminUsersTab({
     staleTime: 2 * 60 * 1000,
   });
 
+  // جلب البائعين المعلقين (is_verified = false)
   const { data: pendingSellers = [], refetch: refetchPendingSellers } = useQuery({
     queryKey: ['pendingSellers'],
     queryFn: async () => {
@@ -83,7 +87,7 @@ export default function AdminUsersTab({
     staleTime: 1 * 60 * 1000,
   });
 
-  // إحصائيات البائع المختار
+  // جلب إحصائيات منتجات البائع المحدد
   useEffect(() => {
     if (!selectedSeller?.id) return;
     const fetchSellerStats = async () => {
@@ -175,6 +179,7 @@ export default function AdminUsersTab({
     fetchSellerStats();
   }, [selectedSeller]);
 
+  // مزامنة نسبة العمولة من البائع المختار
   useEffect(() => {
     if (selectedSeller) {
       const savedPercent = selectedSeller.commission_percent;
@@ -320,7 +325,6 @@ export default function AdminUsersTab({
         </button>
       </div>
 
-      {/* ---------- Sellers ---------- */}
       {activeSubTab === 'sellers' && (
         <div>
           <div className="mb-5">
@@ -399,27 +403,9 @@ export default function AdminUsersTab({
                   <div className="flex items-end gap-3">
                     <div className="flex-1">
                       <label className="block text-gold mb-2">نسبة الموقع (%)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={sellerCommissionPercent}
-                        onChange={e => setSellerCommissionPercent(parseFloat(e.target.value) || 0)}
-                        className="w-full bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-gold focus:border-gold"
-                      />
+                      <input type="number" min="0" max="100" value={sellerCommissionPercent} onChange={e => setSellerCommissionPercent(parseFloat(e.target.value) || 0)} className="w-full bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-gold focus:border-gold" />
                     </div>
-                    <Button 
-                      onClick={async () => {
-                        await updateUserMutation({ 
-                          userId: selectedSeller.id, 
-                          updates: { commission_percent: sellerCommissionPercent } 
-                        });
-                        toast.success('تم حفظ نسبة الموقع');
-                      }} 
-                      className="bg-gold text-primary-blue shadow-md rounded-lg px-5 py-2 hover:bg-gold/90 transition-all whitespace-nowrap"
-                    >
-                      تحديث النسبة
-                    </Button>
+                    <Button onClick={async () => { await updateUserMutation({ userId: selectedSeller.id, updates: { commission_percent: sellerCommissionPercent } }); toast.success('تم حفظ نسبة الموقع'); }} className="bg-gold text-primary-blue shadow-md rounded-lg px-5 py-2 hover:bg-gold/90 transition-all whitespace-nowrap">تحديث النسبة</Button>
                   </div>
                   <p className="text-text-secondary text-sm mt-3">* سيتم إعادة حساب العمولة والمبلغ المتبقي فوراً</p>
                 </div>
@@ -429,31 +415,15 @@ export default function AdminUsersTab({
         </div>
       )}
 
-      {/* ---------- Buyers ---------- */}
       {activeSubTab === 'buyers' && (
         <div>
           <div className="flex gap-4 mb-5">
-            <Input
-              placeholder="ابحث عن مشتري بالاسم أو البريد"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="flex-1 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold"
-            />
-            <Button variant="secondary" onClick={() => refetchUsers()} className="bg-gray-700 hover:bg-gray-600 text-white shadow-md rounded-lg px-5 py-2 transition-all flex items-center gap-1">
-              <Search size={16} /> بحث
-            </Button>
+            <Input placeholder="ابحث عن مشتري بالاسم أو البريد" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="flex-1 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold" />
+            <Button variant="secondary" onClick={() => refetchUsers()} className="bg-gray-700 hover:bg-gray-600 text-white shadow-md rounded-lg px-5 py-2 transition-all flex items-center gap-1"><Search size={16} /> بحث</Button>
           </div>
           <div className="overflow-x-auto rounded-xl border border-gold/20">
             <table className="w-full text-right border-collapse">
-              <thead>
-                <tr className="bg-secondary-blue/40 border-b border-gold/30">
-                  <th className="p-3 text-gold">الاسم</th>
-                  <th className="p-3 text-gold">البريد</th>
-                  <th className="p-3 text-gold">عدد الطلبات</th>
-                  <th className="p-3 text-gold">إجمالي الإنفاق</th>
-                  <th className="p-3 text-gold">الإجراءات</th>
-                </tr>
-              </thead>
+              <thead><tr className="bg-secondary-blue/40 border-b border-gold/30"><th className="p-3 text-gold">الاسم</th><th className="p-3 text-gold">البريد</th><th className="p-3 text-gold">عدد الطلبات</th><th className="p-3 text-gold">إجمالي الإنفاق</th><th className="p-3 text-gold">الإجراءات</th></tr></thead>
               <tbody>
                 {buyerUsers.map(u => (
                   <tr key={u.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
@@ -465,11 +435,7 @@ export default function AdminUsersTab({
                       <button onClick={() => updateUserMutation({ userId: u.id, updates: { is_banned: !u.is_banned } })} className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs shadow">حظر</button>
                       <button onClick={() => setSelectedBuyer(u)} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs shadow">تفاصيل</button>
                       <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(u.id, msg); }} className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs shadow"><Send size={12} /></button>
-                      <button onClick={() => {
-                        const newType = u.account_type === 'seller' ? 'buyer' : 'seller';
-                        if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
-                          updateUserMutation({ userId: u.id, updates: { account_type: newType } });
-                      }} className="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs shadow">🔄 تغيير</button>
+                      <button onClick={() => { const newType = u.account_type === 'seller' ? 'buyer' : 'seller'; if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`)) updateUserMutation({ userId: u.id, updates: { account_type: newType } }); }} className="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs shadow">🔄 تغيير</button>
                     </td>
                   </tr>
                 ))}
@@ -487,11 +453,7 @@ export default function AdminUsersTab({
                 <div className="flex gap-2 mt-4">
                   <Button variant="danger" onClick={() => updateUserMutation({ userId: selectedBuyer.id, updates: { is_banned: !selectedBuyer.is_banned } })} className="bg-red-600 text-white">{selectedBuyer.is_banned ? 'إلغاء الحظر' : 'حظر'}</Button>
                   <Button variant="secondary" onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(selectedBuyer.id, msg); }}>إرسال إشعار</Button>
-                  <Button onClick={() => {
-                    const newType = selectedBuyer.account_type === 'seller' ? 'buyer' : 'seller';
-                    if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
-                      updateUserMutation({ userId: selectedBuyer.id, updates: { account_type: newType } });
-                  }} className="bg-amber-600 text-white">تغيير نوع الحساب</Button>
+                  <Button onClick={() => { const newType = selectedBuyer.account_type === 'seller' ? 'buyer' : 'seller'; if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`)) updateUserMutation({ userId: selectedBuyer.id, updates: { account_type: newType } }); }} className="bg-amber-600 text-white">تغيير نوع الحساب</Button>
                 </div>
               </div>
             </Modal>
@@ -499,7 +461,6 @@ export default function AdminUsersTab({
         </div>
       )}
 
-      {/* ---------- Pending Registrations ---------- */}
       {activeSubTab === 'pending_users' && (
         <div className="space-y-4">
           {pendingSellers?.map(s => (
