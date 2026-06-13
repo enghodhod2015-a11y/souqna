@@ -214,7 +214,6 @@ export default function AdminUsersTab({
     queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
     if (selectedSeller?.id === userId) {
       setSelectedSeller(prev => ({ ...prev, ...updates }));
-      // إذا تم تحديث نسبة العمولة، أعد جلب الإحصائيات المالية لتعكس التغيير
       if (updates.commission_percent !== undefined) {
         fetchSellerStats(userId);
       }
@@ -389,8 +388,8 @@ export default function AdminUsersTab({
               {!statsLoading && sellerDetailTab === 'profile' && (
                 <div>
                   <div className="grid grid-cols-2 gap-4 mb-5 bg-secondary-blue/30 p-4 rounded-xl">
-                    <div><span className="font-bold text-gold">الاسم:</span> <span className="text-gray-900">{selectedSeller.full_name}</span></div>
-                    <div><span className="font-bold text-gold">البريد:</span> <span className="text-gray-900">{selectedSeller.email}</span></div>
+                    <div><span className="font-bold text-gold">الاسم:</span> <span className="text-gray-900">{selectedSeller.full_name || '-'}</span></div>
+                    <div><span className="font-bold text-gold">البريد:</span> <span className="text-gray-900">{selectedSeller.email || '-'}</span></div>
                     <div><span className="font-bold text-gold">الهاتف:</span> <span className="text-gray-900">{selectedSeller.phone || '-'}</span></div>
                     <div><span className="font-bold text-gold">تاريخ التسجيل:</span> <span className="text-gray-900">{formatDate(selectedSeller.created_at)}</span></div>
                     <div><span className="font-bold text-gold">الحالة:</span> <span className={selectedSeller.is_banned ? 'text-red-600' : 'text-green-600'}>{selectedSeller.is_banned ? 'محظور' : 'نشط'}</span></div>
@@ -527,5 +526,4 @@ export default function AdminUsersTab({
     </div>
   );
 }
-
 
