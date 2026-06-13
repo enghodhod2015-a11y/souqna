@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
-import { Send, Search, UserCog } from 'lucide-react';
+import { Send, Search, UserCog, Loader } from 'lucide-react';
 import { formatDate, formatCurrency } from '../../utils/format';
 import toast from 'react-hot-toast';
 import { SkeletonText, Skeleton } from '../../components/ui/Skeleton';
@@ -41,6 +41,7 @@ export default function AdminUsersTab({
     shipped: 0,
     delivered: 0,
   });
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // جلب المستخدمين (كل المستخدمين)
   const { data: users = [], refetch: refetchUsers, isLoading: usersLoading } = useQuery({
@@ -52,7 +53,6 @@ export default function AdminUsersTab({
       }
       const { data, error } = await query;
       if (error) throw error;
-      // إضافة إحصائيات إضافية لكل مستخدم
       for (const user of data) {
         const { count: orderCount } = await supabase
           .from('orders')
@@ -89,106 +89,122 @@ export default function AdminUsersTab({
   });
 
   // جلب إحصائيات منتجات البائع المحدد
-  useEffect(() => {
-    if (!selectedSeller?.id) return;
-    console.log("👤 جلب إحصائيات البائع:", selectedSeller.id, selectedSeller.full_name);
-    const fetchSellerStats = async () => {
-      try {
-        const sellerId = selectedSeller.id;
-        const { data: productsList, error: prodErr } = await supabase
-          .from('products')
-          .select('id')
-          .eq('seller_id', sellerId);
-        if (prodErr) throw prodErr;
-        const totalProducts = productsList?.length || 0;
-        const productIds = productsList?.map(p => p.id) || [];
+  const fetchSellerStats = async (sellerId) => {
+    if (!sellerId) return;
+    setStatsLoading(true);
+    try {
+      const { data: productsList, error: prodErr } = await supabase
+        .from('products')
+        .select('id')
+        .eq('seller_id', sellerId);
+      if (prodErr) throw prodErr;
+      const totalProducts = productsList?.length || 0;
+      const productIds = productsList?.map(p => p.id) || [];
 
-        if (productIds.length === 0) {
-          setSellerStats(prev => ({ ...prev, totalProducts: 0, soldProducts: 0, notPurchased: 0 }));
-          return;
-        }
+      if (productIds.length === 0) {
+        setSellerStats(prev => ({ ...prev, totalProducts: 0, soldProducts: 0, notPurchased: 0 }));
+        setStatsLoading(false);
+        return;
+      }
 
-        const { data: orderItemsData, error: oiErr } = await supabase
-          .from('order_items')
-          .select('order_id, product_id, quantity')
-          .in('product_id', productIds);
-        if (oiErr) throw oiErr;
+      const { data: orderItemsData, error: oiErr } = await supabase
+        .from('order_items')
+        .select('order_id, product_id, quantity')
+        .in('product_id', productIds);
+      if (oiErr) throw oiErr;
 
-        if (!orderItemsData || orderItemsData.length === 0) {
-          setSellerStats({
-            totalProducts,
-            soldProducts: 0,
-            pendingPayment: 0,
-            paymentApproved: 0,
-            processing: 0,
-            shipped: 0,
-            delivered: 0,
-            notPurchased: totalProducts,
-            shippingProducts: 0,
-            notShippedWithReceipt: 0,
-            noReceiptPurchased: 0,
-          });
-          return;
-        }
-
-        const orderIds = [...new Set(orderItemsData.map(oi => oi.order_id))];
-        const { data: orders, error: ordErr } = await supabase
-          .from('orders')
-          .select('id, status')
-          .in('id', orderIds);
-        if (ordErr) throw ordErr;
-        const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
-
-        let soldProducts = 0;
-        const productSoldSet = new Set();
-        const statusCount = {
-          pending_payment_review: new Set(),
-          payment_approved: new Set(),
-          processing: new Set(),
-          shipped: new Set(),
-          delivered: new Set(),
-        };
-
-        for (const item of orderItemsData) {
-          const order = orderMap.get(item.order_id);
-          if (!order) continue;
-          productSoldSet.add(item.product_id);
-          if (order.status === 'completed' || order.status === 'delivered') {
-            soldProducts += item.quantity;
-          }
-          if (statusCount[order.status]) statusCount[order.status].add(order.id);
-        }
-
-        const notPurchased = totalProducts - productSoldSet.size;
+      if (!orderItemsData || orderItemsData.length === 0) {
         setSellerStats({
           totalProducts,
-          soldProducts,
-          pendingPayment: statusCount.pending_payment_review.size,
-          paymentApproved: statusCount.payment_approved.size,
-          processing: statusCount.processing.size,
-          shipped: statusCount.shipped.size,
-          delivered: statusCount.delivered.size,
-          notPurchased,
+          soldProducts: 0,
+          pendingPayment: 0,
+          paymentApproved: 0,
+          processing: 0,
+          shipped: 0,
+          delivered: 0,
+          notPurchased: totalProducts,
           shippingProducts: 0,
           notShippedWithReceipt: 0,
           noReceiptPurchased: 0,
         });
-      } catch (err) {
-        console.error(err);
-        toast.error('فشل تحميل إحصائيات البائع');
+        setStatsLoading(false);
+        return;
       }
-    };
-    fetchSellerStats();
-  }, [selectedSeller]);
 
-  // مزامنة نسبة العمولة من البائع المختار
+      const orderIds = [...new Set(orderItemsData.map(oi => oi.order_id))];
+      const { data: orders, error: ordErr } = await supabase
+        .from('orders')
+        .select('id, status')
+        .in('id', orderIds);
+      if (ordErr) throw ordErr;
+      const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
+
+      let soldProducts = 0;
+      const productSoldSet = new Set();
+      const statusCount = {
+        pending_payment_review: new Set(),
+        payment_approved: new Set(),
+        processing: new Set(),
+        shipped: new Set(),
+        delivered: new Set(),
+      };
+
+      for (const item of orderItemsData) {
+        const order = orderMap.get(item.order_id);
+        if (!order) continue;
+        productSoldSet.add(item.product_id);
+        if (order.status === 'completed' || order.status === 'delivered') {
+          soldProducts += item.quantity;
+        }
+        if (statusCount[order.status]) statusCount[order.status].add(order.id);
+      }
+
+      const notPurchased = totalProducts - productSoldSet.size;
+      setSellerStats({
+        totalProducts,
+        soldProducts,
+        pendingPayment: statusCount.pending_payment_review.size,
+        paymentApproved: statusCount.payment_approved.size,
+        processing: statusCount.processing.size,
+        shipped: statusCount.shipped.size,
+        delivered: statusCount.delivered.size,
+        notPurchased,
+        shippingProducts: 0,
+        notShippedWithReceipt: 0,
+        noReceiptPurchased: 0,
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error('فشل تحميل إحصائيات البائع');
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // عند تغيير البائع المحدد، قم بجلب إحصائياته وتحديث نسبة العمولة
   useEffect(() => {
-    if (selectedSeller) {
+    if (selectedSeller?.id) {
+      console.log("📊 جلب إحصائيات البائع:", selectedSeller.id);
+      fetchSellerStats(selectedSeller.id);
       const savedPercent = selectedSeller.commission_percent;
       setSellerCommissionPercent(savedPercent !== undefined && savedPercent !== null ? savedPercent : 10);
-      console.log("💰 نسبة العمولة للبائع:", sellerCommissionPercent);
+    } else {
+      // إعادة تعيين الإحصائيات إذا لم يتم اختيار بائع
+      setSellerStats({
+        totalProducts: 0,
+        soldProducts: 0,
+        shippingProducts: 0,
+        notShippedWithReceipt: 0,
+        noReceiptPurchased: 0,
+        notPurchased: 0,
+        pendingPayment: 0,
+        paymentApproved: 0,
+        processing: 0,
+        shipped: 0,
+        delivered: 0,
+      });
     }
-  }, [selectedSeller, sellerCommissionPercent]);
+  }, [selectedSeller]);
 
   const updateUserMutation = async ({ userId, updates }) => {
     const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
@@ -196,7 +212,13 @@ export default function AdminUsersTab({
     toast.success('تم تحديث المستخدم');
     refetchUsers();
     queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
-    if (selectedSeller?.id === userId) setSelectedSeller(prev => ({ ...prev, ...updates }));
+    if (selectedSeller?.id === userId) {
+      setSelectedSeller(prev => ({ ...prev, ...updates }));
+      // إذا تم تحديث نسبة العمولة، أعد جلب الإحصائيات المالية لتعكس التغيير
+      if (updates.commission_percent !== undefined) {
+        fetchSellerStats(userId);
+      }
+    }
     if (selectedBuyer?.id === userId) setSelectedBuyer(prev => ({ ...prev, ...updates }));
   };
 
@@ -349,7 +371,7 @@ export default function AdminUsersTab({
               ))}
             </Select>
           </div>
-          {selectedSeller && (
+          {selectedSeller ? (
             <div className="bg-primary-card rounded-2xl p-5 shadow-lg border border-gold/20">
               <div className="flex gap-3 mb-5 border-b border-gold/30 pb-2">
                 <button onClick={() => setSellerDetailTab('profile')} className={`px-4 py-2 rounded-lg transition-all ${sellerDetailTab === 'profile' ? 'bg-gold text-primary-blue shadow' : 'text-text-secondary hover:text-white'}`}>الملف الشخصي</button>
@@ -357,7 +379,14 @@ export default function AdminUsersTab({
                 <button onClick={() => setSellerDetailTab('commission')} className={`px-4 py-2 rounded-lg transition-all ${sellerDetailTab === 'commission' ? 'bg-gold text-primary-blue shadow' : 'text-text-secondary hover:text-white'}`}>نسبة الموقع</button>
               </div>
 
-              {sellerDetailTab === 'profile' && (
+              {statsLoading && (
+                <div className="flex justify-center items-center py-8">
+                  <Loader className="animate-spin text-gold" size={32} />
+                  <span className="mr-2 text-text-secondary">جاري تحميل البيانات...</span>
+                </div>
+              )}
+
+              {!statsLoading && sellerDetailTab === 'profile' && (
                 <div>
                   <div className="grid grid-cols-2 gap-4 mb-5 bg-secondary-blue/30 p-4 rounded-xl">
                     <div><span className="font-bold text-gold">الاسم:</span> <span className="text-gray-900">{selectedSeller.full_name}</span></div>
@@ -385,7 +414,7 @@ export default function AdminUsersTab({
                 </div>
               )}
 
-              {sellerDetailTab === 'stats' && (
+              {!statsLoading && sellerDetailTab === 'stats' && (
                 <div className="overflow-x-auto">
                   <table className="w-full text-right">
                     <tbody>
@@ -402,7 +431,7 @@ export default function AdminUsersTab({
                 </div>
               )}
 
-              {sellerDetailTab === 'commission' && (
+              {!statsLoading && sellerDetailTab === 'commission' && (
                 <div>
                   <div className="flex items-end gap-3">
                     <div className="flex-1">
@@ -415,6 +444,8 @@ export default function AdminUsersTab({
                 </div>
               )}
             </div>
+          ) : (
+            <div className="text-center text-text-secondary p-8">لم يتم اختيار بائع بعد</div>
           )}
         </div>
       )}
