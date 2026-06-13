@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { getUserConversations } from '../services/chatService'
 import { supabase } from '../services/supabase'
 import toast from 'react-hot-toast'
+import { SkeletonConversationItem, Skeleton } from '../components/ui/Skeleton'
 
 export default function InboxPage() {
   const { user } = useAuth()
@@ -14,30 +15,26 @@ export default function InboxPage() {
     queryKey: ['conversations', user?.id],
     queryFn: () => getUserConversations(user.id),
     enabled: !!user?.id,
-    staleTime: 2 * 60 * 1000, // دقيقتان
+    staleTime: 2 * 60 * 1000,
     cacheTime: 5 * 60 * 1000,
   })
 
   const markAllMessagesAsRead = async () => {
     if (!user) return
-
     try {
       const { data: convs, error: convError } = await supabase
         .from('conversations')
         .select('id')
         .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
       if (convError) throw convError
-
       if (!convs || convs.length === 0) return
 
       const conversationIds = convs.map(c => c.id)
-
-      const { error: msgError } = await supabase
+      await supabase
         .from('messages')
         .update({ is_read: true })
         .eq('receiver_id', user.id)
         .in('conversation_id', conversationIds)
-      if (msgError) throw msgError
 
       const updates = []
       for (const conv of convs) {
@@ -51,18 +48,12 @@ export default function InboxPage() {
           if (convData.buyer_id === user.id) updateData.buyer_unread_count = 0
           if (convData.seller_id === user.id) updateData.seller_unread_count = 0
           if (Object.keys(updateData).length) {
-            updates.push(
-              supabase
-                .from('conversations')
-                .update(updateData)
-                .eq('id', conv.id)
-            )
+            updates.push(supabase.from('conversations').update(updateData).eq('id', conv.id))
           }
         }
       }
       await Promise.all(updates)
 
-      // تحديث cache يدوياً
       queryClient.setQueryData(['conversations', user.id], (old) =>
         old?.map(conv => {
           const isBuyer = conv.buyer_id === user.id
@@ -72,7 +63,6 @@ export default function InboxPage() {
           return updatedConv
         })
       )
-
       toast.success('تم تعليم جميع الرسائل كمقروءة')
     } catch (err) {
       if (err?.code === 'PGRST303' || err?.message?.includes('JWT expired')) {
@@ -86,20 +76,28 @@ export default function InboxPage() {
     }
   }
 
-  if (isLoading) return <div className="text-center py-20">جاري التحميل...</div>
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-3xl">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-gold">المحادثات</h1>
+          <Skeleton className="w-32 h-8 rounded-lg" />
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => <SkeletonConversationItem key={i} />)}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gold">المحادثات</h1>
-        <button
-          onClick={markAllMessagesAsRead}
-          className="px-3 py-1 text-sm bg-gold/20 text-gold rounded-lg hover:bg-gold/30 transition"
-        >
+        <button onClick={markAllMessagesAsRead} className="px-3 py-1 text-sm bg-gold/20 text-gold rounded-lg hover:bg-gold/30 transition">
           تعليم الكل كمقروء
         </button>
       </div>
-
       {conversations.length === 0 ? (
         <p className="text-center text-text-secondary">لا توجد محادثات بعد</p>
       ) : (
@@ -116,14 +114,10 @@ export default function InboxPage() {
                     <div>
                       <h3 className="font-bold text-gold">{conv.product?.title || 'منتج غير متوفر'}</h3>
                       <p className="text-text-secondary text-sm">الطرف الآخر: {anonymousLabel}</p>
-                      <p className="text-sm text-text-secondary mt-1 truncate max-w-md">
-                        {conv.last_message || 'بدء المحادثة'}
-                      </p>
+                      <p className="text-sm text-text-secondary mt-1 truncate max-w-md">{conv.last_message || 'بدء المحادثة'}</p>
                     </div>
                     {unreadCount > 0 && (
-                      <span className="bg-danger text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-semibold">
-                        {unreadCount}
-                      </span>
+                      <span className="bg-danger text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-semibold">{unreadCount}</span>
                     )}
                   </div>
                 </div>

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { getSellerStats, getMonthlySales } from '../services/orderService'
 import { getSellerProducts } from '../services/productService'
@@ -7,48 +7,77 @@ import { getUserConversations } from '../services/chatService'
 import { Button } from '../components/ui/Button'
 import { Package, ShoppingBag, MessageCircle, DollarSign, TrendingUp, Eye, Edit } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import toast from 'react-hot-toast'
-import { useAbortController } from '../hooks/useAbortController'
+import { SkeletonDashboardStats, SkeletonProductRow, SkeletonConversationItem, SkeletonText, Skeleton } from '../components/ui/Skeleton'
 
 export default function SellerDashboardPage() {
   const { user } = useAuth()
-  const [stats, setStats] = useState(null)
-  const [monthlySales, setMonthlySales] = useState([])
-  const [recentProducts, setRecentProducts] = useState([])
-  const [recentConversations, setRecentConversations] = useState([])
-  const [loading, setLoading] = useState(true)
-  const abortController = useAbortController()
 
-  useEffect(() => {
-    let isMounted = true
-    const loadDashboard = async () => {
-      try {
-        const signal = abortController?.signal
-        const [statsData, salesData, productsData, conversationsData] = await Promise.all([
-          getSellerStats(user.id).catch(err => { if (err.name !== 'AbortError') console.error('Stats error:', err); return null }),
-          getMonthlySales(user.id).catch(err => { if (err.name !== 'AbortError') console.error('MonthlySales error:', err); return null }),
-          getSellerProducts(user.id),
-          getUserConversations(user.id)
-        ])
-        if (signal?.aborted || !isMounted) return
-        setStats(statsData)
-        setMonthlySales(salesData || [])
-        setRecentProducts(productsData ? productsData.slice(0, 5) : [])
-        setRecentConversations(conversationsData ? conversationsData.slice(0, 5) : [])
-      } catch (err) {
-        if (isMounted && err.name !== 'AbortError') toast.error(err.message)
-      } finally {
-        if (isMounted) setLoading(false)
-      }
-    }
-    if (user) loadDashboard()
-    return () => {
-      isMounted = false
-      abortController?.abort()
-    }
-  }, [user, abortController])
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['sellerStats', user?.id],
+    queryFn: () => getSellerStats(user.id),
+    enabled: !!user?.id,
+    staleTime: 10 * 60 * 1000,
+    cacheTime: 15 * 60 * 1000,
+  })
 
-  if (loading) return <div className="text-center py-20">جاري التحميل...</div>
+  const { data: monthlySales = [], isLoading: salesLoading } = useQuery({
+    queryKey: ['monthlySales', user?.id],
+    queryFn: () => getMonthlySales(user.id),
+    enabled: !!user?.id,
+    staleTime: 30 * 60 * 1000,
+    cacheTime: 60 * 60 * 1000,
+  })
+
+  const { data: recentProducts = [] } = useQuery({
+    queryKey: ['sellerProducts', user?.id, 'recent'],
+    queryFn: async () => {
+      const products = await getSellerProducts(user.id)
+      return products.slice(0, 5)
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const { data: recentConversations = [] } = useQuery({
+    queryKey: ['sellerConversations', user?.id, 'recent'],
+    queryFn: async () => {
+      const convs = await getUserConversations(user.id)
+      return convs.slice(0, 5)
+    },
+    enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000,
+  })
+
+  const isLoading = statsLoading || salesLoading
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <SkeletonText width="w-48" height="h-8" />
+          <Skeleton className="w-32 h-10 rounded-lg" />
+        </div>
+        <SkeletonDashboardStats />
+        <div className="bg-primary-card p-4 rounded-2xl border border-gold/30 mb-8">
+          <SkeletonText width="w-40" height="h-7" className="mb-4" />
+          <Skeleton className="w-full h-64 rounded-xl" />
+        </div>
+        <div className="bg-primary-card p-4 rounded-2xl border border-gold/30 mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <SkeletonText width="w-32" height="h-6" />
+            <SkeletonText width="w-16" height="h-4" />
+          </div>
+          {[1, 2, 3].map(i => <SkeletonProductRow key={i} />)}
+        </div>
+        <div className="bg-primary-card p-4 rounded-2xl border border-gold/30">
+          <div className="flex justify-between items-center mb-4">
+            <SkeletonText width="w-32" height="h-6" />
+            <SkeletonText width="w-16" height="h-4" />
+          </div>
+          {[1, 2, 3].map(i => <SkeletonConversationItem key={i} />)}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -115,12 +144,7 @@ export default function SellerDashboardPage() {
               return (
                 <div key={product.id} className="flex justify-between items-center p-3 bg-secondary-blue/30 rounded-xl">
                   <div className="flex items-center gap-3">
-                    <img 
-                      src={imgSrc}
-                      alt={product.title}
-                      className="w-12 h-12 object-cover rounded-lg border border-gold/30"
-                      onError={(e) => { e.target.src = 'https://placehold.co/60x60/06264D/D4AF37?text=صورة' }}
-                    />
+                    <img src={imgSrc} alt={product.title} className="w-12 h-12 object-cover rounded-lg border border-gold/30" />
                     <div>
                       <p className="font-bold">{product.title}</p>
                       <p className="text-gold">{product.final_price} ريال</p>
@@ -160,9 +184,7 @@ export default function SellerDashboardPage() {
                       <p className="text-text-secondary text-sm truncate">{conv.last_message || 'بدء المحادثة'}</p>
                     </div>
                     {unreadCount > 0 && (
-                      <span className="bg-danger text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">
-                        {unreadCount}
-                      </span>
+                      <span className="bg-danger text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">{unreadCount}</span>
                     )}
                   </div>
                 </Link>
