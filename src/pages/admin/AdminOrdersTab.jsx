@@ -12,6 +12,7 @@ export default function AdminOrdersTab({ navigate }) {
     queryKey: ['adminConversations'],
     queryFn: async () => {
       try {
+        // 1. جلب جميع المحادثات
         const { data: conversations, error: convError } = await supabase
           .from('conversations')
           .select('*')
@@ -42,12 +43,69 @@ export default function AdminOrdersTab({ navigate }) {
           if (!profError) profilesMap = new Map(profiles.map(p => [p.id, p]));
         }
 
-        return conversations.map(conv => ({
-          ...conv,
-          product: productsMap.get(conv.product_id) || null,
-          buyer: profilesMap.get(conv.buyer_id) || null,
-          seller: profilesMap.get(conv.seller_id) || null
-        }));
+        // 2. جلب آخر رسالة لكل محادثة (معرفة المرسل)
+        const conversationIds = conversations.map(c => c.id);
+        const { data: lastMessages, error: msgError } = await supabase
+          .from('messages')
+          .select('conversation_id, sender_id, created_at')
+          .in('conversation_id', conversationIds)
+          .order('created_at', { ascending: false })
+          .limit(1); // ملاحظة: limit(1) سيتم تطبيقه لكل محادثة إذا استخدمنا distinct on، لكننا سنعمل بطريقة مختلفة.
+
+        // نستخدم map لجلب آخر رسالة لكل محادثة بشكل منفصل (أفضل)
+        const lastMessageMap = new Map();
+        for (const convId of conversationIds) {
+          const { data: msgData } = await supabase
+            .from('messages')
+            .select('sender_id, created_at')
+            .eq('conversation_id', convId)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          if (msgData && msgData.length > 0) {
+            lastMessageMap.set(convId, {
+              sender_id: msgData[0].sender_id,
+              created_at: msgData[0].created_at
+            });
+          }
+        }
+
+        // إضافة بيانات المحادثة مع الحالة
+        const enrichedConversations = conversations.map(conv => {
+          const lastMsg = lastMessageMap.get(conv.id);
+          let status = 'في انتظار رد البائع';
+          let statusColor = 'text-yellow-500';
+
+          if (lastMsg) {
+            // إذا كانت آخر رسالة من البائع، فهذا يعني أن البائع قد رد
+            if (lastMsg.sender_id === conv.seller_id) {
+              status = 'تم الرد من البائع';
+              statusColor = 'text-green-500';
+            } else if (lastMsg.sender_id === conv.buyer_id) {
+              status = 'في انتظار رد البائع';
+              statusColor = 'text-yellow-500';
+            } else {
+              status = 'مجهول';
+              statusColor = 'text-gray-500';
+            }
+          } else {
+            // لا توجد رسائل
+            status = 'لا توجد رسائل';
+            statusColor = 'text-gray-500';
+          }
+
+          return {
+            ...conv,
+            product: productsMap.get(conv.product_id) || null,
+            buyer: profilesMap.get(conv.buyer_id) || null,
+            seller: profilesMap.get(conv.seller_id) || null,
+            last_message_sender_id: lastMsg?.sender_id,
+            last_message_date: lastMsg?.created_at,
+            status,
+            statusColor
+          };
+        });
+
+        return enrichedConversations;
       } catch (err) {
         console.error('خطأ في جلب المحادثات:', err);
         return [];
@@ -222,30 +280,40 @@ export default function AdminOrdersTab({ navigate }) {
               </tr>
             </thead>
             <tbody>
-              {conversations.map(conv => (
-                <tr key={conv.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
-                  <td className="p-3 text-white">{conv.product?.title || conv.product?.name || 'منتج غير متوفر'}</td>
-                  <td className="p-3 text-white">{conv.buyer?.full_name || conv.buyer_name || 'غير معروف'}</td>
-                  <td className="p-3 text-white">{conv.seller?.full_name || conv.seller_name || 'غير معروف'}</td>
-                  <td className="p-3 text-white max-w-xs truncate">{conv.last_message || 'لا توجد رسائل'}</td>
-                  <td className="p-3 text-white">{conv.last_message_at ? formatDate(conv.last_message_at) : '-'}</td>
-                  <td className="p-3 text-white"><span className="text-yellow-500">في انتظار رد البائع</span></td>
-                  <td className="p-3">
-                    <div className="flex gap-2">
-                      <Link to={`/chat/c/${conv.id}`} className="bg-gold text-primary-blue px-3 py-1 rounded-lg text-sm shadow hover:bg-gold/90 transition inline-flex items-center gap-1">
-                        <MessageCircle size={14} /> فتح المحادثة
-                      </Link>
-                      <Button
-                        onClick={() => sendReminderForConversation(conv, 'seller')}
-                        size="sm"
-                        className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1"
-                      >
-                        <Send size={12} className="inline ml-1" /> تذكير البائع
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {conversations.map(conv => {
+                // تحديد من أرسل آخر رسالة
+                const lastMsgSenderIsSeller = conv.last_message_sender_id === conv.seller_id;
+                return (
+                  <tr key={conv.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
+                    <td className="p-3 text-white">{conv.product?.title || conv.product?.name || 'منتج غير متوفر'}</td>
+                    <td className="p-3 text-white">{conv.buyer?.full_name || conv.buyer_name || 'غير معروف'}</td>
+                    <td className="p-3 text-white">{conv.seller?.full_name || conv.seller_name || 'غير معروف'}</td>
+                    <td className="p-3 text-white max-w-xs truncate">{conv.last_message || 'لا توجد رسائل'}</td>
+                    <td className="p-3 text-white">{conv.last_message_at ? formatDate(conv.last_message_at) : '-'}</td>
+                    <td className="p-3 text-white">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${conv.statusColor} ${conv.status === 'تم الرد من البائع' ? 'bg-green-900/30' : 'bg-yellow-900/30'}`}>
+                        {conv.status}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex gap-2">
+                        <Link to={`/chat/c/${conv.id}`} className="bg-gold text-primary-blue px-3 py-1 rounded-lg text-sm shadow hover:bg-gold/90 transition inline-flex items-center gap-1">
+                          <MessageCircle size={14} /> فتح المحادثة
+                        </Link>
+                        {conv.status === 'في انتظار رد البائع' && (
+                          <Button
+                            onClick={() => sendReminderForConversation(conv, 'seller')}
+                            size="sm"
+                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1"
+                          >
+                            <Send size={12} className="inline ml-1" /> تذكير البائع
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -253,4 +321,5 @@ export default function AdminOrdersTab({ navigate }) {
     </div>
   );
 }
+
 
