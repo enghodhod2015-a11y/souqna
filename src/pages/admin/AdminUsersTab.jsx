@@ -72,7 +72,7 @@ export default function AdminUsersTab({
     staleTime: 2 * 60 * 1000,
   });
 
-  // جلب البائعين المعلقين (is_verified = false) مع دعم account_type و role
+  // جلب البائعين المعلقين (is_verified = false)
   const { data: pendingSellers = [], refetch: refetchPendingSellers } = useQuery({
     queryKey: ['pendingSellers'],
     queryFn: async () => {
@@ -317,7 +317,7 @@ export default function AdminUsersTab({
     }
   };
 
-  // ✅ تصفية البائعين والمشترين باستخدام account_type أو role
+  // تصفية البائعين والمشترين باستخدام account_type أو role
   const sellerUsers = users?.filter(u => u.account_type === 'seller' || u.role === 'seller') || [];
   const buyerUsers = users?.filter(u => u.account_type === 'buyer' || u.role === 'customer') || [];
 
@@ -449,7 +449,6 @@ export default function AdminUsersTab({
         </div>
       )}
 
-      {/* باقي الكود (المشترين والطلبات المعلقة) كما هو دون تغيير كبير */}
       {activeSubTab === 'buyers' && (
         <div>
           <div className="flex justify-between items-center mb-4">
@@ -472,7 +471,15 @@ export default function AdminUsersTab({
           </div>
           <div className="overflow-x-auto rounded-xl border border-gold/20">
             <table className="w-full text-right border-collapse">
-              <thead><tr className="bg-secondary-blue/40 border-b border-gold/30"><th className="p-3 text-gold">الاسم</th><th className="p-3 text-gold">البريد</th><th className="p-3 text-gold">عدد الطلبات</th><th className="p-3 text-gold">إجمالي الإنفاق</th><th className="p-3 text-gold">الإجراءات</th></td></thead>
+              <thead>
+                <tr className="bg-secondary-blue/40 border-b border-gold/30">
+                  <th className="p-3 text-gold">الاسم</th>
+                  <th className="p-3 text-gold">البريد</th>
+                  <th className="p-3 text-gold">عدد الطلبات</th>
+                  <th className="p-3 text-gold">إجمالي الإنفاق</th>
+                  <th className="p-3 text-gold">الإجراءات</th>
+                </tr>
+              </thead>
               <tbody>
                 {buyerUsers.map(u => (
                   <tr key={u.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
@@ -527,5 +534,4 @@ export default function AdminUsersTab({
     </div>
   );
 }
-
 
