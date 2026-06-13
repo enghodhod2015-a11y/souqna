@@ -18,6 +18,7 @@ import ProfilePage from '../pages/ProfilePage'
 import CheckoutPage from '../pages/CheckoutPage'
 import PaymentPage from '../pages/PaymentPage'
 import NotificationsPage from '../pages/NotificationsPage'
+import WishlistPage from '../pages/WishlistPage'
 
 // ─── صفحات البائع ───
 import AddProductPage from '../pages/AddProductPage'
@@ -77,6 +78,11 @@ export default function AppRoutes() {
           <NotificationsPage />
         </ProtectedRoute>
       } />
+      <Route path="/wishlist" element={
+        <ProtectedRoute allowedRoles={['buyer', 'seller', 'admin']}>
+          <WishlistPage />
+        </ProtectedRoute>
+      } />
 
       {/* صفحات البائع */}
       <Route path="/add-product" element={
@@ -131,4 +137,5 @@ export default function AppRoutes() {
     </Routes>
   )
 }
+
 
