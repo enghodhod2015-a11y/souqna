@@ -127,9 +127,12 @@ export default function AdminUsersTab({
   return (
     <div>
       <div className="flex justify-end mb-5">
-        <Button onClick={sendToAllUsers} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md rounded-lg px-5 py-2">
-          <Send size={16} className="inline ml-1" /> إرسال إشعار لجميع المستخدمين
-        </Button>
+        <button
+          onClick={sendToAllUsers}
+          className="px-5 py-2 rounded-lg font-bold shadow-md transition-all duration-200 flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+        >
+          <Send size={16} /> إرسال إشعار لجميع المستخدمين
+        </button>
       </div>
 
       <div className="flex gap-4 border-b border-gold/30 mb-6">
@@ -154,9 +157,9 @@ export default function AdminUsersTab({
               }}
               className="w-full md:w-1/2 bg-white text-gray-900 border border-gray-300 rounded-lg"
             >
-              <option value="">-- اختر بائعاً --</option>
+              <option value="" className="text-gray-900">-- اختر بائعاً --</option>
               {sellerUsers.map(s => (
-                <option key={s.id} value={s.id}>{s.store_name || s.full_name} ({s.email})</option>
+                <option key={s.id} value={s.id} className="text-gray-900">{s.store_name || s.full_name} ({s.email})</option>
               ))}
             </Select>
           </div>
@@ -179,35 +182,44 @@ export default function AdminUsersTab({
                     <div><span className="font-bold text-gray-700">نسبة الموقع:</span> <span className="text-gold font-bold">{sellerCommissionPercent}%</span></div>
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    <Button variant="danger" onClick={() => updateUserMutation({ userId: selectedSeller.id, updates: { is_banned: !selectedSeller.is_banned } })}>
+                    <button
+                      onClick={() => updateUserMutation({ userId: selectedSeller.id, updates: { is_banned: !selectedSeller.is_banned } })}
+                      className="px-4 py-2 rounded-lg font-bold shadow-md transition-all duration-200 flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white"
+                    >
                       {selectedSeller.is_banned ? 'إلغاء الحظر' : 'حظر'}
-                    </Button>
-                    <Button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(selectedSeller.id, msg); }}>
-                      <Send size={14} className="inline ml-1" /> إرسال إشعار
-                    </Button>
-                    <Button onClick={() => {
-                      const newType = selectedSeller.account_type === 'seller' ? 'buyer' : 'seller';
-                      if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
-                        updateUserMutation({ userId: selectedSeller.id, updates: { account_type: newType } });
-                    }}>
-                      <UserCog size={14} className="inline ml-1" /> تغيير نوع الحساب
-                    </Button>
+                    </button>
+                    <button
+                      onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(selectedSeller.id, msg); }}
+                      className="px-4 py-2 rounded-lg font-bold shadow-md transition-all duration-200 flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      <Send size={16} /> إرسال إشعار
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newType = selectedSeller.account_type === 'seller' ? 'buyer' : 'seller';
+                        if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
+                          updateUserMutation({ userId: selectedSeller.id, updates: { account_type: newType } });
+                      }}
+                      className="px-4 py-2 rounded-lg font-bold shadow-md transition-all duration-200 flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-gray-900"
+                    >
+                      <UserCog size={16} /> تغيير نوع الحساب
+                    </button>
                   </div>
                 </div>
               )}
 
               {sellerDetailTab === 'stats' && (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-right">
+                  <table className="w-full text-right border-collapse">
                     <tbody>
-                      <tr><td className="py-2 font-bold">جميع المنتجات المنشورة</td><td>{selectedSeller.products_count || 0}</td></tr>
-                      <tr><td className="py-2 font-bold">المنتجات التي تم بيعها (قطع)</td><td>0</td></tr>
-                      <tr><td className="py-2 font-bold">منتظرة الدفع</td><td>0</td></tr>
-                      <tr><td className="py-2 font-bold">تم تأكيد الدفع</td><td>0</td></tr>
-                      <tr><td className="py-2 font-bold">قيد التجهيز</td><td>0</td></tr>
-                      <tr><td className="py-2 font-bold">تم الشحن</td><td>0</td></tr>
-                      <tr><td className="py-2 font-bold">تم التسليم</td><td>0</td></tr>
-                      <tr><td className="py-2 font-bold">غير مشتراة</td><td>0</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">جميع المنتجات المنشورة</td><td className="text-gray-900">{selectedSeller.products_count || 0}</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">المنتجات التي تم بيعها (قطع)</td><td className="text-gray-900">0</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">منتظرة الدفع</td><td className="text-gray-900">0</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">تم تأكيد الدفع</td><td className="text-gray-900">0</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">قيد التجهيز</td><td className="text-gray-900">0</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">تم الشحن</td><td className="text-gray-900">0</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">تم التسليم</td><td className="text-gray-900">0</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">غير مشتراة</td><td className="text-gray-900">0</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -220,7 +232,12 @@ export default function AdminUsersTab({
                       <label className="block text-gray-700 mb-2">نسبة الموقع (%)</label>
                       <input type="number" min="0" max="100" value={sellerCommissionPercent} onChange={e => setSellerCommissionPercent(parseFloat(e.target.value) || 0)} className="w-full bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300" />
                     </div>
-                    <Button onClick={async () => { await updateUserMutation({ userId: selectedSeller.id, updates: { commission_percent: sellerCommissionPercent } }); toast.success('تم حفظ نسبة الموقع'); }}>تحديث النسبة</Button>
+                    <button
+                      onClick={async () => { await updateUserMutation({ userId: selectedSeller.id, updates: { commission_percent: sellerCommissionPercent } }); toast.success('تم حفظ نسبة الموقع'); }}
+                      className="px-5 py-2 rounded-lg font-bold shadow-md transition-all duration-200 bg-gold text-primary-blue hover:bg-gold/90"
+                    >
+                      تحديث النسبة
+                    </button>
                   </div>
                   <p className="text-gray-500 text-sm mt-3">* سيتم إعادة حساب العمولة والمبلغ المتبقي فوراً</p>
                 </div>
@@ -243,7 +260,9 @@ export default function AdminUsersTab({
           </div>
           <div className="flex gap-4 mb-5">
             <Input placeholder="ابحث عن مشتري بالاسم أو البريد" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="flex-1 bg-white text-gray-900 border border-gray-300 rounded-lg" />
-            <Button variant="secondary" onClick={() => refetchUsers()}><Search size={16} className="inline ml-1" /> بحث</Button>
+            <button onClick={() => refetchUsers()} className="px-5 py-2 rounded-lg font-bold shadow-md transition-all duration-200 bg-gray-700 hover:bg-gray-600 text-white flex items-center gap-2">
+              <Search size={16} /> بحث
+            </button>
           </div>
           <div className="overflow-x-auto rounded-xl border border-gray-300">
             {buyerUsers.map(u => (
@@ -255,14 +274,34 @@ export default function AdminUsersTab({
                   <div><strong>إجمالي الإنفاق:</strong> {formatCurrency(u.total_spent || 0)}</div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => updateUserMutation({ userId: u.id, updates: { is_banned: !u.is_banned } })} className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs">حظر</button>
-                  <button onClick={() => setSelectedBuyer(u)} className="bg-gold text-primary-blue px-2 py-1 rounded text-xs">تفاصيل</button>
-                  <button onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(u.id, msg); }} className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs"><Send size={12} /></button>
-                  <button onClick={() => {
-                    const newType = u.account_type === 'seller' ? 'buyer' : 'seller';
-                    if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
-                      updateUserMutation({ userId: u.id, updates: { account_type: newType } });
-                  }} className="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs">🔄</button>
+                  <button
+                    onClick={() => updateUserMutation({ userId: u.id, updates: { is_banned: !u.is_banned } })}
+                    className="px-3 py-1 rounded-lg text-sm font-bold shadow-md transition-all duration-200 bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {u.is_banned ? 'إلغاء الحظر' : 'حظر'}
+                  </button>
+                  <button
+                    onClick={() => setSelectedBuyer(u)}
+                    className="px-3 py-1 rounded-lg text-sm font-bold shadow-md transition-all duration-200 bg-gold text-primary-blue hover:bg-gold/90"
+                  >
+                    تفاصيل
+                  </button>
+                  <button
+                    onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(u.id, msg); }}
+                    className="px-3 py-1 rounded-lg text-sm font-bold shadow-md transition-all duration-200 bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-1"
+                  >
+                    <Send size={12} /> إشعار
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newType = u.account_type === 'seller' ? 'buyer' : 'seller';
+                      if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
+                        updateUserMutation({ userId: u.id, updates: { account_type: newType } });
+                    }}
+                    className="px-3 py-1 rounded-lg text-sm font-bold shadow-md transition-all duration-200 bg-amber-500 hover:bg-amber-600 text-gray-900 flex items-center gap-1"
+                  >
+                    <UserCog size={12} /> تغيير
+                  </button>
                 </div>
               </div>
             ))}
@@ -277,13 +316,28 @@ export default function AdminUsersTab({
                 <div><strong>عدد الطلبات:</strong> {selectedBuyer.order_count || 0}</div>
                 <div><strong>إجمالي الإنفاق:</strong> {formatCurrency(selectedBuyer.total_spent || 0)}</div>
                 <div className="flex gap-2 mt-4">
-                  <Button variant="danger" onClick={() => updateUserMutation({ userId: selectedBuyer.id, updates: { is_banned: !selectedBuyer.is_banned } })}>{selectedBuyer.is_banned ? 'إلغاء الحظر' : 'حظر'}</Button>
-                  <Button variant="secondary" onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(selectedBuyer.id, msg); }}>إرسال إشعار</Button>
-                  <Button onClick={() => {
-                    const newType = selectedBuyer.account_type === 'seller' ? 'buyer' : 'seller';
-                    if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
-                      updateUserMutation({ userId: selectedBuyer.id, updates: { account_type: newType } });
-                  }}>تغيير نوع الحساب</Button>
+                  <button
+                    onClick={() => updateUserMutation({ userId: selectedBuyer.id, updates: { is_banned: !selectedBuyer.is_banned } })}
+                    className="px-4 py-2 rounded-lg font-bold shadow-md transition-all duration-200 bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {selectedBuyer.is_banned ? 'إلغاء الحظر' : 'حظر'}
+                  </button>
+                  <button
+                    onClick={() => { const msg = prompt('أدخل نص الإشعار:'); if (msg) sendNotificationToUser(selectedBuyer.id, msg); }}
+                    className="px-4 py-2 rounded-lg font-bold shadow-md transition-all duration-200 bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
+                  >
+                    <Send size={16} /> إرسال إشعار
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newType = selectedBuyer.account_type === 'seller' ? 'buyer' : 'seller';
+                      if (confirm(`تغيير نوع الحساب إلى ${newType === 'seller' ? 'بائع' : 'مشتري'}؟`))
+                        updateUserMutation({ userId: selectedBuyer.id, updates: { account_type: newType } });
+                    }}
+                    className="px-4 py-2 rounded-lg font-bold shadow-md transition-all duration-200 bg-amber-500 hover:bg-amber-600 text-gray-900 flex items-center gap-2"
+                  >
+                    <UserCog size={16} /> تغيير نوع الحساب
+                  </button>
                 </div>
               </div>
             </Modal>
@@ -299,8 +353,18 @@ export default function AdminUsersTab({
               <p className="text-gray-900">{s.email} | {s.phone}</p>
               <p className="text-gray-500">تاريخ الطلب: {formatDate(s.created_at)}</p>
               <div className="flex gap-2 mt-2">
-                <Button onClick={() => approveSellerMutation({ sellerId: s.id, approved: true })} className="bg-green-600 text-white">قبول</Button>
-                <Button variant="danger" onClick={() => { const notes = prompt('سبب الرفض:'); approveSellerMutation({ sellerId: s.id, approved: false, notes }); }}>رفض</Button>
+                <button
+                  onClick={() => approveSellerMutation({ sellerId: s.id, approved: true })}
+                  className="px-4 py-2 rounded-lg font-bold shadow-md transition-all duration-200 bg-green-600 hover:bg-green-700 text-white"
+                >
+                  قبول
+                </button>
+                <button
+                  onClick={() => { const notes = prompt('سبب الرفض:'); approveSellerMutation({ sellerId: s.id, approved: false, notes }); }}
+                  className="px-4 py-2 rounded-lg font-bold shadow-md transition-all duration-200 bg-red-600 hover:bg-red-700 text-white"
+                >
+                  رفض
+                </button>
               </div>
             </div>
           ))}
