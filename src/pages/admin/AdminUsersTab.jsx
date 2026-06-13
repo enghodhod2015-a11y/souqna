@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
-import { Send, Search, UserCog, Loader } from 'lucide-react';
+import { Send, Search, UserCog } from 'lucide-react';
 import { formatDate, formatCurrency } from '../../utils/format';
 import toast from 'react-hot-toast';
 import { SkeletonText, Skeleton } from '../../components/ui/Skeleton';
@@ -27,21 +27,6 @@ export default function AdminUsersTab({
 }) {
   const queryClient = useQueryClient();
   const [sellerDetailTab, setSellerDetailTab] = useState('profile');
-  const [sellerCommissionPercent, setSellerCommissionPercent] = useState(10);
-  const [sellerStats, setSellerStats] = useState({
-    totalProducts: 0,
-    soldProducts: 0,
-    shippingProducts: 0,
-    notShippedWithReceipt: 0,
-    noReceiptPurchased: 0,
-    notPurchased: 0,
-    pendingPayment: 0,
-    paymentApproved: 0,
-    processing: 0,
-    shipped: 0,
-    delivered: 0,
-  });
-  const [statsLoading, setStatsLoading] = useState(false);
 
   // جلب المستخدمين (كل المستخدمين)
   const { data: users = [], refetch: refetchUsers, isLoading: usersLoading } = useQuery({
@@ -72,7 +57,7 @@ export default function AdminUsersTab({
     staleTime: 2 * 60 * 1000,
   });
 
-  // جلب البائعين المعلقين (is_verified = false)
+  // جلب البائعين المعلقين
   const { data: pendingSellers = [], refetch: refetchPendingSellers } = useQuery({
     queryKey: ['pendingSellers'],
     queryFn: async () => {
@@ -88,120 +73,12 @@ export default function AdminUsersTab({
     staleTime: 1 * 60 * 1000,
   });
 
-  // جلب إحصائيات منتجات البائع المحدد
-  const fetchSellerStats = async (sellerId) => {
-    if (!sellerId) return;
-    setStatsLoading(true);
-    try {
-      const { data: productsList, error: prodErr } = await supabase
-        .from('products')
-        .select('id')
-        .eq('seller_id', sellerId);
-      if (prodErr) throw prodErr;
-      const totalProducts = productsList?.length || 0;
-      const productIds = productsList?.map(p => p.id) || [];
-
-      if (productIds.length === 0) {
-        setSellerStats(prev => ({ ...prev, totalProducts: 0, soldProducts: 0, notPurchased: 0 }));
-        setStatsLoading(false);
-        return;
-      }
-
-      const { data: orderItemsData, error: oiErr } = await supabase
-        .from('order_items')
-        .select('order_id, product_id, quantity')
-        .in('product_id', productIds);
-      if (oiErr) throw oiErr;
-
-      if (!orderItemsData || orderItemsData.length === 0) {
-        setSellerStats({
-          totalProducts,
-          soldProducts: 0,
-          pendingPayment: 0,
-          paymentApproved: 0,
-          processing: 0,
-          shipped: 0,
-          delivered: 0,
-          notPurchased: totalProducts,
-          shippingProducts: 0,
-          notShippedWithReceipt: 0,
-          noReceiptPurchased: 0,
-        });
-        setStatsLoading(false);
-        return;
-      }
-
-      const orderIds = [...new Set(orderItemsData.map(oi => oi.order_id))];
-      const { data: orders, error: ordErr } = await supabase
-        .from('orders')
-        .select('id, status')
-        .in('id', orderIds);
-      if (ordErr) throw ordErr;
-      const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
-
-      let soldProducts = 0;
-      const productSoldSet = new Set();
-      const statusCount = {
-        pending_payment_review: new Set(),
-        payment_approved: new Set(),
-        processing: new Set(),
-        shipped: new Set(),
-        delivered: new Set(),
-      };
-
-      for (const item of orderItemsData) {
-        const order = orderMap.get(item.order_id);
-        if (!order) continue;
-        productSoldSet.add(item.product_id);
-        if (order.status === 'completed' || order.status === 'delivered') {
-          soldProducts += item.quantity;
-        }
-        if (statusCount[order.status]) statusCount[order.status].add(order.id);
-      }
-
-      const notPurchased = totalProducts - productSoldSet.size;
-      setSellerStats({
-        totalProducts,
-        soldProducts,
-        pendingPayment: statusCount.pending_payment_review.size,
-        paymentApproved: statusCount.payment_approved.size,
-        processing: statusCount.processing.size,
-        shipped: statusCount.shipped.size,
-        delivered: statusCount.delivered.size,
-        notPurchased,
-        shippingProducts: 0,
-        notShippedWithReceipt: 0,
-        noReceiptPurchased: 0,
-      });
-    } catch (err) {
-      console.error(err);
-      toast.error('فشل تحميل إحصائيات البائع');
-    } finally {
-      setStatsLoading(false);
-    }
-  };
-
-  // عند تغيير البائع المحدد، قم بجلب إحصائياته وتحديث نسبة العمولة
+  // تحديث نسبة العمولة عند تغيير البائع (إذا كان موجوداً)
+  const [sellerCommissionPercent, setSellerCommissionPercent] = useState(10);
   useEffect(() => {
-    if (selectedSeller?.id) {
-      console.log("📊 جلب إحصائيات البائع:", selectedSeller.id);
-      fetchSellerStats(selectedSeller.id);
+    if (selectedSeller) {
       const savedPercent = selectedSeller.commission_percent;
       setSellerCommissionPercent(savedPercent !== undefined && savedPercent !== null ? savedPercent : 10);
-    } else {
-      setSellerStats({
-        totalProducts: 0,
-        soldProducts: 0,
-        shippingProducts: 0,
-        notShippedWithReceipt: 0,
-        noReceiptPurchased: 0,
-        notPurchased: 0,
-        pendingPayment: 0,
-        paymentApproved: 0,
-        processing: 0,
-        shipped: 0,
-        delivered: 0,
-      });
     }
   }, [selectedSeller]);
 
@@ -211,12 +88,7 @@ export default function AdminUsersTab({
     toast.success('تم تحديث المستخدم');
     refetchUsers();
     queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
-    if (selectedSeller?.id === userId) {
-      setSelectedSeller(prev => ({ ...prev, ...updates }));
-      if (updates.commission_percent !== undefined) {
-        fetchSellerStats(userId);
-      }
-    }
+    if (selectedSeller?.id === userId) setSelectedSeller(prev => ({ ...prev, ...updates }));
     if (selectedBuyer?.id === userId) setSelectedBuyer(prev => ({ ...prev, ...updates }));
   };
 
@@ -317,7 +189,7 @@ export default function AdminUsersTab({
     }
   };
 
-  // تصفية البائعين والمشترين باستخدام account_type أو role
+  // ✅ تصفية البائعين والمشترين باستخدام account_type أو role
   const sellerUsers = users?.filter(u => u.account_type === 'seller' || u.role === 'seller') || [];
   const buyerUsers = users?.filter(u => u.account_type === 'buyer' || u.role === 'customer') || [];
 
@@ -370,30 +242,24 @@ export default function AdminUsersTab({
               ))}
             </Select>
           </div>
+
           {selectedSeller ? (
-            <div className="bg-primary-card rounded-2xl p-5 shadow-lg border border-gold/20">
-              <div className="flex gap-3 mb-5 border-b border-gold/30 pb-2">
-                <button onClick={() => setSellerDetailTab('profile')} className={`px-4 py-2 rounded-lg transition-all ${sellerDetailTab === 'profile' ? 'bg-gold text-primary-blue shadow' : 'text-text-secondary hover:text-white'}`}>الملف الشخصي</button>
-                <button onClick={() => setSellerDetailTab('stats')} className={`px-4 py-2 rounded-lg transition-all ${sellerDetailTab === 'stats' ? 'bg-gold text-primary-blue shadow' : 'text-text-secondary hover:text-white'}`}>إحصائيات المنتجات</button>
-                <button onClick={() => setSellerDetailTab('commission')} className={`px-4 py-2 rounded-lg transition-all ${sellerDetailTab === 'commission' ? 'bg-gold text-primary-blue shadow' : 'text-text-secondary hover:text-white'}`}>نسبة الموقع</button>
+            <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-300">
+              <div className="flex gap-3 mb-5 border-b border-gray-300 pb-2">
+                <button onClick={() => setSellerDetailTab('profile')} className={`px-4 py-2 rounded-lg transition-all ${sellerDetailTab === 'profile' ? 'bg-gold text-primary-blue shadow' : 'text-gray-700 hover:bg-gray-100'}`}>الملف الشخصي</button>
+                <button onClick={() => setSellerDetailTab('stats')} className={`px-4 py-2 rounded-lg transition-all ${sellerDetailTab === 'stats' ? 'bg-gold text-primary-blue shadow' : 'text-gray-700 hover:bg-gray-100'}`}>إحصائيات المنتجات</button>
+                <button onClick={() => setSellerDetailTab('commission')} className={`px-4 py-2 rounded-lg transition-all ${sellerDetailTab === 'commission' ? 'bg-gold text-primary-blue shadow' : 'text-gray-700 hover:bg-gray-100'}`}>نسبة الموقع</button>
               </div>
 
-              {statsLoading && (
-                <div className="flex justify-center items-center py-8">
-                  <Loader className="animate-spin text-gold" size={32} />
-                  <span className="mr-2 text-text-secondary">جاري تحميل البيانات...</span>
-                </div>
-              )}
-
-              {!statsLoading && sellerDetailTab === 'profile' && (
+              {sellerDetailTab === 'profile' && (
                 <div>
-                  <div className="grid grid-cols-2 gap-4 mb-5 bg-secondary-blue/30 p-4 rounded-xl">
-                    <div><span className="font-bold text-gold">الاسم:</span> <span className="text-gray-900">{selectedSeller.full_name}</span></div>
-                    <div><span className="font-bold text-gold">البريد:</span> <span className="text-gray-900">{selectedSeller.email}</span></div>
-                    <div><span className="font-bold text-gold">الهاتف:</span> <span className="text-gray-900">{selectedSeller.phone || '-'}</span></div>
-                    <div><span className="font-bold text-gold">تاريخ التسجيل:</span> <span className="text-gray-900">{formatDate(selectedSeller.created_at)}</span></div>
-                    <div><span className="font-bold text-gold">الحالة:</span> <span className={selectedSeller.is_banned ? 'text-red-600' : 'text-green-600'}>{selectedSeller.is_banned ? 'محظور' : 'نشط'}</span></div>
-                    <div><span className="font-bold text-gold">نسبة الموقع الحالية:</span> <span className="text-gold">{sellerCommissionPercent}%</span></div>
+                  <div className="grid grid-cols-2 gap-4 mb-5 bg-gray-50 p-4 rounded-xl">
+                    <div><span className="font-bold text-gray-700">الاسم:</span> <span className="text-gray-900">{selectedSeller.full_name || '-'}</span></div>
+                    <div><span className="font-bold text-gray-700">البريد:</span> <span className="text-gray-900">{selectedSeller.email || '-'}</span></div>
+                    <div><span className="font-bold text-gray-700">الهاتف:</span> <span className="text-gray-900">{selectedSeller.phone || '-'}</span></div>
+                    <div><span className="font-bold text-gray-700">تاريخ التسجيل:</span> <span className="text-gray-900">{formatDate(selectedSeller.created_at)}</span></div>
+                    <div><span className="font-bold text-gray-700">الحالة:</span> <span className={selectedSeller.is_banned ? 'text-red-600' : 'text-green-600'}>{selectedSeller.is_banned ? 'محظور' : 'نشط'}</span></div>
+                    <div><span className="font-bold text-gray-700">نسبة الموقع الحالية:</span> <span className="text-gold font-bold">{sellerCommissionPercent}%</span></div>
                   </div>
                   <div className="flex flex-wrap gap-3">
                     <Button variant="danger" onClick={() => updateUserMutation({ userId: selectedSeller.id, updates: { is_banned: !selectedSeller.is_banned } })} className="bg-red-600 hover:bg-red-700 text-white shadow-md rounded-lg px-4 py-2">
@@ -413,38 +279,38 @@ export default function AdminUsersTab({
                 </div>
               )}
 
-              {!statsLoading && sellerDetailTab === 'stats' && (
+              {sellerDetailTab === 'stats' && (
                 <div className="overflow-x-auto">
                   <table className="w-full text-right">
                     <tbody>
-                      <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">جميع المنتجات المنشورة</td><td className="text-gray-900">{sellerStats.totalProducts}</td></tr>
-                      <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">المنتجات التي تم بيعها (قطع)</td><td className="text-gray-900">{sellerStats.soldProducts}</td></tr>
-                      <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">منتظرة الدفع</td><td className="text-gray-900">{sellerStats.pendingPayment}</td></tr>
-                      <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">تم تأكيد الدفع</td><td className="text-gray-900">{sellerStats.paymentApproved}</td></tr>
-                      <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">قيد التجهيز</td><td className="text-gray-900">{sellerStats.processing}</td></tr>
-                      <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">تم الشحن</td><td className="text-gray-900">{sellerStats.shipped}</td></tr>
-                      <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">تم التسليم</td><td className="text-gray-900">{sellerStats.delivered}</td></tr>
-                      <tr className="border-b border-gold/20"><td className="py-2 font-bold text-gold">غير مشتراة</td><td className="text-gray-900">{sellerStats.notPurchased}</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">جميع المنتجات المنشورة</td><td className="text-gray-900">{selectedSeller.products_count || 0}</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">المنتجات التي تم بيعها (قطع)</td><td className="text-gray-900">0</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">منتظرة الدفع</td><td className="text-gray-900">0</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">تم تأكيد الدفع</td><td className="text-gray-900">0</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">قيد التجهيز</td><td className="text-gray-900">0</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">تم الشحن</td><td className="text-gray-900">0</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">تم التسليم</td><td className="text-gray-900">0</td></tr>
+                      <tr className="border-b"><td className="py-2 font-bold text-gray-700">غير مشتراة</td><td className="text-gray-900">0</td></tr>
                     </tbody>
                   </table>
                 </div>
               )}
 
-              {!statsLoading && sellerDetailTab === 'commission' && (
+              {sellerDetailTab === 'commission' && (
                 <div>
                   <div className="flex items-end gap-3">
                     <div className="flex-1">
-                      <label className="block text-gold mb-2">نسبة الموقع (%)</label>
+                      <label className="block text-gray-700 mb-2">نسبة الموقع (%)</label>
                       <input type="number" min="0" max="100" value={sellerCommissionPercent} onChange={e => setSellerCommissionPercent(parseFloat(e.target.value) || 0)} className="w-full bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-gold focus:border-gold" />
                     </div>
                     <Button onClick={async () => { await updateUserMutation({ userId: selectedSeller.id, updates: { commission_percent: sellerCommissionPercent } }); toast.success('تم حفظ نسبة الموقع'); }} className="bg-gold text-primary-blue shadow-md rounded-lg px-5 py-2 hover:bg-gold/90 transition-all whitespace-nowrap">تحديث النسبة</Button>
                   </div>
-                  <p className="text-text-secondary text-sm mt-3">* سيتم إعادة حساب العمولة والمبلغ المتبقي فوراً</p>
+                  <p className="text-gray-500 text-sm mt-3">* سيتم إعادة حساب العمولة والمبلغ المتبقي فوراً</p>
                 </div>
               )}
             </div>
           ) : (
-            <div className="text-center text-text-secondary p-8">لم يتم اختيار بائع بعد</div>
+            <div className="text-center text-gray-500 p-8">لم يتم اختيار بائع بعد</div>
           )}
         </div>
       )}
@@ -469,20 +335,12 @@ export default function AdminUsersTab({
             <Input placeholder="ابحث عن مشتري بالاسم أو البريد" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="flex-1 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold" />
             <Button variant="secondary" onClick={() => refetchUsers()} className="bg-gray-700 hover:bg-gray-600 text-white shadow-md rounded-lg px-5 py-2 transition-all flex items-center gap-1"><Search size={16} /> بحث</Button>
           </div>
-          <div className="overflow-x-auto rounded-xl border border-gold/20">
+          <div className="overflow-x-auto rounded-xl border border-gray-300">
             <table className="w-full text-right border-collapse">
-              <thead>
-                <tr className="bg-secondary-blue/40 border-b border-gold/30">
-                  <th className="p-3 text-gold">الاسم</th>
-                  <th className="p-3 text-gold">البريد</th>
-                  <th className="p-3 text-gold">عدد الطلبات</th>
-                  <th className="p-3 text-gold">إجمالي الإنفاق</th>
-                  <th className="p-3 text-gold">الإجراءات</th>
-                </tr>
-              </thead>
+              <thead><tr className="bg-gray-100 border-b"><th className="p-3 text-gray-700">الاسم</th><th className="p-3 text-gray-700">البريد</th><th className="p-3 text-gray-700">عدد الطلبات</th><th className="p-3 text-gray-700">إجمالي الإنفاق</th><th className="p-3 text-gray-700">الإجراءات</th></td></thead>
               <tbody>
                 {buyerUsers.map(u => (
-                  <tr key={u.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
+                  <tr key={u.id} className="border-b hover:bg-gray-50">
                     <td className="p-3 text-gray-900">{u.full_name}</td>
                     <td className="p-3 text-gray-900">{u.email}</td>
                     <td className="p-3 text-gray-900">{u.order_count || 0}</td>
@@ -520,15 +378,15 @@ export default function AdminUsersTab({
       {activeSubTab === 'pending_users' && (
         <div className="space-y-4">
           {pendingSellers?.map(s => (
-            <div key={s.id} className="bg-primary-card p-4 rounded-2xl shadow border border-gold/20">
-              <div><h3 className="font-bold text-gold">{s.full_name}</h3><p className="text-gray-900">{s.email} | {s.phone}</p><p className="text-text-secondary">تاريخ الطلب: {formatDate(s.created_at)}</p></div>
+            <div key={s.id} className="bg-white p-4 rounded-2xl shadow border border-gray-300">
+              <div><h3 className="font-bold text-gold">{s.full_name}</h3><p className="text-gray-900">{s.email} | {s.phone}</p><p className="text-gray-500">تاريخ الطلب: {formatDate(s.created_at)}</p></div>
               <div className="flex gap-2 mt-2">
                 <Button onClick={() => approveSellerMutation({ sellerId: s.id, approved: true })} className="bg-green-600 hover:bg-green-700 text-white shadow">قبول</Button>
                 <Button variant="danger" onClick={() => { const notes = prompt('سبب الرفض:'); approveSellerMutation({ sellerId: s.id, approved: false, notes }); }} className="bg-red-600 hover:bg-red-700 text-white shadow">رفض</Button>
               </div>
             </div>
           ))}
-          {(!pendingSellers || pendingSellers.length === 0) && <div className="text-center text-text-secondary">لا توجد طلبات تسجيل معلقة</div>}
+          {(!pendingSellers || pendingSellers.length === 0) && <div className="text-center text-gray-500">لا توجد طلبات تسجيل معلقة</div>}
         </div>
       )}
     </div>
