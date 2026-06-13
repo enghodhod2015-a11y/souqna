@@ -1,13 +1,25 @@
 import { supabase } from './supabase'
 
-const fixImageUrl = (url) => {
+// استبدل دالة fixImageUrl الموجودة بهذه النسخة المحسنة
+const fixImageUrl = (url, width = 400) => {
   if (!url) return null
-  if (url.startsWith('http://') || url.startsWith('https://')) return url
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://utmhjbeyrwohrvfobibl.supabase.co'
-  if (url.startsWith('/')) {
-    return `${supabaseUrl}/storage/v1/object/public/product-images${url}`
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    // إذا كان الرابط من Supabase storage، أضف معلمات التحويل
+    if (url.includes('supabase.co/storage')) {
+      // إضافة width و format webp مع الاحتفاظ بالمعلمات الموجودة
+      const separator = url.includes('?') ? '&' : '?'
+      return `${url}${separator}width=${width}&format=webp`
+    }
+    return url
   }
-  return `${supabaseUrl}/storage/v1/object/public/product-images/${url}`
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://utmhjbeyrwohrvfobibl.supabase.co'
+  let baseUrl
+  if (url.startsWith('/')) {
+    baseUrl = `${supabaseUrl}/storage/v1/object/public/product-images${url}`
+  } else {
+    baseUrl = `${supabaseUrl}/storage/v1/object/public/product-images/${url}`
+  }
+  return `${baseUrl}?width=${width}&format=webp`
 }
 
 export const getProducts = async (filters = {}, signal = null) => {
@@ -98,11 +110,9 @@ export const getProductById = async (id) => {
       .from('products')
       .select('*')
       .eq('id', numericId)
-      .maybeSingle()   // ✅ التصحيح: استخدام maybeSingle() بدلاً من single()
+      .maybeSingle()
     
     if (error) throw error
-    
-    // ✅ إذا لم يوجد المنتج، نعيد null بدلاً من رمي خطأ
     if (!product) return null
     
     if (product?.seller_id) {
@@ -197,6 +207,34 @@ export const uploadProductImages = async (files, productId, onProgress = null) =
     return urls
   } catch (error) {
     console.error('❌ فشل رفع الصور:', error)
+    throw error
+  }
+}
+
+// ✅ دالة جديدة: تحديث مخزون منتج معين (زيادة أو نقصان)
+export const updateProductStock = async (productId, quantityChange) => {
+  if (!productId || typeof quantityChange !== 'number') {
+    throw new Error('معرف المنتج وقيمة التغيير مطلوبة')
+  }
+  try {
+    // جلب المخزون الحالي
+    const { data: product, error: fetchError } = await supabase
+      .from('products')
+      .select('stock_quantity')
+      .eq('id', productId)
+      .single()
+    if (fetchError) throw fetchError
+
+    const newQuantity = Math.max(0, (product.stock_quantity || 0) + quantityChange)
+    const { error: updateError } = await supabase
+      .from('products')
+      .update({ stock_quantity: newQuantity })
+      .eq('id', productId)
+    if (updateError) throw updateError
+
+    return newQuantity
+  } catch (error) {
+    console.error('❌ فشل تحديث مخزون المنتج:', error)
     throw error
   }
 }

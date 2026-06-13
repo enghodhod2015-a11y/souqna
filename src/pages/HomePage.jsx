@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { getProducts } from '../services/productService'
 import { ProductCard } from '../components/products/ProductCard'
-import { useAbortController } from '../hooks/useAbortController'
 
 const categories = [
   { id: 'electronics', name: 'الإلكترونيات', icon: '📱' },
@@ -58,34 +58,14 @@ const SidebarLink = ({ children, to, className = '' }) => {
 }
 
 export default function HomePage() {
-  const [products, setProducts] = useState([])
-  const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState('')
-  const abortController = useAbortController()
 
-  // CHANGED: تم إزالة متغيرات البحث (searchTerm, city)
-  useEffect(() => {
-    let isMounted = true
-    const loadProducts = async () => {
-      setLoading(true)
-      try {
-        const filters = {}
-        if (selectedCategory) filters.category = selectedCategory
-        // CHANGED: تم إزالة إضافة فلتر البحث والمدينة
-        const data = await getProducts(filters, abortController?.signal)
-        if (isMounted) setProducts(data || [])
-      } catch (err) {
-        if (isMounted && err.name !== 'AbortError') console.error(err)
-      } finally {
-        if (isMounted) setLoading(false)
-      }
-    }
-    loadProducts()
-    return () => {
-      isMounted = false
-      abortController?.abort()
-    }
-  }, [selectedCategory, abortController]) // CHANGED: إزالة الاعتماد على searchTerm, city
+  const { data: products = [], isLoading } = useQuery({
+    queryKey: ['products', selectedCategory],
+    queryFn: () => getProducts({ category: selectedCategory }),
+    staleTime: 5 * 60 * 1000, // 5 دقائق قبل اعتبار البيانات قديمة
+    cacheTime: 10 * 60 * 1000, // 10 دقائق قبل مسح cache
+  })
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -124,7 +104,7 @@ export default function HomePage() {
         </aside>
 
         <main className="lg:w-3/5">
-          {loading ? (
+          {isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {[...Array(6)].map((_, i) => (
                 <div key={i} className="bg-primary-card rounded-2xl h-80 animate-pulse"></div>
@@ -163,4 +143,5 @@ export default function HomePage() {
     </div>
   )
 }
+
 

@@ -1,112 +1,92 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { getUserConversations } from '../services/chatService';
-import { supabase } from '../services/supabase';
-import { useAbortController } from '../hooks/useAbortController';
-import toast from 'react-hot-toast';
+import { Link, useNavigate } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '../contexts/AuthContext'
+import { getUserConversations } from '../services/chatService'
+import { supabase } from '../services/supabase'
+import toast from 'react-hot-toast'
 
 export default function InboxPage() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const abortController = useAbortController();
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  const { data: conversations = [], isLoading } = useQuery({
+    queryKey: ['conversations', user?.id],
+    queryFn: () => getUserConversations(user.id),
+    enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000, // دقيقتان
+    cacheTime: 5 * 60 * 1000,
+  })
 
   const markAllMessagesAsRead = async () => {
-    if (!user) return;
+    if (!user) return
 
     try {
       const { data: convs, error: convError } = await supabase
         .from('conversations')
         .select('id')
-        .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`);
-      if (convError) throw convError;
+        .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+      if (convError) throw convError
 
-      if (!convs || convs.length === 0) return;
+      if (!convs || convs.length === 0) return
 
-      const conversationIds = convs.map(c => c.id);
+      const conversationIds = convs.map(c => c.id)
 
       const { error: msgError } = await supabase
         .from('messages')
         .update({ is_read: true })
         .eq('receiver_id', user.id)
-        .in('conversation_id', conversationIds);
-      if (msgError) throw msgError;
+        .in('conversation_id', conversationIds)
+      if (msgError) throw msgError
 
-      const updates = [];
+      const updates = []
       for (const conv of convs) {
-        const updateData = {};
+        const updateData = {}
         const { data: convData } = await supabase
           .from('conversations')
           .select('buyer_id, seller_id')
           .eq('id', conv.id)
-          .single();
+          .single()
         if (convData) {
-          if (convData.buyer_id === user.id) updateData.buyer_unread_count = 0;
-          if (convData.seller_id === user.id) updateData.seller_unread_count = 0;
+          if (convData.buyer_id === user.id) updateData.buyer_unread_count = 0
+          if (convData.seller_id === user.id) updateData.seller_unread_count = 0
           if (Object.keys(updateData).length) {
             updates.push(
               supabase
                 .from('conversations')
                 .update(updateData)
                 .eq('id', conv.id)
-            );
+            )
           }
         }
       }
-      await Promise.all(updates);
+      await Promise.all(updates)
 
-      setConversations(prev =>
-        prev.map(conv => {
-          const isBuyer = conv.buyer_id === user.id;
-          const updatedConv = { ...conv };
-          if (isBuyer) updatedConv.buyer_unread_count = 0;
-          else updatedConv.seller_unread_count = 0;
-          return updatedConv;
+      // تحديث cache يدوياً
+      queryClient.setQueryData(['conversations', user.id], (old) =>
+        old?.map(conv => {
+          const isBuyer = conv.buyer_id === user.id
+          const updatedConv = { ...conv }
+          if (isBuyer) updatedConv.buyer_unread_count = 0
+          else updatedConv.seller_unread_count = 0
+          return updatedConv
         })
-      );
+      )
 
-      console.log('✅ تم تعليم جميع الرسائل كمقروءة');
+      toast.success('تم تعليم جميع الرسائل كمقروءة')
     } catch (err) {
       if (err?.code === 'PGRST303' || err?.message?.includes('JWT expired')) {
-        toast.error('انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى');
-        await supabase.auth.signOut();
-        navigate('/login');
-        return;
+        toast.error('انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى')
+        await supabase.auth.signOut()
+        navigate('/login')
+        return
       }
-      console.error('خطأ في تعليم الرسائل كمقروءة:', err);
-      toast.error('حدث خطأ أثناء تحديث حالة القراءة');
+      console.error('خطأ في تعليم الرسائل كمقروءة:', err)
+      toast.error('حدث خطأ أثناء تحديث حالة القراءة')
     }
-  };
+  }
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadConversations = async () => {
-      try {
-        setLoading(true);
-        const data = await getUserConversations(user.id);
-        if (isMounted) setConversations(data || []);
-      } catch (err) {
-        if (isMounted) console.error('Error loading inbox conversations:', err);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-    if (user?.id) loadConversations();
-    return () => {
-      isMounted = false;
-      abortController?.abort();
-    };
-  }, [user?.id, abortController]);
-
-  useEffect(() => {
-    if (!loading && conversations.length > 0) {
-      markAllMessagesAsRead();
-    }
-  }, [loading, conversations]);
-
-  if (loading) return <div className="text-center py-20">جاري التحميل...</div>;
+  if (isLoading) return <div className="text-center py-20">جاري التحميل...</div>
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
@@ -125,10 +105,10 @@ export default function InboxPage() {
       ) : (
         <div className="space-y-3">
           {conversations.map(conv => {
-            if (!conv?.id) return null;
-            const isBuyer = conv.buyer_id === user?.id;
-            const unreadCount = isBuyer ? conv.buyer_unread_count : conv.seller_unread_count;
-            const anonymousLabel = isBuyer ? 'البائع' : 'مشتري محتمل';
+            if (!conv?.id) return null
+            const isBuyer = conv.buyer_id === user?.id
+            const unreadCount = isBuyer ? conv.buyer_unread_count : conv.seller_unread_count
+            const anonymousLabel = isBuyer ? 'البائع' : 'مشتري محتمل'
             return (
               <Link to={`/chat/c/${conv.id}`} key={conv.id}>
                 <div className="bg-primary-card p-4 rounded-2xl border border-gold/30 hover:border-gold transition">
@@ -148,12 +128,12 @@ export default function InboxPage() {
                   </div>
                 </div>
               </Link>
-            );
+            )
           })}
         </div>
       )}
     </div>
-  );
+  )
 }
 
 

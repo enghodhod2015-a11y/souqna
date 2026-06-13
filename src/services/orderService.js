@@ -4,24 +4,39 @@
  * دوال إدارة الطلبات (Orders)
  * 
  * قائمة الدوال:
- * 1. createOrder(orderData)        - إنشاء طلب جديد
+ * 1. createOrder(orderData)        - إنشاء طلب جديد (مع خصم المخزون)
  * 2. getBuyerOrders(buyerId)       - جلب طلبات المشتري
  * 3. getSellerOrders(sellerId)     - جلب طلبات البائع (باستخدام RPC)
- * 4. updateOrderStatus(orderId, status) - تحديث حالة الطلب
+ * 4. updateOrderStatus(orderId, status) - تحديث حالة الطلب (مع إعادة المخزون إذا ألغي)
  * 5. confirmDelivery(orderId)      - تأكيد استلام الطلب
  * 6. requestReturn(orderId, reason)- طلب استرجاع المنتج
- * 7. approveReturn(orderId, approve, adminNotes) - قبول/رفض الاسترجاع
+ * 7. approveReturn(orderId, approve, adminNotes) - قبول/رفض الاسترجاع (مع إعادة المخزون إذا قُبل)
  * 8. uploadReceipt(orderId, file, transferData) - رفع إيصال الدفع
- * 9. getSellerStats(sellerId)      - إحصائيات البائع (معدلة لجلب بيانات حقيقية)
+ * 9. getSellerStats(sellerId)      - إحصائيات البائع
  * 10. getMonthlySales(sellerId)    - المبيعات الشهرية (غير مفعلة)
  */
 
 import { supabase } from './supabase'
+import { updateProductStock } from './productService' // ✅ استيراد دالة تحديث المخزون
 
-// 1️⃣ إنشاء طلب جديد
+// 1️⃣ إنشاء طلب جديد (مع خصم المخزون)
 export const createOrder = async (orderData) => {
   const { buyer_id, total_amount, shipping_address, shipping_city, payment_method, notes, items } = orderData
 
+  // بدء معاملة يدوية (نقوم بالعمليات ثم إنشاء الطلب)
+  // 1. التحقق من توفر المخزون وخصمه مؤقتاً
+  for (const item of items) {
+    const { data: product } = await supabase
+      .from('products')
+      .select('stock_quantity')
+      .eq('id', item.product_id)
+      .single()
+    if (!product || product.stock_quantity < item.quantity) {
+      throw new Error(`المنتج غير متوفر بالكمية المطلوبة (المتبقي: ${product?.stock_quantity || 0})`)
+    }
+  }
+
+  // 2. إنشاء الطلب
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({
@@ -40,6 +55,7 @@ export const createOrder = async (orderData) => {
 
   if (orderError) throw orderError
 
+  // 3. إضافة عناصر الطلب مع أسماء المنتجات
   const itemsWithNames = await Promise.all(items.map(async (item) => {
     const { data: product, error: productError } = await supabase
       .from('products')
@@ -63,6 +79,11 @@ export const createOrder = async (orderData) => {
   if (itemsError) {
     await supabase.from('orders').delete().eq('id', order.id)
     throw itemsError
+  }
+
+  // 4. خصم الكميات من المخزون
+  for (const item of items) {
+    await updateProductStock(item.product_id, -item.quantity)
   }
 
   return { id: order.id }
@@ -153,8 +174,22 @@ export const getSellerOrders = async (sellerId) => {
   }
 }
 
-// 4️⃣ تحديث حالة الطلب
+// 4️⃣ تحديث حالة الطلب (مع إعادة المخزون إذا أصبح ملغياً)
 export const updateOrderStatus = async (orderId, status) => {
+  // إذا كانت الحالة الجديدة "cancelled"، يجب إعادة الكميات إلى المخزون
+  if (status === 'cancelled') {
+    // جلب عناصر الطلب
+    const { data: items, error: itemsError } = await supabase
+      .from('order_items')
+      .select('product_id, quantity')
+      .eq('order_id', orderId)
+    if (!itemsError && items) {
+      for (const item of items) {
+        await updateProductStock(item.product_id, item.quantity)
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from('orders')
     .update({ status })
@@ -216,9 +251,23 @@ export const requestReturn = async (orderId, reason) => {
   return data
 }
 
-// 7️⃣ الموافقة على الاسترجاع
+// 7️⃣ الموافقة على الاسترجاع (مع إعادة المخزون إذا قُبل)
 export const approveReturn = async (orderId, approve, adminNotes = '') => {
   const newStatus = approve ? 'return_approved' : 'return_rejected'
+  
+  // إذا تم قبول الاسترجاع، أعد الكميات إلى المخزون
+  if (approve) {
+    const { data: items, error: itemsError } = await supabase
+      .from('order_items')
+      .select('product_id, quantity')
+      .eq('order_id', orderId)
+    if (!itemsError && items) {
+      for (const item of items) {
+        await updateProductStock(item.product_id, item.quantity)
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from('orders')
     .update({
@@ -265,12 +314,10 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
   return publicUrl
 }
 
-// 9️⃣ إحصائيات البائع (معدلة لجلب بيانات حقيقية مع console.log للتشخيص)
-// 9️⃣ إحصائيات البائع (معدلة بحيث تحسب المبيعات فقط للطلبات المكتملة أو المسلمة)
+// 9️⃣ إحصائيات البائع (معدلة)
 export const getSellerStats = async (sellerId) => {
   console.log('📊 getSellerStats called for seller:', sellerId);
   try {
-    // 1. جلب جميع منتجات البائع
     const { data: products, error: productsError } = await supabase
       .from('products')
       .select('id')
@@ -299,7 +346,6 @@ export const getSellerStats = async (sellerId) => {
       };
     }
 
-    // 2. جلب order_items للمنتجات
     const { data: orderItems, error: oiError } = await supabase
       .from('order_items')
       .select('order_id, product_price, quantity')
@@ -322,7 +368,6 @@ export const getSellerStats = async (sellerId) => {
     const orderIds = [...new Set(orderItems.map(oi => oi.order_id))];
     console.log('📦 orderIds الفريدة:', orderIds);
 
-    // 3. جلب حالات الطلبات
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select('id, status')
@@ -344,12 +389,10 @@ export const getSellerStats = async (sellerId) => {
       const saleAmount = item.product_price * item.quantity;
       console.log(`💰 order ${item.order_id}: ${saleAmount} ريال (الحالة: ${status})`);
 
-      // ✅ المبيعات فقط للطلبات المكتملة أو المسلمة
       if (status === 'completed' || status === 'delivered') {
         totalSales += saleAmount;
       }
 
-      // تصنيف الطلبات حسب الحالة (للإحصائيات الأخرى)
       if (status === 'pending' || status === 'pending_payment_review') {
         pendingOrders++;
       } else if (status === 'payment_approved' || status === 'processing' || status === 'shipped') {
@@ -386,4 +429,5 @@ export const getSellerStats = async (sellerId) => {
 export const getMonthlySales = async (sellerId) => {
   return []
 }
+
 
