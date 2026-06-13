@@ -8,6 +8,7 @@ import { Modal } from '../../components/ui/Modal';
 import { formatDate, formatCurrency } from '../../utils/format';
 import toast from 'react-hot-toast';
 import { Skeleton, SkeletonText } from '../../components/ui/Skeleton';
+import { ExportButtons } from '../../components/ui/ExportButtons';
 
 export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, navigate }) {
   const queryClient = useQueryClient();
@@ -86,7 +87,6 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
         }
       }
       const netAfterReturns = totalSales - totalReturns;
-      // استخدام sellerCommissionPercent الحالي (من state)
       const commissionAmount = netAfterReturns * (sellerCommissionPercent / 100);
       const { data: transfers } = await supabase
         .from('seller_transfers')
@@ -105,13 +105,12 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
     if (error) throw error;
     toast.success('تم تحديث نسبة العمولة');
-    // تحديث البائع المحدد محلياً
+    // تحديث البائع المحدد محلياً وإعادة الحساب
     if (selectedSeller?.id === userId) {
       setSelectedSeller(prev => ({ ...prev, ...updates }));
-      // إذا تم تحديث النسبة، قم بتحديث الـ state وإعادة الحساب
       if (updates.commission_percent !== undefined) {
         setSellerCommissionPercent(updates.commission_percent);
-        await calculateFinance(); // إعادة الحساب بعد التحديث المباشر
+        await calculateFinance();
       }
     }
     refetchUsers();
@@ -261,6 +260,17 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-bold text-gold">ملخص حسابات البائع</h3>
               <div className="flex gap-2">
+                <ExportButtons 
+                  data={financeRows} 
+                  filename={`seller_finance_${selectedSeller.id}`}
+                  title={`ملخص حسابات البائع: ${selectedSeller.full_name}`}
+                  columns={[
+                    { header: 'القسم', dataKey: 'القسم' },
+                    { header: 'المبلغ', dataKey: 'المبلغ' },
+                    { header: 'العملة', dataKey: 'العملة' }
+                  ]}
+                  showCSV
+                />
                 <Button variant="secondary" onClick={loadSellerReceipts} className="bg-gray-700 hover:bg-gray-600 text-white shadow">
                   الاستعلام عن التحويلات
                 </Button>
@@ -354,16 +364,12 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
                 <tr key={r.id}>
                   <td className="text-gray-800">{formatCurrency(r.amount)}</td>
                   <td className="text-gray-800">{formatDate(r.created_at)}</td>
-                  <td>
-                    <a href={r.receipt_image} target="_blank" rel="noreferrer" className="text-blue-500 underline">عرض</a>
-                  </td>
+                  <td><a href={r.receipt_image} target="_blank" rel="noreferrer" className="text-blue-500 underline">عرض</a></td>
                   <td className="text-gray-800">{r.notes || '-'}</td>
                 </tr>
               ))}
               {sellerReceiptsList.length === 0 && (
-                <tr>
-                  <td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td>
-                </tr>
+                <tr><td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td></tr>
               )}
             </tbody>
           </table>
@@ -375,5 +381,4 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     </div>
   );
 }
-
 
