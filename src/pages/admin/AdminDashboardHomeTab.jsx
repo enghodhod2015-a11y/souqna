@@ -9,9 +9,10 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import { formatDate, formatCurrency } from '../../utils/format';
+import { Skeleton, SkeletonText, SkeletonCircle } from '../../components/ui/Skeleton';
 
 export default function AdminDashboardHomeTab() {
-  const { data: dashboardData } = useQuery({
+  const { data: dashboardData, isLoading: dashboardLoading } = useQuery({
     queryKey: ['adminDashboard'],
     queryFn: async () => {
       const today = new Date();
@@ -117,7 +118,7 @@ export default function AdminDashboardHomeTab() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: salesChartData = [] } = useQuery({
+  const { data: salesChartData = [], isLoading: chartLoading } = useQuery({
     queryKey: ['adminSalesChart'],
     queryFn: async () => {
       const last7Days = [];
@@ -140,6 +141,32 @@ export default function AdminDashboardHomeTab() {
     },
     staleTime: 5 * 60 * 1000,
   });
+
+  if (dashboardLoading || chartLoading) {
+    return (
+      <div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+          {Array(6).fill(0).map((_, i) => (
+            <div key={i} className="bg-primary-card p-5 rounded-2xl">
+              <SkeletonCircle size="w-8 h-8 mb-2" />
+              <SkeletonText width="w-20" height="h-3" className="mb-1" />
+              <SkeletonText width="w-16" height="h-6" />
+            </div>
+          ))}
+        </div>
+        <div className="grid md:grid-cols-3 gap-5 mb-8">
+          {Array(3).fill(0).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-2xl" />
+          ))}
+        </div>
+        <div className="grid md:grid-cols-2 gap-8 mb-8">
+          <Skeleton className="h-64 rounded-2xl" />
+          <Skeleton className="h-64 rounded-2xl" />
+        </div>
+        <Skeleton className="h-80 rounded-2xl" />
+      </div>
+    );
+  }
 
   return (
     <div>

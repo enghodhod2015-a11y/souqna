@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getProductById, deleteProduct } from '../services/productService'
+import { getProductReviews, getAverageRating, canUserReviewProduct, addReview } from '../services/reviewService'
 import toast from 'react-hot-toast'
 import { Skeleton, SkeletonText, SkeletonCircle } from '../components/ui/Skeleton'
+import { Star } from 'lucide-react'
+import { Button } from '../components/ui/Button'
 
 export default function ProductDetailsPage() {
   const { id, productId } = useParams()
@@ -13,6 +16,13 @@ export default function ProductDetailsPage() {
   const { user, profile } = useAuth()
   const [product, setProduct] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [reviews, setReviews] = useState([])
+  const [averageRating, setAverageRating] = useState(0)
+  const [totalReviews, setTotalReviews] = useState(0)
+  const [userCanReview, setUserCanReview] = useState(false)
+  const [reviewRating, setReviewRating] = useState(5)
+  const [reviewComment, setReviewComment] = useState('')
+  const [submittingReview, setSubmittingReview] = useState(false)
 
   useEffect(() => {
     if (targetId) loadProduct()
@@ -24,11 +34,63 @@ export default function ProductDetailsPage() {
       setLoading(true)
       const data = await getProductById(targetId)
       setProduct(data)
+      if (data) {
+        await loadReviews(data.id)
+        if (user) checkCanReview(data.id)
+      }
     } catch (err) {
       console.error(err)
       toast.error(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadReviews = async (productIdNum) => {
+    try {
+      const [reviewsData, avgData] = await Promise.all([
+        getProductReviews(productIdNum),
+        getAverageRating(productIdNum)
+      ])
+      setReviews(reviewsData)
+      setAverageRating(avgData.average)
+      setTotalReviews(avgData.count)
+    } catch (err) {
+      console.error('خطأ في جلب المراجعات:', err)
+    }
+  }
+
+  const checkCanReview = async (productIdNum) => {
+    try {
+      const can = await canUserReviewProduct(user.id, productIdNum)
+      setUserCanReview(can)
+    } catch (err) {
+      console.error('خطأ في التحقق من إمكانية المراجعة:', err)
+    }
+  }
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault()
+    if (!user) {
+      toast.error('يرجى تسجيل الدخول أولاً')
+      return
+    }
+    if (!reviewComment.trim()) {
+      toast.error('الرجاء كتابة تعليق')
+      return
+    }
+    setSubmittingReview(true)
+    try {
+      await addReview(product.id, user.id, reviewRating, reviewComment)
+      toast.success('تم إضافة تقييمك بنجاح')
+      setReviewComment('')
+      setReviewRating(5)
+      await loadReviews(product.id)
+      setUserCanReview(false)
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setSubmittingReview(false)
     }
   }
 
@@ -146,6 +208,71 @@ export default function ProductDetailsPage() {
                 <button onClick={handleEdit} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white bg-amber-500 hover:bg-amber-600 transition-all shadow-md">✏️ تعديل</button>
                 <button onClick={handleDelete} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-all shadow-md">🗑️ حذف</button>
               </>)}
+            </div>
+
+            {/* قسم التقييمات */}
+            <div className="mt-6 bg-primary-card/40 rounded-xl p-5 border border-gold/20">
+              <h3 className="text-xl font-bold text-gold mb-3">تقييمات المنتج</h3>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="text-3xl font-bold text-gold">{averageRating || 'لا يوجد'}</div>
+                <div className="flex items-center gap-1">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} size={20} className={i < Math.floor(averageRating) ? 'text-gold fill-gold' : 'text-gray-400'} />
+                  ))}
+                </div>
+                <span className="text-text-secondary">({totalReviews} تقييم)</span>
+              </div>
+
+              {userCanReview && (
+                <form onSubmit={handleSubmitReview} className="mb-6 p-4 bg-secondary-blue/30 rounded-xl border border-gold/20">
+                  <h4 className="font-bold text-gold mb-2">قيّم هذا المنتج</h4>
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-text-secondary">تقييمك:</span>
+                    <div className="flex gap-1">
+                      {[1,2,3,4,5].map(r => (
+                        <button key={r} type="button" onClick={() => setReviewRating(r)} className="focus:outline-none">
+                          <Star size={24} className={r <= reviewRating ? 'text-gold fill-gold' : 'text-gray-500'} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <textarea
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="شارك تجربتك مع هذا المنتج..."
+                    rows="3"
+                    className="w-full px-4 py-2 rounded-lg bg-white text-gray-900 border border-gold/30 focus:outline-none focus:border-gold mb-3"
+                  />
+                  <Button type="submit" disabled={submittingReview}>
+                    {submittingReview ? 'جاري النشر...' : 'نشر التقييم'}
+                  </Button>
+                </form>
+              )}
+
+              {reviews.length === 0 ? (
+                <p className="text-text-secondary text-center py-4">لا توجد مراجعات بعد. كن أول من يقيم هذا المنتج!</p>
+              ) : (
+                <div className="space-y-4">
+                  {reviews.map(review => (
+                    <div key={review.id} className="border-b border-gold/20 pb-3">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                          <div className="font-bold text-white">{review.user?.full_name || 'مستخدم'}</div>
+                          <div className="flex items-center gap-1">
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} size={14} className={i < review.rating ? 'text-gold fill-gold' : 'text-gray-500'} />
+                            ))}
+                          </div>
+                        </div>
+                        <span className="text-xs text-text-secondary">
+                          {new Date(review.created_at).toLocaleDateString('ar')}
+                        </span>
+                      </div>
+                      <p className="text-text-secondary mt-1 text-sm">{review.comment}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

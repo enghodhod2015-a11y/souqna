@@ -7,6 +7,7 @@ import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import { formatDate, formatCurrency } from '../../utils/format';
 import toast from 'react-hot-toast';
+import { Skeleton, SkeletonText, SkeletonCircle } from '../../components/ui/Skeleton';
 
 export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, navigate }) {
   const queryClient = useQueryClient();
@@ -28,7 +29,7 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
   const [sellerReceiptsList, setSellerReceiptsList] = useState([]);
 
   // جلب المستخدمين لعرضهم في القائمة المنسدلة
-  const { data: users, refetch: refetchUsers } = useQuery({
+  const { data: users, isLoading: usersLoading, refetch: refetchUsers } = useQuery({
     queryKey: ['adminUsersForFinance'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -155,6 +156,35 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
 
   const sellerUsers = users || [];
 
+  // ✅ Skeleton loading while fetching sellers list
+  if (usersLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <SkeletonText width="w-48" height="h-5" className="mb-2" />
+          <Skeleton className="w-full md:w-1/2 h-12 rounded-lg" />
+        </div>
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20 space-y-3">
+            <SkeletonText width="w-36" height="h-6" />
+            <SkeletonText width="w-full" height="h-10" />
+            <SkeletonText width="w-full" height="h-10" />
+            <Skeleton className="h-24 rounded-lg" />
+            <Skeleton className="w-full h-12 rounded-lg" />
+          </div>
+          <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20 space-y-3">
+            <div className="flex justify-between">
+              <SkeletonText width="w-32" height="h-6" />
+              <Skeleton className="w-24 h-8 rounded-lg" />
+            </div>
+            <SkeletonText width="w-full" height="h-12" />
+            <Skeleton className="h-48 rounded-lg" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -248,7 +278,7 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
               <thead>
                 <tr className="border-b border-gold/30">
                   <th className="py-2 text-gold">القسم</th><th className="py-2 text-gold">المبلغ</th><th className="py-2 text-gold">العملة</th>
-                </tr>
+                <tr>
               </thead>
               <tbody>
                 <tr><td className="py-2 font-bold">إجمالي المبيعات</td><td className="text-white">{formatCurrency(sellerFinance.totalSales)}</td><td className="text-white">ريال يمني</td></tr>
@@ -294,4 +324,5 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     </div>
   );
 }
+
 

@@ -26,7 +26,6 @@ export default function AdminDashboardLayout() {
     await queryClient.invalidateQueries({ queryKey: ['pendingSellers'] });
     await queryClient.invalidateQueries({ queryKey: ['adminOrderItems'] });
     await queryClient.invalidateQueries({ queryKey: ['adminConversations'] });
-    // سيتم إعادة جلب البيانات في كل تبويب عند التبديل إليه
   };
 
   return (
@@ -100,3 +99,4 @@ export default function AdminDashboardLayout() {
     </div>
   );
 }
+

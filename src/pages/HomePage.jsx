@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getProducts } from '../services/productService'
 import { ProductCard } from '../components/products/ProductCard'
+import { SkeletonProductGrid } from '../components/ui/Skeleton'
 
 const categories = [
   { id: 'electronics', name: 'الإلكترونيات', icon: '📱' },
@@ -24,38 +25,17 @@ const sideLinks = [
   { name: 'مميز / مختار لك', slug: 'featured', icon: '⭐' }
 ]
 
-const SidebarItem = ({ children, isActive, onClick, className = '' }) => {
-  return (
-    <button
-      onClick={onClick}
-      className={`
-        w-full text-right px-4 py-3 rounded-lg border transition-all duration-200
-        ${isActive 
-          ? 'bg-gold text-primary-blue font-bold shadow-md border-gold' 
-          : 'bg-primary-card text-white border border-gold/40 hover:bg-gold hover:text-primary-blue hover:shadow-md'
-        }
-        ${className}
-      `}
-    >
-      {children}
-    </button>
-  )
-}
+const SidebarItem = ({ children, isActive, onClick, className = '' }) => (
+  <button onClick={onClick} className={`w-full text-right px-4 py-3 rounded-lg border transition-all duration-200 ${isActive ? 'bg-gold text-primary-blue font-bold shadow-md border-gold' : 'bg-primary-card text-white border border-gold/40 hover:bg-gold hover:text-primary-blue hover:shadow-md'} ${className}`}>
+    {children}
+  </button>
+)
 
-const SidebarLink = ({ children, to, className = '' }) => {
-  return (
-    <Link
-      to={to}
-      className={`
-        w-full text-right px-4 py-3 rounded-lg border transition-all duration-200
-        bg-primary-card text-white border border-gold/40 hover:bg-gold hover:text-primary-blue hover:shadow-md
-        ${className}
-      `}
-    >
-      {children}
-    </Link>
-  )
-}
+const SidebarLink = ({ children, to, className = '' }) => (
+  <Link to={to} className={`w-full text-right px-4 py-3 rounded-lg border transition-all duration-200 bg-primary-card text-white border border-gold/40 hover:bg-gold hover:text-primary-blue hover:shadow-md ${className}`}>
+    {children}
+  </Link>
+)
 
 export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState('')
@@ -63,40 +43,25 @@ export default function HomePage() {
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products', selectedCategory],
     queryFn: () => getProducts({ category: selectedCategory }),
-    staleTime: 5 * 60 * 1000, // 5 دقائق قبل اعتبار البيانات قديمة
-    cacheTime: 10 * 60 * 1000, // 10 دقائق قبل مسح cache
+    staleTime: 5 * 60 * 1000,
+    cacheTime: 10 * 60 * 1000,
   })
 
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold text-gold mb-8 text-center">مرحباً بكم في سوقنا</h1>
 
-      {/* CHANGED: تم حذف شريط البحث المتقدم بالكامل */}
-
       <div className="flex flex-col lg:flex-row gap-8">
         <aside className="lg:w-1/5">
           <div className="sticky top-20">
             <h2 className="text-xl font-bold text-gold mb-4">الأقسام</h2>
             <div className="bg-primary-card rounded-xl shadow-md p-4 border border-gold/30 flex flex-col gap-3">
-              <SidebarItem
-                isActive={!selectedCategory}
-                onClick={() => setSelectedCategory('')}
-              >
-                <div className="flex items-center gap-2">
-                  <span>📋</span>
-                  <span>الكل</span>
-                </div>
+              <SidebarItem isActive={!selectedCategory} onClick={() => setSelectedCategory('')}>
+                <div className="flex items-center gap-2"><span>📋</span><span>الكل</span></div>
               </SidebarItem>
               {categories.map((cat) => (
-                <SidebarItem
-                  key={cat.id}
-                  isActive={selectedCategory === cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{cat.icon}</span>
-                    <span>{cat.name}</span>
-                  </div>
+                <SidebarItem key={cat.id} isActive={selectedCategory === cat.id} onClick={() => setSelectedCategory(cat.id)}>
+                  <div className="flex items-center gap-2"><span className="text-xl">{cat.icon}</span><span>{cat.name}</span></div>
                 </SidebarItem>
               ))}
             </div>
@@ -105,21 +70,12 @@ export default function HomePage() {
 
         <main className="lg:w-3/5">
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="bg-primary-card rounded-2xl h-80 animate-pulse"></div>
-              ))}
-            </div>
+            <SkeletonProductGrid count={6} />
           ) : products.length === 0 ? (
-            <div className="text-center py-20 text-text-secondary">
-              لا توجد منتجات في هذا القسم حالياً
-            </div>
+            <div className="text-center py-20 text-text-secondary">لا توجد منتجات في هذا القسم حالياً</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {products.map((product) => {
-                if (!product?.id) return null
-                return <ProductCard key={product.id} product={product} />
-              })}
+              {products.map((product) => <ProductCard key={product.id} product={product} />)}
             </div>
           )}
         </main>
@@ -130,10 +86,7 @@ export default function HomePage() {
             <div className="bg-primary-card rounded-xl shadow-md p-4 border border-gold/30 flex flex-col gap-3">
               {sideLinks.map((link) => (
                 <SidebarLink key={link.slug} to={`/${link.slug}`}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{link.icon}</span>
-                    <span>{link.name}</span>
-                  </div>
+                  <div className="flex items-center gap-2"><span className="text-xl">{link.icon}</span><span>{link.name}</span></div>
                 </SidebarLink>
               ))}
             </div>

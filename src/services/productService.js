@@ -4,9 +4,7 @@ import { supabase } from './supabase'
 const fixImageUrl = (url, width = 400) => {
   if (!url) return null
   if (url.startsWith('http://') || url.startsWith('https://')) {
-    // إذا كان الرابط من Supabase storage، أضف معلمات التحويل
     if (url.includes('supabase.co/storage')) {
-      // إضافة width و format webp مع الاحتفاظ بالمعلمات الموجودة
       const separator = url.includes('?') ? '&' : '?'
       return `${url}${separator}width=${width}&format=webp`
     }
@@ -61,17 +59,15 @@ export const getProducts = async (filters = {}, signal = null) => {
           p.discount_percentage = 0
           p.final_price = p.price
         }
-        if (p.cover_image) p.cover_image = fixImageUrl(p.cover_image)
+        if (p.cover_image) p.cover_image = fixImageUrl(p.cover_image, 400)
         if (p.images && Array.isArray(p.images)) {
-          p.images = p.images.map(img => fixImageUrl(img)).filter(Boolean)
+          p.images = p.images.map(img => fixImageUrl(img, 200)).filter(Boolean)
         }
       })
     }
     return products || []
   } catch (error) {
-    if (error.name === 'AbortError') {
-      return []
-    }
+    if (error.name === 'AbortError') return []
     console.error('⚠️ فشل جلب المنتجات:', error)
     return []
   }
@@ -90,8 +86,8 @@ export const getSellerProducts = async (sellerId) => {
       title: p.name,
       final_price: p.price,
       discount_percentage: 0,
-      cover_image: fixImageUrl(p.cover_image),
-      images: p.images ? p.images.map(img => fixImageUrl(img)).filter(Boolean) : []
+      cover_image: fixImageUrl(p.cover_image, 200),
+      images: p.images ? p.images.map(img => fixImageUrl(img, 100)).filter(Boolean) : []
     }))
     return dataWithTitle
   } catch (error) {
@@ -132,8 +128,8 @@ export const getProductById = async (id) => {
       product.discount_percentage = 0
       product.final_price = product.price
     }
-    product.cover_image = fixImageUrl(product.cover_image)
-    if (product.images) product.images = product.images.map(img => fixImageUrl(img)).filter(Boolean)
+    product.cover_image = fixImageUrl(product.cover_image, 600)
+    if (product.images) product.images = product.images.map(img => fixImageUrl(img, 200)).filter(Boolean)
     
     return product
   } catch (error) {
@@ -217,7 +213,6 @@ export const updateProductStock = async (productId, quantityChange) => {
     throw new Error('معرف المنتج وقيمة التغيير مطلوبة')
   }
   try {
-    // جلب المخزون الحالي
     const { data: product, error: fetchError } = await supabase
       .from('products')
       .select('stock_quantity')

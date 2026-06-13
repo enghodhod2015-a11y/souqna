@@ -5,11 +5,12 @@ import { Button } from '../ui/Button'
 export const ProductCard = ({ product }) => {
   if (!product || !product.id) return null;
 
-  // تأكد من وجود title و final_price
   const title = product.title || product.name || 'بدون عنوان'
   const price = product.final_price || product.price || 0
   const discount = product.discount_percentage || 0
   const imageUrl = product.cover_image || (product.images && product.images[0]) || 'https://placehold.co/400x200/06264D/D4AF37?text=صورة'
+  const averageRating = product.average_rating || 0
+  const totalReviews = product.total_reviews || 0
 
   return (
     <div className="bg-primary-card rounded-2xl overflow-hidden border border-gold/30 hover:border-gold transition-all duration-300">
@@ -17,7 +18,6 @@ export const ProductCard = ({ product }) => {
         <img 
           src={imageUrl}
           alt={title} 
-          // CHANGED: إضافة lazy loading لتحسين تحميل الصفحة
           loading="lazy"
           className="w-full h-48 object-cover hover:scale-105 transition duration-300"
           onError={(e) => { e.target.src = 'https://placehold.co/400x200/06264D/D4AF37?text=صورة' }}
@@ -38,9 +38,9 @@ export const ProductCard = ({ product }) => {
         
         <div className="flex items-center gap-1 mb-3">
           {[...Array(5)].map((_, i) => (
-            <Star key={i} size={16} className={i < Math.floor(product.average_rating || 0) ? 'text-gold fill-gold' : 'text-gray-400'} />
+            <Star key={i} size={16} className={i < Math.floor(averageRating) ? 'text-gold fill-gold' : 'text-gray-400'} />
           ))}
-          <span className="text-text-secondary text-sm ml-2">({product.total_reviews || 0})</span>
+          <span className="text-text-secondary text-sm mr-2">({totalReviews})</span>
         </div>
         
         <div className="flex gap-2">
@@ -59,4 +59,5 @@ export const ProductCard = ({ product }) => {
     </div>
   )
 }
+
 

@@ -2,29 +2,16 @@
  * services/orderService.js
  * 
  * دوال إدارة الطلبات (Orders)
- * 
- * قائمة الدوال:
- * 1. createOrder(orderData)        - إنشاء طلب جديد (مع خصم المخزون)
- * 2. getBuyerOrders(buyerId)       - جلب طلبات المشتري
- * 3. getSellerOrders(sellerId)     - جلب طلبات البائع (باستخدام RPC)
- * 4. updateOrderStatus(orderId, status) - تحديث حالة الطلب (مع إعادة المخزون إذا ألغي)
- * 5. confirmDelivery(orderId)      - تأكيد استلام الطلب
- * 6. requestReturn(orderId, reason)- طلب استرجاع المنتج
- * 7. approveReturn(orderId, approve, adminNotes) - قبول/رفض الاسترجاع (مع إعادة المخزون إذا قُبل)
- * 8. uploadReceipt(orderId, file, transferData) - رفع إيصال الدفع
- * 9. getSellerStats(sellerId)      - إحصائيات البائع
- * 10. getMonthlySales(sellerId)    - المبيعات الشهرية (غير مفعلة)
  */
 
 import { supabase } from './supabase'
-import { updateProductStock } from './productService' // ✅ استيراد دالة تحديث المخزون
+import { updateProductStock } from './productService'
 
 // 1️⃣ إنشاء طلب جديد (مع خصم المخزون)
 export const createOrder = async (orderData) => {
   const { buyer_id, total_amount, shipping_address, shipping_city, payment_method, notes, items } = orderData
 
-  // بدء معاملة يدوية (نقوم بالعمليات ثم إنشاء الطلب)
-  // 1. التحقق من توفر المخزون وخصمه مؤقتاً
+  // التحقق من توفر المخزون
   for (const item of items) {
     const { data: product } = await supabase
       .from('products')
@@ -36,7 +23,7 @@ export const createOrder = async (orderData) => {
     }
   }
 
-  // 2. إنشاء الطلب
+  // إنشاء الطلب
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({
@@ -52,10 +39,9 @@ export const createOrder = async (orderData) => {
     })
     .select()
     .single()
-
   if (orderError) throw orderError
 
-  // 3. إضافة عناصر الطلب مع أسماء المنتجات
+  // إضافة عناصر الطلب
   const itemsWithNames = await Promise.all(items.map(async (item) => {
     const { data: product, error: productError } = await supabase
       .from('products')
@@ -81,7 +67,7 @@ export const createOrder = async (orderData) => {
     throw itemsError
   }
 
-  // 4. خصم الكميات من المخزون
+  // خصم الكميات من المخزون
   for (const item of items) {
     await updateProductStock(item.product_id, -item.quantity)
   }
@@ -176,9 +162,7 @@ export const getSellerOrders = async (sellerId) => {
 
 // 4️⃣ تحديث حالة الطلب (مع إعادة المخزون إذا أصبح ملغياً)
 export const updateOrderStatus = async (orderId, status) => {
-  // إذا كانت الحالة الجديدة "cancelled"، يجب إعادة الكميات إلى المخزون
   if (status === 'cancelled') {
-    // جلب عناصر الطلب
     const { data: items, error: itemsError } = await supabase
       .from('order_items')
       .select('product_id, quantity')
@@ -255,7 +239,6 @@ export const requestReturn = async (orderId, reason) => {
 export const approveReturn = async (orderId, approve, adminNotes = '') => {
   const newStatus = approve ? 'return_approved' : 'return_rejected'
   
-  // إذا تم قبول الاسترجاع، أعد الكميات إلى المخزون
   if (approve) {
     const { data: items, error: itemsError } = await supabase
       .from('order_items')
@@ -314,7 +297,7 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
   return publicUrl
 }
 
-// 9️⃣ إحصائيات البائع (معدلة)
+// 9️⃣ إحصائيات البائع
 export const getSellerStats = async (sellerId) => {
   console.log('📊 getSellerStats called for seller:', sellerId);
   try {
@@ -324,7 +307,6 @@ export const getSellerStats = async (sellerId) => {
       .eq('seller_id', sellerId);
     if (productsError) throw productsError;
     const productIds = products?.map(p => p.id) || [];
-    console.log('📦 منتجات البائع IDs:', productIds);
     
     const productsCount = productIds.length;
 
@@ -335,7 +317,6 @@ export const getSellerStats = async (sellerId) => {
     if (convCountErr) throw convCountErr;
 
     if (productIds.length === 0) {
-      console.log('⚠️ لا توجد منتجات للبائع');
       return {
         totalSales: 0,
         productsCount,
@@ -351,10 +332,8 @@ export const getSellerStats = async (sellerId) => {
       .select('order_id, product_price, quantity')
       .in('product_id', productIds);
     if (oiError) throw oiError;
-    console.log('📦 order_items المستلمة:', orderItems);
 
     if (!orderItems || orderItems.length === 0) {
-      console.log('⚠️ لا توجد order_items لهذه المنتجات');
       return {
         totalSales: 0,
         productsCount,
@@ -366,14 +345,11 @@ export const getSellerStats = async (sellerId) => {
     }
 
     const orderIds = [...new Set(orderItems.map(oi => oi.order_id))];
-    console.log('📦 orderIds الفريدة:', orderIds);
-
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select('id, status')
       .in('id', orderIds);
     if (ordersError) throw ordersError;
-    console.log('📦 الطلبات:', orders);
 
     const orderStatusMap = new Map(orders?.map(o => [o.id, o.status]) || []);
 
@@ -387,7 +363,6 @@ export const getSellerStats = async (sellerId) => {
       if (!status) continue;
 
       const saleAmount = item.product_price * item.quantity;
-      console.log(`💰 order ${item.order_id}: ${saleAmount} ريال (الحالة: ${status})`);
 
       if (status === 'completed' || status === 'delivered') {
         totalSales += saleAmount;
@@ -402,7 +377,7 @@ export const getSellerStats = async (sellerId) => {
       }
     }
 
-    const result = {
+    return {
       totalSales,
       productsCount,
       conversationsCount: conversationsCount || 0,
@@ -410,8 +385,6 @@ export const getSellerStats = async (sellerId) => {
       processingOrders,
       completedOrders,
     };
-    console.log('🎉 النتيجة النهائية للـ stats:', result);
-    return result;
   } catch (err) {
     console.error('❌ خطأ في جلب إحصائيات البائع:', err);
     return {

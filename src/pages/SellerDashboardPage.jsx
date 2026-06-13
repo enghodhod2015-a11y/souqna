@@ -145,10 +145,7 @@ export default function SellerDashboardPage() {
                 <div key={product.id} className="flex justify-between items-center p-3 bg-secondary-blue/30 rounded-xl">
                   <div className="flex items-center gap-3">
                     <img src={imgSrc} alt={product.title} className="w-12 h-12 object-cover rounded-lg border border-gold/30" />
-                    <div>
-                      <p className="font-bold">{product.title}</p>
-                      <p className="text-gold">{product.final_price} ريال</p>
-                    </div>
+                    <div><p className="font-bold">{product.title}</p><p className="text-gold">{product.final_price} ريال</p></div>
                   </div>
                   <div className="flex gap-2">
                     <Link to={`/product/${product.id}`}><Eye size={18} className="text-gold" /></Link>
@@ -183,9 +180,7 @@ export default function SellerDashboardPage() {
                       <p className="text-text-secondary text-sm">الطرف الآخر: {anonymousLabel}</p>
                       <p className="text-text-secondary text-sm truncate">{conv.last_message || 'بدء المحادثة'}</p>
                     </div>
-                    {unreadCount > 0 && (
-                      <span className="bg-danger text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">{unreadCount}</span>
-                    )}
+                    {unreadCount > 0 && <span className="bg-danger text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">{unreadCount}</span>}
                   </div>
                 </Link>
               )

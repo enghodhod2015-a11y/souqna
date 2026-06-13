@@ -94,9 +94,7 @@ export default function InboxPage() {
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gold">المحادثات</h1>
-        <button onClick={markAllMessagesAsRead} className="px-3 py-1 text-sm bg-gold/20 text-gold rounded-lg hover:bg-gold/30 transition">
-          تعليم الكل كمقروء
-        </button>
+        <button onClick={markAllMessagesAsRead} className="px-3 py-1 text-sm bg-gold/20 text-gold rounded-lg hover:bg-gold/30 transition">تعليم الكل كمقروء</button>
       </div>
       {conversations.length === 0 ? (
         <p className="text-center text-text-secondary">لا توجد محادثات بعد</p>
@@ -116,9 +114,7 @@ export default function InboxPage() {
                       <p className="text-text-secondary text-sm">الطرف الآخر: {anonymousLabel}</p>
                       <p className="text-sm text-text-secondary mt-1 truncate max-w-md">{conv.last_message || 'بدء المحادثة'}</p>
                     </div>
-                    {unreadCount > 0 && (
-                      <span className="bg-danger text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-semibold">{unreadCount}</span>
-                    )}
+                    {unreadCount > 0 && <span className="bg-danger text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-semibold">{unreadCount}</span>}
                   </div>
                 </div>
               </Link>
