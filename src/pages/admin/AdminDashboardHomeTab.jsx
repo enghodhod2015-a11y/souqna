@@ -10,11 +10,13 @@ import {
 import { supabase } from '../../services/supabase';
 import { formatDate, formatCurrency } from '../../utils/format';
 import { Skeleton, SkeletonText, SkeletonCircle } from '../../components/ui/Skeleton';
+import { ExportButtons } from '../../components/ui/ExportButtons';
 
 export default function AdminDashboardHomeTab() {
   const { data: dashboardData, isLoading: dashboardLoading } = useQuery({
     queryKey: ['adminDashboard'],
     queryFn: async () => {
+      // ... نفس الكود الأصلي ...
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -171,6 +173,7 @@ export default function AdminDashboardHomeTab() {
   return (
     <div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        {/* ... نفس البطاقات ... */}
         <div className="bg-gradient-to-br from-primary-card to-primary-card/95 p-5 rounded-2xl shadow-lg border border-gold/20">
           <DollarSign className="text-gold mb-2" size={32} />
           <p className="text-text-secondary text-sm">مبيعات اليوم</p>
@@ -204,6 +207,7 @@ export default function AdminDashboardHomeTab() {
       </div>
 
       <div className="grid md:grid-cols-3 gap-5 mb-8">
+        {/* ... نفس البطاقات ... */}
         <div className="bg-yellow-900/20 border border-yellow-600/50 rounded-2xl p-4 text-center backdrop-blur-sm">
           <Clock className="mx-auto text-yellow-500 mb-2" size={28} />
           <p className="text-text-secondary">طلبات معلقة</p>
@@ -251,7 +255,18 @@ export default function AdminDashboardHomeTab() {
       </div>
 
       <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20">
-        <h2 className="text-xl font-bold mb-4"><LineChartIcon className="inline ml-2 text-gold" /> المبيعات اليومية (آخر 7 أيام)</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold"><LineChartIcon className="inline ml-2 text-gold" /> المبيعات اليومية (آخر 7 أيام)</h2>
+          <ExportButtons 
+            data={salesChartData} 
+            filename="daily_sales_report" 
+            title="تقرير المبيعات اليومية"
+            columns={[
+              { header: 'اليوم', dataKey: 'name' },
+              { header: 'المبيعات (ريال)', dataKey: 'sales' }
+            ]}
+          />
+        </div>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={salesChartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#333" />
@@ -265,4 +280,5 @@ export default function AdminDashboardHomeTab() {
     </div>
   );
 }
+
 
