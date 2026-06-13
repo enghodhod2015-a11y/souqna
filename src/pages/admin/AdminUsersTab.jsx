@@ -72,14 +72,14 @@ export default function AdminUsersTab({
     staleTime: 2 * 60 * 1000,
   });
 
-  // جلب البائعين المعلقين (is_verified = false)
+  // جلب البائعين المعلقين (is_verified = false) مع دعم account_type و role
   const { data: pendingSellers = [], refetch: refetchPendingSellers } = useQuery({
     queryKey: ['pendingSellers'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('account_type', 'seller')
+        .or('account_type.eq.seller,role.eq.seller')
         .eq('is_verified', false);
       if (error) throw error;
       return data || [];
@@ -189,7 +189,6 @@ export default function AdminUsersTab({
       const savedPercent = selectedSeller.commission_percent;
       setSellerCommissionPercent(savedPercent !== undefined && savedPercent !== null ? savedPercent : 10);
     } else {
-      // إعادة تعيين الإحصائيات إذا لم يتم اختيار بائع
       setSellerStats({
         totalProducts: 0,
         soldProducts: 0,
@@ -318,8 +317,9 @@ export default function AdminUsersTab({
     }
   };
 
-  const sellerUsers = users?.filter(u => u.account_type === 'seller') || [];
-  const buyerUsers = users?.filter(u => u.account_type === 'buyer') || [];
+  // ✅ تصفية البائعين والمشترين باستخدام account_type أو role
+  const sellerUsers = users?.filter(u => u.account_type === 'seller' || u.role === 'seller') || [];
+  const buyerUsers = users?.filter(u => u.account_type === 'buyer' || u.role === 'customer') || [];
 
   if (usersLoading && activeSubTab !== 'pending_users') {
     return (
@@ -388,8 +388,8 @@ export default function AdminUsersTab({
               {!statsLoading && sellerDetailTab === 'profile' && (
                 <div>
                   <div className="grid grid-cols-2 gap-4 mb-5 bg-secondary-blue/30 p-4 rounded-xl">
-                    <div><span className="font-bold text-gold">الاسم:</span> <span className="text-gray-900">{selectedSeller.full_name || '-'}</span></div>
-                    <div><span className="font-bold text-gold">البريد:</span> <span className="text-gray-900">{selectedSeller.email || '-'}</span></div>
+                    <div><span className="font-bold text-gold">الاسم:</span> <span className="text-gray-900">{selectedSeller.full_name}</span></div>
+                    <div><span className="font-bold text-gold">البريد:</span> <span className="text-gray-900">{selectedSeller.email}</span></div>
                     <div><span className="font-bold text-gold">الهاتف:</span> <span className="text-gray-900">{selectedSeller.phone || '-'}</span></div>
                     <div><span className="font-bold text-gold">تاريخ التسجيل:</span> <span className="text-gray-900">{formatDate(selectedSeller.created_at)}</span></div>
                     <div><span className="font-bold text-gold">الحالة:</span> <span className={selectedSeller.is_banned ? 'text-red-600' : 'text-green-600'}>{selectedSeller.is_banned ? 'محظور' : 'نشط'}</span></div>
@@ -449,6 +449,7 @@ export default function AdminUsersTab({
         </div>
       )}
 
+      {/* باقي الكود (المشترين والطلبات المعلقة) كما هو دون تغيير كبير */}
       {activeSubTab === 'buyers' && (
         <div>
           <div className="flex justify-between items-center mb-4">
@@ -471,7 +472,7 @@ export default function AdminUsersTab({
           </div>
           <div className="overflow-x-auto rounded-xl border border-gold/20">
             <table className="w-full text-right border-collapse">
-              <thead><tr className="bg-secondary-blue/40 border-b border-gold/30"><th className="p-3 text-gold">الاسم</th><th className="p-3 text-gold">البريد</th><th className="p-3 text-gold">عدد الطلبات</th><th className="p-3 text-gold">إجمالي الإنفاق</th><th className="p-3 text-gold">الإجراءات</th></tr></thead>
+              <thead><tr className="bg-secondary-blue/40 border-b border-gold/30"><th className="p-3 text-gold">الاسم</th><th className="p-3 text-gold">البريد</th><th className="p-3 text-gold">عدد الطلبات</th><th className="p-3 text-gold">إجمالي الإنفاق</th><th className="p-3 text-gold">الإجراءات</th></td></thead>
               <tbody>
                 {buyerUsers.map(u => (
                   <tr key={u.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
@@ -526,4 +527,5 @@ export default function AdminUsersTab({
     </div>
   );
 }
+
 
