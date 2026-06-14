@@ -6,6 +6,31 @@ import { addNotification } from '../services/notificationService'
 import { Button } from '../components/ui/Button'
 import toast from 'react-hot-toast'
 
+const PaymentInstructionsBlock = () => (
+  <div className="mt-2 bg-primary-card/50 p-3 rounded-lg border border-gold/20 space-y-2">
+    {/* القسم الأول: بنك الكريمي */}
+    <div>
+      <p className="text-gold text-sm font-semibold mb-1">🏦 عبر بنك الكريمي</p>
+      <p className="text-white text-sm font-mono select-all">
+        رقم الحساب: 3005499158
+      </p>
+      <p className="text-white text-sm font-mono select-all">
+        أو الرقم المميز: 1802716
+      </p>
+    </div>
+
+    <hr className="border-gold/20" />
+
+    {/* القسم الثاني: شبكة الموحدة */}
+    <div>
+      <p className="text-gold text-sm font-semibold mb-1">📱 عبر شبكة الموحدة</p>
+      <p className="text-white text-sm font-mono select-all">
+        حساب الفنيع: 231011
+      </p>
+    </div>
+  </div>
+);
+
 export default function PaymentPage() {
   const { orderId } = useParams()
   const navigate = useNavigate()
@@ -140,23 +165,10 @@ export default function PaymentPage() {
         <p><strong className="text-gold">المبلغ المطلوب:</strong> {order.total_amount} ريال</p>
         <hr className="border-gold/20 my-3" />
         <p className="text-sm bg-gold/5 p-3 rounded-lg border border-gold/10 text-text-secondary leading-relaxed">
-          <strong className="text-gold block mb-1">تعليمات التحويل البنكي:</strong>
-          قم بتحويل المبلغ إلى أحد الحسابات التالية وأرفق صورة واضحة من إيصال التحويل:
-          {/* التعديل الوحيد */}
-          <div className="mt-2 bg-primary-card/50 p-3 rounded-lg border border-gold/20 space-y-2">
-            <div>
-              <p className="text-gold text-sm font-semibold mb-1">🏦 عبر بنك الكريمي</p>
-              <p className="text-white text-sm font-mono select-all">رقم الحساب: 3005499158</p>
-              <p className="text-white text-sm font-mono select-all">أو الرقم المميز: 1802716</p>
-            </div>
-            <hr className="border-gold/20" />
-            <div>
-              <p className="text-gold text-sm font-semibold mb-1">📱 عبر شبكة الموحدة</p>
-              <p className="text-white text-sm font-mono select-all">حساب الفنيع: 231011</p>
-            </div>
-          </div>
-          {/* نهاية التعديل */}
-        </p>
+  <strong className="text-gold block mb-1">تعليمات التحويل البنكي:</strong>
+  قم بتحويل المبلغ إلى أحد الحسابات التالية وأرفق صورة واضحة من إيصال التحويل:
+  <PaymentInstructionsBlock />
+</p>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-primary-card p-6 rounded-2xl border border-gold/30 space-y-4">
@@ -205,6 +217,7 @@ export default function PaymentPage() {
             className="w-full text-sm text-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gold file:text-primary-blue hover:file:bg-gold-light cursor-pointer"
             required 
           />
+          {/* CHANGED: شريط تقدم رفع الإيصال */}
           {uploadProgress > 0 && uploadProgress < 100 && (
             <div className="mt-2">
               <div className="bg-gray-200 rounded-full h-2.5">
@@ -224,4 +237,5 @@ export default function PaymentPage() {
     </div>
   )
 }
+
 
