@@ -156,7 +156,8 @@ export default function AdminUsersTab({
     setSellerDetailTab('profile');
     setSellerFilterId(null);
   }}
-  className="w-full md:w-1/2 bg-white text-black border border-gray-300 rounded-lg"
+  textColor="text-black"
+  className="w-full md:w-1/2 bg-white border border-gray-300 rounded-lg"
 >
   <option value="" className="text-black">-- اختر بائعاً --</option>
   {sellerUsers.map(s => (
