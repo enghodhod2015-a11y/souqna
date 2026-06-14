@@ -10,6 +10,12 @@ import toast from 'react-hot-toast';
 import { Skeleton, SkeletonText } from '../../components/ui/Skeleton';
 import { ExportButtons } from '../../components/ui/ExportButtons';
 
+// دالة مساعدة لعرض الأرقام بدون رمز العملة وبأرقام إنجليزية
+const formatNumber = (amount) => {
+  if (amount === undefined || amount === null) return '0.00';
+  return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, navigate }) {
   const queryClient = useQueryClient();
 
@@ -53,7 +59,6 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
       setSellerCommissionPercent(savedPercent !== undefined && savedPercent !== null ? savedPercent : 10);
       calculateFinance();
     } else {
-      // إعادة تعيين البيانات إذا لم يكن هناك بائع محدد
       setSellerFinance({
         totalSales: 0,
         totalReturns: 0,
@@ -64,7 +69,6 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     }
   }, [selectedSeller]);
 
-  // ✅ الدالة المعدلة لحساب المالية (منطقية وبسيطة)
   const calculateFinance = async () => {
     if (!selectedSeller?.id) return;
     try {
@@ -94,7 +98,6 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
           for (const item of orderItemsData) {
             const order = orderMap.get(item.order_id);
             if (order) {
-              // شرط المبيعات المستحقة: الطلب مكتمل (أو مسلم) منذ 3 أيام على الأقل ولم يُسترجع
               const isEligible = (order.status === 'completed' || order.status === 'delivered')
                                  && order.completed_at
                                  && order.completed_at <= threeDaysAgo
@@ -110,7 +113,6 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
         }
       }
       const netAfterReturns = totalSales - totalReturns;
-      // منع العمولة السالبة
       const commissionAmount = netAfterReturns > 0 ? netAfterReturns * (sellerCommissionPercent / 100) : 0;
       const { data: transfers } = await supabase
         .from('seller_transfers')
@@ -213,7 +215,6 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     );
   }
 
-  // رسالة إذا لم يوجد بائعون
   if (sellerUsers.length === 0) {
     return (
       <div className="text-center text-text-secondary p-8 bg-primary-card rounded-2xl">
@@ -222,12 +223,13 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     );
   }
 
+  // بيانات التصدير (بدون رمز العملة)
   const financeRows = selectedSeller ? [
-    { 'القسم': 'إجمالي المبيعات', 'المبلغ': formatCurrency(sellerFinance.totalSales), 'العملة': 'ريال يمني' },
-    { 'القسم': 'إجمالي المرتجعات', 'المبلغ': formatCurrency(sellerFinance.totalReturns), 'العملة': 'ريال يمني' },
-    { 'القسم': `نسبة الموقع (${sellerCommissionPercent}%)`, 'المبلغ': formatCurrency(sellerFinance.commissionAmount), 'العملة': 'ريال يمني' },
-    { 'القسم': 'إجمالي الاستلامات', 'المبلغ': formatCurrency(sellerFinance.totalReceived), 'العملة': 'ريال يمني' },
-    { 'القسم': 'المبلغ المتبقي', 'المبلغ': formatCurrency(sellerFinance.remaining), 'العملة': 'ريال يمني' },
+    { 'القسم': 'إجمالي المبيعات', 'المبلغ': formatNumber(sellerFinance.totalSales), 'العملة': '' },
+    { 'القسم': 'إجمالي المرتجعات', 'المبلغ': formatNumber(sellerFinance.totalReturns), 'العملة': '' },
+    { 'القسم': `نسبة الموقع (${sellerCommissionPercent}%)`, 'المبلغ': formatNumber(sellerFinance.commissionAmount), 'العملة': '' },
+    { 'القسم': 'إجمالي الاستلامات', 'المبلغ': formatNumber(sellerFinance.totalReceived), 'العملة': '' },
+    { 'القسم': 'المبلغ المتبقي', 'المبلغ': formatNumber(sellerFinance.remaining), 'العملة': '' },
   ] : [];
 
   return (
@@ -349,27 +351,27 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
               <tbody>
                 <tr>
                   <td className="py-2 font-bold">إجمالي المبيعات</td>
-                  <td className="text-white">{formatCurrency(sellerFinance.totalSales)}</td>
+                  <td className="text-white">{formatNumber(sellerFinance.totalSales)}</td>
                   <td className="text-white">ريال يمني</td>
                 </tr>
                 <tr>
                   <td className="py-2 font-bold">إجمالي المرتجعات</td>
-                  <td className="text-white">{formatCurrency(sellerFinance.totalReturns)}</td>
+                  <td className="text-white">{formatNumber(sellerFinance.totalReturns)}</td>
                   <td className="text-white">ريال يمني</td>
                 </tr>
                 <tr>
                   <td className="py-2 font-bold">نسبة الموقع ({sellerCommissionPercent}%)</td>
-                  <td className="text-white">{formatCurrency(sellerFinance.commissionAmount)}</td>
+                  <td className="text-white">{formatNumber(sellerFinance.commissionAmount)}</td>
                   <td className="text-white">ريال يمني</td>
                 </tr>
                 <tr>
                   <td className="py-2 font-bold">إجمالي الاستلامات</td>
-                  <td className="text-white">{formatCurrency(sellerFinance.totalReceived)}</td>
+                  <td className="text-white">{formatNumber(sellerFinance.totalReceived)}</td>
                   <td className="text-white">ريال يمني</td>
                 </tr>
                 <tr className="border-t border-gold/30">
                   <td className="py-2 font-bold text-gold">المبلغ المتبقي</td>
-                  <td className="font-bold text-gold">{formatCurrency(sellerFinance.remaining)}</td>
+                  <td className="font-bold text-gold">{formatNumber(sellerFinance.remaining)}</td>
                   <td className="text-gold">ريال يمني</td>
                 </tr>
               </tbody>
@@ -389,21 +391,19 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
                 <th className="py-2 text-gold">التاريخ</th>
                 <th className="py-2 text-gold">الصورة</th>
                 <th className="py-2 text-gold">ملاحظات</th>
-              </tr>
+              </table>
             </thead>
             <tbody>
               {sellerReceiptsList.map(r => (
                 <tr key={r.id}>
-                  <td className="text-gray-800">{formatCurrency(r.amount)}</td>
+                  <td className="text-gray-800">{formatNumber(r.amount)}</td>
                   <td className="text-gray-800">{formatDate(r.created_at)}</td>
                   <td><a href={r.receipt_image} target="_blank" rel="noreferrer" className="text-blue-500 underline">عرض</a></td>
                   <td className="text-gray-800">{r.notes || '-'}</td>
                 </tr>
               ))}
               {sellerReceiptsList.length === 0 && (
-                <tr>
-                  <td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td>
-                </tr>
+                <tr><td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td></tr>
               )}
             </tbody>
           </table>
@@ -415,4 +415,5 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     </div>
   );
 }
+
 
