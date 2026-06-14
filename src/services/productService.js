@@ -138,10 +138,36 @@ export const getProductById = async (id) => {
   }
 }
 
+// ✅ دالة addProduct المعدلة (تضمن وجود slug)
 export const addProduct = async (productData) => {
   try {
     const { title, discount_percentage, final_price, contact_number, ...rest } = productData
-    const cleanData = { ...rest, name: title || rest.name }
+    const name = title || rest.name
+    
+    // إنشاء slug من name إذا لم يتم توفيره
+    let slug = rest.slug
+    if (!slug && name) {
+      slug = name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now()
+    }
+    
+    const cleanData = {
+      ...rest,
+      name,
+      slug,
+      compare_at_price: rest.compare_at_price || null,
+      stock_quantity: rest.stock_quantity || 0,
+      category: rest.category || 'other',
+      city: rest.city || '',
+      condition: rest.condition || 'new',
+      is_featured: rest.is_featured || false,
+      is_hidden: rest.is_hidden !== undefined ? rest.is_hidden : false,
+      is_approved: rest.is_approved !== undefined ? rest.is_approved : true,
+      is_active: rest.is_active !== undefined ? rest.is_active : true,
+      images: rest.images || [],
+      cover_image: rest.cover_image || '',
+      contact_number: rest.contact_number || null
+    }
+    
     const { data, error } = await supabase
       .from('products')
       .insert([cleanData])
