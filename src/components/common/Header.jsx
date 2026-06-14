@@ -141,12 +141,21 @@ export const Header = () => {
           )}
 
           {isAdmin && (
-            <Link 
-              to="/admin/dashboard" 
-              className="bg-red-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-600 transition text-sm whitespace-nowrap"
-            >
-              لوحة الأدمن
-            </Link>
+            <>
+              <Link 
+                to="/admin/dashboard" 
+                className="bg-red-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-600 transition text-sm whitespace-nowrap"
+              >
+                لوحة الأدمن
+              </Link>
+              {/* 🔽 إضافة رابط القسائم للأدمن */}
+              <Link 
+                to="/admin/coupons" 
+                className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 transition text-sm whitespace-nowrap"
+              >
+                🎟️ القسائم
+              </Link>
+            </>
           )}
 
           <Link 
@@ -162,7 +171,6 @@ export const Header = () => {
             )}
           </Link>
 
-          {/* رابط المفضلة */}
           <Link 
             to="/wishlist" 
             className="p-2 rounded-full hover:bg-primary-card transition-colors"
