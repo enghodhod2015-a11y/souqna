@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { getBuyerOrders, confirmDelivery, requestReturn } from '../services/orderService'
+import { getBuyerOrders, confirmDelivery, requestReturn, updateOrderStatus } from '../services/orderService'
 import { Link } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import toast from 'react-hot-toast'
@@ -36,6 +36,20 @@ export default function OrdersPage() {
       case 'completed_paid': return allOrders.filter(o => ['payment_approved', 'processing', 'shipped', 'delivered', 'completed'].includes(o.status))
       case 'cancelled': return allOrders.filter(o => o.status === 'cancelled')
       default: return allOrders
+    }
+  }
+
+  // دالة إلغاء الطلب
+  const handleCancelOrder = async (orderId) => {
+    if (!confirm('هل أنت متأكد من إلغاء هذا الطلب؟')) return
+    try {
+      await updateOrderStatus(orderId, 'cancelled')
+      toast.success('تم إلغاء الطلب بنجاح')
+      // إعادة تحميل الطلبات
+      const data = await getBuyerOrders(user.id)
+      setAllOrders(data)
+    } catch (err) {
+      toast.error(err.message || 'حدث خطأ أثناء إلغاء الطلب')
     }
   }
 
@@ -77,12 +91,65 @@ export default function OrdersPage() {
                   <p className="text-text-secondary">طريقة الدفع: {order.payment_method}</p>
                 </div>
                 <div className="flex gap-2">
-                  {order.status === 'pending_payment_review' && (<Link to={`/payment/${order.id}`}><Button>رفع إيصال</Button></Link>)}
-                  {order.status === 'delivered' && (<Button onClick={async () => { await confirmDelivery(order.id); toast.success('تم تأكيد الاستلام'); const data = await getBuyerOrders(user.id); setAllOrders(data); }}>✅ تأكيد الاستلام</Button>)}
-                  {order.status === 'completed' && (() => { const completedDate = new Date(order.completed_at); const daysDiff = (new Date() - completedDate) / (1000 * 60 * 60 * 24); if (daysDiff <= 3 && (!order.return_status || order.return_status === 'none')) { return (<Button variant="secondary" onClick={async () => { const reason = prompt('الرجاء كتابة سبب الاسترجاع:'); if (reason) { await requestReturn(order.id, reason); toast.success('تم إرسال طلب الاسترجاع'); const data = await getBuyerOrders(user.id); setAllOrders(data); } }}>↩️ استرجاع (خلال 3 أيام)</Button>) } return null })()}
+                  {/* زر رفع الإيصال (لـ pending و pending_payment_review) */}
+                  {(order.status === 'pending_payment_review' || order.status === 'pending') && (
+                    <Link to={`/payment/${order.id}`}>
+                      <Button>رفع إيصال</Button>
+                    </Link>
+                  )}
+                  {/* زر إلغاء الطلب (للطلبات غير المكتملة وغير الملغية) */}
+                  {!['completed', 'cancelled', 'delivered'].includes(order.status) && (
+                    <Button 
+                      variant="danger"
+                      onClick={() => handleCancelOrder(order.id)}
+                    >
+                      إلغاء الطلب
+                    </Button>
+                  )}
+                  {order.status === 'delivered' && (
+                    <Button 
+                      onClick={async () => { 
+                        await confirmDelivery(order.id); 
+                        toast.success('تم تأكيد الاستلام'); 
+                        const data = await getBuyerOrders(user.id); 
+                        setAllOrders(data); 
+                      }}
+                    >
+                      ✅ تأكيد الاستلام
+                    </Button>
+                  )}
+                  {order.status === 'completed' && (() => {
+                    const completedDate = new Date(order.completed_at)
+                    const daysDiff = (new Date() - completedDate) / (1000 * 60 * 60 * 24)
+                    if (daysDiff <= 3 && (!order.return_status || order.return_status === 'none')) {
+                      return (
+                        <Button 
+                          variant="secondary"
+                          onClick={async () => {
+                            const reason = prompt('الرجاء كتابة سبب الاسترجاع:')
+                            if (reason) {
+                              await requestReturn(order.id, reason)
+                              toast.success('تم إرسال طلب الاسترجاع')
+                              const data = await getBuyerOrders(user.id)
+                              setAllOrders(data)
+                            }
+                          }}
+                        >
+                          ↩️ استرجاع (خلال 3 أيام)
+                        </Button>
+                      )
+                    }
+                    return null
+                  })()}
                 </div>
               </div>
-              {order.receipt_image && (<div className="mt-3 pt-2 border-t border-gold/20"><a href={order.receipt_image} target="_blank" rel="noopener noreferrer" className="text-gold text-sm underline">عرض الإيصال</a></div>)}
+              {order.receipt_image && (
+                <div className="mt-3 pt-2 border-t border-gold/20">
+                  <a href={order.receipt_image} target="_blank" rel="noopener noreferrer" className="text-gold text-sm underline">
+                    عرض الإيصال
+                  </a>
+                </div>
+              )}
             </div>
           ))}
         </div>
