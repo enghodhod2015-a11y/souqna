@@ -139,16 +139,19 @@ export default function PaymentPage() {
         <p><strong className="text-gold">المنتج:</strong> {productTitle}</p>
         <p><strong className="text-gold">المبلغ المطلوب:</strong> {order.total_amount} ريال</p>
         <hr className="border-gold/20 my-3" />
-        <p className="text-sm bg-gold/5 p-3 rounded-lg border border-gold/10 text-text-secondary leading-relaxed">
+        <div className="text-sm bg-gold/5 p-3 rounded-lg border border-gold/10 text-text-secondary leading-relaxed">
           <strong className="text-gold block mb-1">تعليمات التحويل البنكي:</strong>
-          قم بتحويل المبلغ إلى الحساب التالي وأرفق صورة واضحة من إيصال التحويل:
-          <span className="block font-mono text-white mt-1 select-all bg-primary-card p-2 rounded border border-gold/20 text-center">
-            <span className="block font-mono text-white mt-1 select-all bg-primary-card p-2 rounded border border-gold/20 text-center">
-  الرقم المميز: 1802716<br />
-  رقم الحساب: 3005499158
-</span>
-          </span>
-        </p>
+          <p className="mt-1">قم بتحويل المبلغ إلى الحساب التالي وأرفق صورة واضحة من إيصال التحويل:</p>
+          <div className="mt-2 bg-primary-card p-2 rounded border border-gold/20 text-center">
+            <div className="bg-primary-card/50 p-3 rounded-lg border border-gold/20 space-y-2">
+              <div>
+                <p className="text-gold text-sm font-semibold mb-1">🏦 عبر بنك الكريمي</p>
+                <p className="text-white text-sm font-mono select-all">رقم الحساب: 3005499158</p>
+                <p className="text-white text-sm font-mono select-all">أو الرقم المميز: 1802716</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-primary-card p-6 rounded-2xl border border-gold/30 space-y-4">
