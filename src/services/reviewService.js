@@ -25,13 +25,13 @@ export const getProductReviews = async (productId) => {
     .from('reviews')
     .select(`
       *,
-      user:profiles!reviews_user_id_fkey (full_name, avatar_url)
+      user:profiles!user_id (full_name, avatar_url)
     `)
     .eq('product_id', productId)
-    .order('created_at', { ascending: false })
-  if (error) throw error
-  return data || []
-}
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+};
 
 export const getAverageRating = async (productId) => {
   const { data, error } = await supabase
