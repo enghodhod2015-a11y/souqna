@@ -10,6 +10,7 @@ import SearchPage from '../pages/SearchPage'
 import ContactPage from '../pages/ContactPage'
 import ForgotPasswordPage from '../pages/ForgotPasswordPage'
 import ResetPasswordPage from '../pages/ResetPasswordPage'
+import AdminCouponsPage from '../pages/admin/AdminCouponsPage'
 
 // ─── صفحات المشتري ───
 import OrdersPage from '../pages/OrdersPage'
@@ -73,6 +74,11 @@ export default function AppRoutes() {
           <PaymentPage />
         </ProtectedRoute>
       } />
+      <Route path="/admin/coupons" element={
+  <ProtectedRoute allowedRoles={['admin']}>
+    <AdminCouponsPage />
+  </ProtectedRoute>
+} />
       <Route path="/notifications" element={
         <ProtectedRoute allowedRoles={['buyer', 'seller', 'admin']}>
           <NotificationsPage />

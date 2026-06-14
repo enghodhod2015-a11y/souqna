@@ -5,6 +5,7 @@ import { createOrder } from '../services/orderService'
 import { supabase } from '../services/supabase'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
+import { getCouponByCode, applyCoupon, incrementCouponUsage } from '../services/couponService'
 import toast from 'react-hot-toast'
 
 export default function CheckoutPage() {
@@ -23,6 +24,13 @@ export default function CheckoutPage() {
     color: 'أحمر',
     size: 'M'
   })
+  
+  // Coupon states
+  const [couponCode, setCouponCode] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState(null)
+  const [couponDiscount, setCouponDiscount] = useState(0)
+  const [couponError, setCouponError] = useState('')
+  const [applyingCoupon, setApplyingCoupon] = useState(false)
 
   useEffect(() => {
     const fetchProductData = async () => {
@@ -36,10 +44,9 @@ export default function CheckoutPage() {
         console.error('Error fetching product data:', error)
         toast.error('تعذر التحقق من بيانات المنتج')
       } else {
-        // ✅ حساب السعر الفعلي بعد الخصم
         let finalPrice = data.price
         if (data.compare_at_price && data.compare_at_price > data.price) {
-          finalPrice = data.price // السعر بعد الخصم هو price (لأن compare_at_price هو السعر الأصلي)
+          finalPrice = data.price
         }
         setActualPrice(finalPrice)
         setStock(data.stock_quantity)
@@ -73,6 +80,39 @@ export default function CheckoutPage() {
     }
   }
 
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponError('الرجاء إدخال كود القسيمة')
+      return
+    }
+    setApplyingCoupon(true)
+    setCouponError('')
+    try {
+      const coupon = await getCouponByCode(couponCode.trim())
+      if (!coupon) {
+        setCouponError('الكود غير صالح أو منتهي الصلاحية')
+        setAppliedCoupon(null)
+        setCouponDiscount(0)
+        return
+      }
+      const originalTotal = actualPrice !== null ? actualPrice * quantity : (product.final_price || product.price) * quantity
+      const result = applyCoupon(coupon, originalTotal)
+      if (result.error) {
+        setCouponError(result.error)
+        setAppliedCoupon(null)
+        setCouponDiscount(0)
+      } else {
+        setAppliedCoupon(coupon)
+        setCouponDiscount(result.discount)
+        toast.success(`تم تطبيق الخصم: ${result.discount} ريال`)
+      }
+    } catch (err) {
+      setCouponError('حدث خطأ في التحقق من القسيمة')
+    } finally {
+      setApplyingCoupon(false)
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.shipping_address.trim() || !formData.shipping_city.trim()) {
@@ -92,7 +132,8 @@ export default function CheckoutPage() {
 
     setLoading(true)
     try {
-      const totalPrice = actualPrice * quantity
+      const originalTotal = actualPrice * quantity
+      const finalTotal = originalTotal - couponDiscount
       const items = [{
         product_id: product.id,
         quantity: quantity,
@@ -102,7 +143,10 @@ export default function CheckoutPage() {
 
       const orderData = {
         buyer_id: user?.id,
-        total_amount: totalPrice,
+        total_amount: finalTotal,
+        original_amount: originalTotal,
+        discount_amount: couponDiscount,
+        coupon_id: appliedCoupon?.id || null,
         shipping_address: formData.shipping_address,
         shipping_city: formData.shipping_city,
         payment_method: formData.payment_method,
@@ -111,6 +155,11 @@ export default function CheckoutPage() {
       }
 
       const order = await createOrder(orderData)
+      
+      if (appliedCoupon?.id) {
+        await incrementCouponUsage(appliedCoupon.id)
+      }
+      
       toast.success('تم إنشاء الطلب بنجاح')
       navigate(`/payment/${order.id}`)
     } catch (err) {
@@ -122,7 +171,8 @@ export default function CheckoutPage() {
   }
 
   const displayPrice = product.final_price || product.price
-  const totalPriceDisplay = (actualPrice !== null ? actualPrice : displayPrice) * quantity
+  const originalTotal = (actualPrice !== null ? actualPrice : displayPrice) * quantity
+  const finalTotal = originalTotal - couponDiscount
 
   const colorOptions = ['أحمر', 'أزرق', 'أخضر', 'أسود', 'أبيض']
   const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
@@ -152,10 +202,43 @@ export default function CheckoutPage() {
           )}
         </div>
         <hr className="border-gold/20 my-4" />
-        <div className="flex justify-between font-bold text-lg text-gold">
-          <span>إجمالي المبلغ:</span>
-          <span>{totalPriceDisplay} ريال</span>
+        <div className="space-y-1">
+          <div className="flex justify-between text-text-secondary">
+            <span>المجموع الفرعي:</span>
+            <span>{originalTotal} ريال</span>
+          </div>
+          {couponDiscount > 0 && (
+            <div className="flex justify-between text-green-500">
+              <span>الخصم:</span>
+              <span>- {couponDiscount} ريال</span>
+            </div>
+          )}
+          <div className="flex justify-between font-bold text-lg text-gold">
+            <span>الإجمالي بعد الخصم:</span>
+            <span>{finalTotal} ريال</span>
+          </div>
         </div>
+      </div>
+
+      {/* Coupon Section */}
+      <div className="bg-primary-card p-6 rounded-2xl border border-gold/30 mb-6">
+        <h3 className="text-lg font-bold text-gold mb-2">قسيمة خصم</h3>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={couponCode}
+            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+            placeholder="أدخل كود القسيمة"
+            className="flex-1 px-4 py-2 rounded-lg bg-white text-gray-900 border border-gold/30 focus:outline-none focus:border-gold"
+          />
+          <Button onClick={handleApplyCoupon} disabled={applyingCoupon}>
+            {applyingCoupon ? 'جاري التحقق...' : 'تطبيق'}
+          </Button>
+        </div>
+        {couponError && <p className="text-red-500 text-sm mt-1">{couponError}</p>}
+        {appliedCoupon && (
+          <p className="text-green-500 text-sm mt-1">✓ تم تطبيق الخصم</p>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="bg-primary-card p-6 rounded-2xl border border-gold/30 space-y-4">
@@ -217,4 +300,5 @@ export default function CheckoutPage() {
     </div>
   )
 }
+
 

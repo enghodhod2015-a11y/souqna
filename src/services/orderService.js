@@ -24,22 +24,26 @@ export const createOrder = async (orderData) => {
   }
 
   // إنشاء الطلب
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .insert({
-      user_id: buyer_id,
-      total_amount: total_amount,
-      shipping_address: shipping_address,
-      shipping_city: shipping_city,
-      payment_method: payment_method,
-      notes: notes,
-      status: 'pending',
-      payment_status: 'unpaid',
-      created_at: new Date().toISOString()
-    })
-    .select()
-    .single()
-  if (orderError) throw orderError
+  // إنشاء الطلب
+const { data: order, error: orderError } = await supabase
+  .from('orders')
+  .insert({
+    user_id: buyer_id,
+    total_amount: total_amount,
+    original_amount: orderData.original_amount || total_amount,
+    discount_amount: orderData.discount_amount || 0,
+    coupon_id: orderData.coupon_id || null,
+    shipping_address: shipping_address,
+    shipping_city: shipping_city,
+    payment_method: payment_method,
+    notes: notes,
+    status: 'pending',
+    payment_status: 'unpaid',
+    created_at: new Date().toISOString()
+  })
+  .select()
+  .single()
+if (orderError) throw orderError
 
   // إضافة عناصر الطلب
   const itemsWithNames = await Promise.all(items.map(async (item) => {
