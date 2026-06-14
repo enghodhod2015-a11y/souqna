@@ -34,10 +34,10 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     queryKey: ['adminUsersForFinance'],
     queryFn: async () => {
       const { data, error } = await supabase
-       .from('profiles')
-       .select('id, full_name, email, store_name, commission_percent')
-       .eq('account_type', 'seller')
-       .order('created_at', { ascending: false });
+     .from('profiles')
+     .select('id, full_name, email, store_name, commission_percent')
+     .eq('account_type', 'seller')
+     .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -69,22 +69,22 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     try {
       const sellerId = selectedSeller.id;
       const { data: products } = await supabase
-       .from('products')
-       .select('id')
-       .eq('seller_id', sellerId);
+     .from('products')
+     .select('id')
+     .eq('seller_id', sellerId);
       const productIds = products?.map(p => p.id) || [];
       let totalSales = 0, totalReturns = 0;
       if (productIds.length) {
         const { data: orderItemsData } = await supabase
-         .from('order_items')
-         .select('order_id, product_price, quantity')
-         .in('product_id', productIds);
+       .from('order_items')
+       .select('order_id, product_price, quantity')
+       .in('product_id', productIds);
         if (orderItemsData?.length) {
           const orderIds = [...new Set(orderItemsData.map(i => i.order_id))];
           const { data: orders } = await supabase
-           .from('orders')
-           .select('id, status, return_status')
-           .in('id', orderIds);
+         .from('orders')
+         .select('id, status, return_status')
+         .in('id', orderIds);
           const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
           for (const item of orderItemsData) {
             const order = orderMap.get(item.order_id);
@@ -100,9 +100,9 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
       const netAfterReturns = totalSales - totalReturns;
       const commissionAmount = netAfterReturns * (sellerCommissionPercent / 100);
       const { data: transfers } = await supabase
-       .from('seller_transfers')
-       .select('amount')
-       .eq('seller_id', sellerId);
+     .from('seller_transfers')
+     .select('amount')
+     .eq('seller_id', sellerId);
       const totalReceived = transfers?.reduce((s, t) => s + (t.amount || 0), 0) || 0;
       const remaining = netAfterReturns - commissionAmount - totalReceived;
       setSellerFinance({ totalSales, totalReturns, commissionAmount, totalReceived, remaining });
@@ -137,16 +137,19 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
       const fileExt = receiptFile.name.split('.').pop();
       const fileName = `seller_transfers/${selectedSeller.id}/${Date.now()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage
-       .from('receipts')
-       .upload(fileName, receiptFile);
-      if (uploadError) throw uploadError;
-      const { data: { publicUrl } = supabase.storage.from('receipts').getPublicUrl(fileName);
-      const { error: insertError } = await supabase.from('seller_transfers').insert({
-        seller_id: selectedSeller.id,
-        amount: amountNum,
-        receipt_image: publicUrl,
-        notes: transferNote,
-      });
+  .from('receipts')
+  .upload(fileName, receiptFile);
+if (uploadError) throw uploadError;
+
+const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(fileName);
+//                   ^^ هنا أضفنا القوس المفقود
+
+const { error: insertError } = await supabase.from('seller_transfers').insert({
+  seller_id: selectedSeller.id,
+  amount: amountNum,
+  receipt_image: publicUrl,
+  notes: transferNote,
+});
       if (insertError) throw insertError;
       toast.success('تم تسجيل التحويل بنجاح');
       setTransferAmount('');
@@ -164,10 +167,10 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
   const loadSellerReceipts = async () => {
     if (!selectedSeller) return;
     const { data } = await supabase
-     .from('seller_transfers')
-     .select('*')
-     .eq('seller_id', selectedSeller.id)
-     .order('created_at', { ascending: false });
+   .from('seller_transfers')
+   .select('*')
+   .eq('seller_id', selectedSeller.id)
+   .order('created_at', { ascending: false });
     setSellerReceiptsList(data || []);
     setShowReceiptsModal(true);
   };
