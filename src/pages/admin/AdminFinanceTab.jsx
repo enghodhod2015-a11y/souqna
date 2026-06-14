@@ -29,7 +29,7 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
   const [showReceiptsModal, setShowReceiptsModal] = useState(false);
   const [sellerReceiptsList, setSellerReceiptsList] = useState([]);
 
-  // جلب المستخدمين لعرضهم في القائمة المنسدلة
+  // جلب المستخدمين (البائعين فقط)
   const { data: users, isLoading: usersLoading, refetch: refetchUsers } = useQuery({
     queryKey: ['adminUsersForFinance'],
     queryFn: async () => {
@@ -44,12 +44,23 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     staleTime: 2 * 60 * 1000,
   });
 
-  // تحديث نسبة العمولة عند تغيير البائع
+  const sellerUsers = users || [];
+
+  // تحديث نسبة العمولة وإعادة الحساب عند تغيير البائع
   useEffect(() => {
     if (selectedSeller) {
       const savedPercent = selectedSeller.commission_percent;
       setSellerCommissionPercent(savedPercent !== undefined && savedPercent !== null ? savedPercent : 10);
       calculateFinance();
+    } else {
+      // إعادة تعيين البيانات إذا لم يكن هناك بائع محدد
+      setSellerFinance({
+        totalSales: 0,
+        totalReturns: 0,
+        commissionAmount: 0,
+        totalReceived: 0,
+        remaining: 0,
+      });
     }
   }, [selectedSeller]);
 
@@ -105,7 +116,6 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
     if (error) throw error;
     toast.success('تم تحديث نسبة العمولة');
-    // تحديث البائع المحدد محلياً وإعادة الحساب
     if (selectedSeller?.id === userId) {
       setSelectedSeller(prev => ({ ...prev, ...updates }));
       if (updates.commission_percent !== undefined) {
@@ -162,8 +172,6 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     setShowReceiptsModal(true);
   };
 
-  const sellerUsers = users || [];
-
   if (usersLoading) {
     return (
       <div className="space-y-6">
@@ -192,7 +200,15 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     );
   }
 
-  // تحويل بيانات الملخص إلى مصفوفة للتصدير
+  // رسالة إذا لم يوجد بائعون
+  if (sellerUsers.length === 0) {
+    return (
+      <div className="text-center text-text-secondary p-8 bg-primary-card rounded-2xl">
+        ⚠️ لا يوجد بائعون مسجلون في النظام بعد.
+      </div>
+    );
+  }
+
   const financeRows = selectedSeller ? [
     { 'القسم': 'إجمالي المبيعات', 'المبلغ': formatCurrency(sellerFinance.totalSales), 'العملة': 'ريال يمني' },
     { 'القسم': 'إجمالي المرتجعات', 'المبلغ': formatCurrency(sellerFinance.totalReturns), 'العملة': 'ريال يمني' },
@@ -206,15 +222,25 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
       <div className="mb-6">
         <label className="block text-gold font-medium mb-2">اختر البائع لتسوية حسابه:</label>
         <Select
-  className="w-full md:w-1/2 bg-white text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold"
->
-  <option value="" className="text-black">-- اختر بائعاً --</option>
-  {sellerUsers.map(s => (
-    <option key={s.id} value={s.id} className="text-black">
-      {s.store_name || s.full_name} ({s.email})
-    </option>
-  ))}
-</Select>
+          value={selectedSeller?.id || ''}
+          onChange={e => {
+            const sellerId = e.target.value;
+            const seller = sellerUsers.find(u => u.id === sellerId);
+            if (seller) {
+              setSelectedSeller(seller);
+            } else {
+              setSelectedSeller(null);
+            }
+          }}
+          className="w-full md:w-1/2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold"
+        >
+          <option value="" className="text-gray-900">-- اختر بائعاً --</option>
+          {sellerUsers.map(s => (
+            <option key={s.id} value={s.id} className="text-gray-900">
+              {s.store_name || s.full_name} ({s.email})
+            </option>
+          ))}
+        </Select>
       </div>
 
       {selectedSeller ? (
@@ -366,7 +392,9 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
                 </tr>
               ))}
               {sellerReceiptsList.length === 0 && (
-                <tr><td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td></tr>
+                <tr>
+                  <td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td>
+                </tr>
               )}
             </tbody>
           </table>
