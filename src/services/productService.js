@@ -174,13 +174,38 @@ export const updateProduct = async (id, updates) => {
   }
 }
 
+// ✅ إخفاء المنتج (Soft Delete)
 export const deleteProduct = async (id) => {
   try {
-    const { error } = await supabase.from('products').delete().eq('id', id)
+    const { error } = await supabase
+      .from('products')
+      .update({ 
+        is_hidden: true,
+        is_approved: false
+      })
+      .eq('id', id)
     if (error) throw error
     return true
   } catch (error) {
-    console.error('❌ فشل حذف المنتج:', error)
+    console.error('❌ فشل إخفاء المنتج:', error)
+    throw error
+  }
+}
+
+// ✅ إعادة تنشيط منتج مخفي (Restore)
+export const restoreProduct = async (id) => {
+  try {
+    const { error } = await supabase
+      .from('products')
+      .update({ 
+        is_hidden: false,
+        is_approved: true
+      })
+      .eq('id', id)
+    if (error) throw error
+    return true
+  } catch (error) {
+    console.error('❌ فشل استعادة المنتج:', error)
     throw error
   }
 }
@@ -207,7 +232,7 @@ export const uploadProductImages = async (files, productId, onProgress = null) =
   }
 }
 
-// ✅ دالة جديدة: تحديث مخزون منتج معين (زيادة أو نقصان)
+// ✅ تحديث مخزون منتج معين (زيادة أو نقصان)
 export const updateProductStock = async (productId, quantityChange) => {
   if (!productId || typeof quantityChange !== 'number') {
     throw new Error('معرف المنتج وقيمة التغيير مطلوبة')

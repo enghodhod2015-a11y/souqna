@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { getSellerProducts, deleteProduct, updateProduct } from '../services/productService'
+import { getSellerProducts, deleteProduct, updateProduct, restoreProduct } from '../services/productService'
 import { Button } from '../components/ui/Button'
-import { Edit, Trash2, Eye, EyeOff } from 'lucide-react'
+import { Edit, Trash2, Eye, EyeOff, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function MyProductsPage() {
@@ -26,22 +26,37 @@ export default function MyProductsPage() {
     }
   }
 
+  // تبديل حالة الإخفاء/الإظهار (للزر الثنائي Eye/EyeOff)
   const handleToggleHidden = async (id, currentHidden) => {
     try {
-      await updateProduct(id, { is_hidden: !currentHidden })
+      await updateProduct(id, { is_hidden: !currentHidden, is_approved: currentHidden ? true : false })
       setProducts(prev => prev.map(p => p.id === id ? { ...p, is_hidden: !currentHidden } : p))
-      toast.success('تم تحديث حالة المنتج')
+      toast.success(currentHidden ? 'تم نشر المنتج' : 'تم إخفاء المنتج')
     } catch (err) {
       toast.error(err.message)
     }
   }
 
-  const handleDelete = async (id) => {
-    if (confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
+  // إخفاء المنتج (Soft Delete)
+  const handleHide = async (id) => {
+    if (confirm('هل أنت متأكد من إخفاء هذا المنتج؟ سيبقى في المحادثات والطلبات القديمة لكن لن يظهر في المتجر.')) {
       try {
         await deleteProduct(id)
-        setProducts(prev => prev.filter(p => p.id !== id))
-        toast.success('تم حذف المنتج')
+        setProducts(prev => prev.map(p => p.id === id ? { ...p, is_hidden: true, is_approved: false } : p))
+        toast.success('تم إخفاء المنتج')
+      } catch (err) {
+        toast.error(err.message)
+      }
+    }
+  }
+
+  // استعادة منتج مخفي
+  const handleRestore = async (id) => {
+    if (confirm('هل أنت متأكد من استعادة هذا المنتج؟ سيصبح مرئياً في المتجر مرة أخرى.')) {
+      try {
+        await restoreProduct(id)
+        setProducts(prev => prev.map(p => p.id === id ? { ...p, is_hidden: false, is_approved: true } : p))
+        toast.success('تم استعادة المنتج')
       } catch (err) {
         toast.error(err.message)
       }
@@ -68,9 +83,26 @@ export default function MyProductsPage() {
                 <p className="text-gold">{product.final_price} ريال</p>
                 <p className="text-text-secondary text-sm">الحالة: {product.is_hidden ? 'مخفي' : 'منشور'}</p>
                 <div className="flex gap-2 mt-4 flex-wrap">
-                  <Link to={`/product/${product.id}`} className="flex-1"><Button variant="secondary" className="w-full">عرض</Button></Link>
-                  <Link to={`/edit-product/${product.id}`}><Button variant="secondary"><Edit size={18} /></Button></Link>
-                  <Button variant="danger" onClick={() => handleDelete(product.id)}><Trash2 size={18} /></Button>
+                  <Link to={`/product/${product.id}`} className="flex-1">
+                    <Button variant="secondary" className="w-full">عرض</Button>
+                  </Link>
+                  <Link to={`/edit-product/${product.id}`}>
+                    <Button variant="secondary"><Edit size={18} /></Button>
+                  </Link>
+
+                  {product.is_hidden ? (
+                    // زر الاستعادة للمنتجات المخفية
+                    <Button onClick={() => handleRestore(product.id)} variant="secondary" className="bg-green-600 hover:bg-green-700 text-white">
+                      <RefreshCw size={18} /> استعادة
+                    </Button>
+                  ) : (
+                    // زر الإخفاء للمنتجات المنشورة
+                    <Button onClick={() => handleHide(product.id)} variant="danger">
+                      <Trash2 size={18} /> إخفاء
+                    </Button>
+                  )}
+
+                  {/* زر تبديل الإظهار/الإخفاء (اختياري) */}
                   <Button variant="secondary" onClick={() => handleToggleHidden(product.id, product.is_hidden)}>
                     {product.is_hidden ? <Eye size={18} /> : <EyeOff size={18} />}
                   </Button>
@@ -83,3 +115,5 @@ export default function MyProductsPage() {
     </div>
   )
 }
+
+
