@@ -6,6 +6,7 @@ import { MessageCircle, Send, RefreshCw } from 'lucide-react';
 import { formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
 import { SkeletonConversationItem, Skeleton } from '../../components/ui/Skeleton';
+import { ExportButtons } from '../../components/ui/ExportButtons';
 
 export default function AdminOrdersTab({ navigate }) {
   const { data: conversations = [], refetch: refetchConversations, isLoading } = useQuery({
@@ -45,14 +46,6 @@ export default function AdminOrdersTab({ navigate }) {
 
         // 2. جلب آخر رسالة لكل محادثة (معرفة المرسل)
         const conversationIds = conversations.map(c => c.id);
-        const { data: lastMessages, error: msgError } = await supabase
-          .from('messages')
-          .select('conversation_id, sender_id, created_at')
-          .in('conversation_id', conversationIds)
-          .order('created_at', { ascending: false })
-          .limit(1); // ملاحظة: limit(1) سيتم تطبيقه لكل محادثة إذا استخدمنا distinct on، لكننا سنعمل بطريقة مختلفة.
-
-        // نستخدم map لجلب آخر رسالة لكل محادثة بشكل منفصل (أفضل)
         const lastMessageMap = new Map();
         for (const convId of conversationIds) {
           const { data: msgData } = await supabase
@@ -76,7 +69,6 @@ export default function AdminOrdersTab({ navigate }) {
           let statusColor = 'text-yellow-500';
 
           if (lastMsg) {
-            // إذا كانت آخر رسالة من البائع، فهذا يعني أن البائع قد رد
             if (lastMsg.sender_id === conv.seller_id) {
               status = 'تم الرد من البائع';
               statusColor = 'text-green-500';
@@ -88,7 +80,6 @@ export default function AdminOrdersTab({ navigate }) {
               statusColor = 'text-gray-500';
             }
           } else {
-            // لا توجد رسائل
             status = 'لا توجد رسائل';
             statusColor = 'text-gray-500';
           }
@@ -247,13 +238,39 @@ export default function AdminOrdersTab({ navigate }) {
     );
   }
 
+  // إعداد بيانات التصدير
+  const exportData = conversations.map(conv => ({
+    'المنتج': conv.product?.title || conv.product?.name || 'منتج غير متوفر',
+    'المشتري': conv.buyer?.full_name || conv.buyer_name || 'غير معروف',
+    'البائع': conv.seller?.full_name || conv.seller_name || 'غير معروف',
+    'آخر رسالة': conv.last_message || 'لا توجد رسائل',
+    'التاريخ': conv.last_message_at ? formatDate(conv.last_message_at) : '-',
+    'الحالة': conv.status,
+  }));
+
   return (
     <div>
       <div className="flex justify-between items-center mb-5">
         <h2 className="text-xl font-bold text-gold">المحادثات بين المستخدمين</h2>
-        <Button onClick={() => refetchConversations()} className="bg-gray-700 hover:bg-gray-600 text-white shadow-md rounded-lg px-4 py-2 text-sm flex items-center gap-1">
-          <RefreshCw size={14} /> تحديث
-        </Button>
+        <div className="flex gap-2">
+          <ExportButtons 
+            data={exportData} 
+            filename="conversations_report" 
+            title="تقرير المحادثات"
+            columns={[
+              { header: 'المنتج', dataKey: 'المنتج' },
+              { header: 'المشتري', dataKey: 'المشتري' },
+              { header: 'البائع', dataKey: 'البائع' },
+              { header: 'آخر رسالة', dataKey: 'آخر رسالة' },
+              { header: 'التاريخ', dataKey: 'التاريخ' },
+              { header: 'الحالة', dataKey: 'الحالة' }
+            ]}
+            showCSV
+          />
+          <Button onClick={() => refetchConversations()} className="bg-gray-700 hover:bg-gray-600 text-white shadow-md rounded-lg px-4 py-2 text-sm flex items-center gap-1">
+            <RefreshCw size={14} /> تحديث
+          </Button>
+        </div>
       </div>
 
       {!conversations || conversations.length === 0 ? (
@@ -277,43 +294,39 @@ export default function AdminOrdersTab({ navigate }) {
                 <th className="p-3 text-gold">التاريخ</th>
                 <th className="p-3 text-gold">الحالة</th>
                 <th className="p-3 text-gold">الإجراءات</th>
-              </tr>
+              </table>
             </thead>
             <tbody>
-              {conversations.map(conv => {
-                // تحديد من أرسل آخر رسالة
-                const lastMsgSenderIsSeller = conv.last_message_sender_id === conv.seller_id;
-                return (
-                  <tr key={conv.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
-                    <td className="p-3 text-white">{conv.product?.title || conv.product?.name || 'منتج غير متوفر'}</td>
-                    <td className="p-3 text-white">{conv.buyer?.full_name || conv.buyer_name || 'غير معروف'}</td>
-                    <td className="p-3 text-white">{conv.seller?.full_name || conv.seller_name || 'غير معروف'}</td>
-                    <td className="p-3 text-white max-w-xs truncate">{conv.last_message || 'لا توجد رسائل'}</td>
-                    <td className="p-3 text-white">{conv.last_message_at ? formatDate(conv.last_message_at) : '-'}</td>
-                    <td className="p-3 text-white">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${conv.statusColor} ${conv.status === 'تم الرد من البائع' ? 'bg-green-900/30' : 'bg-yellow-900/30'}`}>
-                        {conv.status}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <div className="flex gap-2">
-                        <Link to={`/chat/c/${conv.id}`} className="bg-gold text-primary-blue px-3 py-1 rounded-lg text-sm shadow hover:bg-gold/90 transition inline-flex items-center gap-1">
-                          <MessageCircle size={14} /> فتح المحادثة
-                        </Link>
-                        {conv.status === 'في انتظار رد البائع' && (
-                          <Button
-                            onClick={() => sendReminderForConversation(conv, 'seller')}
-                            size="sm"
-                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1"
-                          >
-                            <Send size={12} className="inline ml-1" /> تذكير البائع
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {conversations.map(conv => (
+                <tr key={conv.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
+                  <td className="p-3 text-white">{conv.product?.title || conv.product?.name || 'منتج غير متوفر'}</td>
+                  <td className="p-3 text-white">{conv.buyer?.full_name || conv.buyer_name || 'غير معروف'}</td>
+                  <td className="p-3 text-white">{conv.seller?.full_name || conv.seller_name || 'غير معروف'}</td>
+                  <td className="p-3 text-white max-w-xs truncate">{conv.last_message || 'لا توجد رسائل'}</td>
+                  <td className="p-3 text-white">{conv.last_message_at ? formatDate(conv.last_message_at) : '-'}</td>
+                  <td className="p-3 text-white">
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${conv.statusColor} ${conv.status === 'تم الرد من البائع' ? 'bg-green-900/30' : 'bg-yellow-900/30'}`}>
+                      {conv.status}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <div className="flex gap-2">
+                      <Link to={`/chat/c/${conv.id}`} className="bg-gold text-primary-blue px-3 py-1 rounded-lg text-sm shadow hover:bg-gold/90 transition inline-flex items-center gap-1">
+                        <MessageCircle size={14} /> فتح المحادثة
+                      </Link>
+                      {conv.status === 'في انتظار رد البائع' && (
+                        <Button
+                          onClick={() => sendReminderForConversation(conv, 'seller')}
+                          size="sm"
+                          className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1"
+                        >
+                          <Send size={12} className="inline ml-1" /> تذكير البائع
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

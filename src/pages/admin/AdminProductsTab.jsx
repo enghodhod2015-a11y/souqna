@@ -6,6 +6,7 @@ import { Send } from 'lucide-react';
 import { formatDate, formatCurrency } from '../../utils/format';
 import toast from 'react-hot-toast';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { ExportButtons } from '../../components/ui/ExportButtons';
 
 export default function AdminProductsTab({ sellerFilterId, setSellerFilterId, navigate }) {
   const [productFilterStatus, setProductFilterStatus] = useState('all');
@@ -219,24 +220,54 @@ export default function AdminProductsTab({ sellerFilterId, setSellerFilterId, na
     );
   }
 
+  // إعداد بيانات التصدير (تحويل الأعمدة إلى تنسيق مناسب)
+  const exportData = orderItems.map(item => ({
+    'اسم المنتج': item.product_name,
+    'البائع': item.seller_name,
+    'تاريخ العملية': item.order_date ? formatDate(item.order_date) : '-',
+    'سعر الوحدة (ريال)': item.unit_price,
+    'الكمية': item.quantity,
+    'الإجمالي (ريال)': item.total_price,
+    'المشتري': item.buyer_name,
+    'حالة الطلب': item.order_status,
+  }));
+
   return (
     <div>
-      <div className="flex flex-wrap gap-3 mb-5 items-center">
-        <label className="text-gold font-medium">فلترة حسب حالة الطلب:</label>
-        <select
-          value={productFilterStatus}
-          onChange={e => setProductFilterStatus(e.target.value)}
-          className="bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-gold focus:border-gold"
-        >
-          {orderStatusOptions.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-        {sellerFilterId && (
-          <Button variant="secondary" onClick={() => setSellerFilterId(null)} className="bg-gray-700 hover:bg-gray-600 text-white shadow">
-            إلغاء فلتر البائع
-          </Button>
-        )}
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-5">
+        <div className="flex gap-3 items-center">
+          <label className="text-gold font-medium">فلترة حسب حالة الطلب:</label>
+          <select
+            value={productFilterStatus}
+            onChange={e => setProductFilterStatus(e.target.value)}
+            className="bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-gold focus:border-gold"
+          >
+            {orderStatusOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          {sellerFilterId && (
+            <Button variant="secondary" onClick={() => setSellerFilterId(null)} className="bg-gray-700 hover:bg-gray-600 text-white shadow">
+              إلغاء فلتر البائع
+            </Button>
+          )}
+        </div>
+        <ExportButtons 
+          data={exportData} 
+          filename="order_items_report" 
+          title="تقرير عناصر الطلبات"
+          columns={[
+            { header: 'اسم المنتج', dataKey: 'اسم المنتج' },
+            { header: 'البائع', dataKey: 'البائع' },
+            { header: 'تاريخ العملية', dataKey: 'تاريخ العملية' },
+            { header: 'سعر الوحدة (ريال)', dataKey: 'سعر الوحدة (ريال)' },
+            { header: 'الكمية', dataKey: 'الكمية' },
+            { header: 'الإجمالي (ريال)', dataKey: 'الإجمالي (ريال)' },
+            { header: 'المشتري', dataKey: 'المشتري' },
+            { header: 'حالة الطلب', dataKey: 'حالة الطلب' }
+          ]}
+          showCSV
+        />
       </div>
 
       <div className="bg-primary-card rounded-2xl shadow-lg border border-gold/20 overflow-x-auto">
