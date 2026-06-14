@@ -391,19 +391,23 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
                 <th className="py-2 text-gold">التاريخ</th>
                 <th className="py-2 text-gold">الصورة</th>
                 <th className="py-2 text-gold">ملاحظات</th>
-              </table>
+              </tr>
             </thead>
             <tbody>
               {sellerReceiptsList.map(r => (
                 <tr key={r.id}>
                   <td className="text-gray-800">{formatNumber(r.amount)}</td>
                   <td className="text-gray-800">{formatDate(r.created_at)}</td>
-                  <td><a href={r.receipt_image} target="_blank" rel="noreferrer" className="text-blue-500 underline">عرض</a></td>
+                  <td className="text-gray-800">
+                    <a href={r.receipt_image} target="_blank" rel="noreferrer" className="text-blue-500 underline">عرض</a>
+                  </td>
                   <td className="text-gray-800">{r.notes || '-'}</td>
                 </tr>
               ))}
               {sellerReceiptsList.length === 0 && (
-                <tr><td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td></tr>
+                <tr>
+                  <td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -415,5 +419,4 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     </div>
   );
 }
-
 
