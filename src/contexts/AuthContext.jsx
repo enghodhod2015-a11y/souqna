@@ -75,16 +75,12 @@ export const AuthProvider = ({ children }) => {
     }
     loadAuth()
 
-    // CHANGED: إزالة أي استدعاء غير متزامن من onAuthStateChange لتجنب تعليق updateUser
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted.current) return
       const currentUser = session?.user ?? null
       setUser(currentUser)
       
-      // CHANGED: عدم استدعاء fetchProfile هنا لأنها تسبب deadlock مع updateUser
-      // بدلاً من ذلك، يتم تحميل الملف الشخصي عبر loadAuth() أو تحديثه بشكل منفصل
       if (currentUser) {
-        // CHANGED: استخدام setTimeout لتجنب deadlock
         setTimeout(async () => {
           if (!isMounted.current) return
           const profileData = await fetchProfile(currentUser.id)
@@ -105,6 +101,32 @@ export const AuthProvider = ({ children }) => {
       subscription?.unsubscribe()
     }
   }, [])
+
+  // ✅ دالة تحديث الملف الشخصي
+  const updateProfile = async (updates) => {
+    if (!user) throw new Error('لا يوجد مستخدم مسجل')
+
+    // منع تغيير البريد الإلكتروني (لأسباب أمنية)
+    if (updates.email) {
+      delete updates.email
+      toast.warning('لا يمكن تغيير البريد الإلكتروني')
+    }
+
+    // تحديث قاعدة البيانات
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', user.id)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    // تحديث الـ State المحلي
+    setProfile(prev => ({ ...prev, ...data }))
+    toast.success('تم تحديث الملف الشخصي بنجاح')
+    return data
+  }
 
   const logout = async () => {
     try {
@@ -147,10 +169,9 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading: false, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading: false, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   )
 }
-
 
