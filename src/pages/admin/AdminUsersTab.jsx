@@ -149,20 +149,20 @@ export default function AdminUsersTab({
           <div className="mb-5">
             <label className="block text-gold font-medium mb-2">اختر البائع:</label>
             <Select
-              value={selectedSeller?.id || ''}
-              onChange={e => {
-                const seller = sellerUsers.find(u => u.id === e.target.value);
-                setSelectedSeller(seller);
-                setSellerDetailTab('profile');
-                setSellerFilterId(null);
-              }}
-              className="w-full md:w-1/2 bg-white text-gray-900 border border-gray-300 rounded-lg"
-            >
-              <option value="" className="text-gray-900">-- اختر بائعاً --</option>
-              {sellerUsers.map(s => (
-                <option key={s.id} value={s.id} className="text-gray-900">{s.store_name || s.full_name} ({s.email})</option>
-              ))}
-            </Select>
+  value={selectedSeller?.id || ''}
+  onChange={e => {
+    const seller = sellerUsers.find(u => u.id === e.target.value);
+    setSelectedSeller(seller);
+    setSellerDetailTab('profile');
+    setSellerFilterId(null);
+  }}
+  className="w-full md:w-1/2 bg-white text-gray-900 border border-gray-300 rounded-lg"
+>
+  <option value="" className="text-gray-900">-- اختر بائعاً --</option>
+  {sellerUsers.map(s => (
+    <option key={s.id} value={s.id} className="text-gray-900">{s.store_name || s.full_name} ({s.email})</option>
+  ))}
+</Select>
           </div>
           {selectedSeller && (
             <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-300">
