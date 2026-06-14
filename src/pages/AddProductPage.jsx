@@ -6,7 +6,18 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import toast from 'react-hot-toast'
 
-const categories = ['electronics', 'fashion', 'beauty', 'vehicles', 'home', 'baby', 'grocery', 'books', 'pets']
+// قائمة الأقسام مع الاسم العربي والقيمة الإنجليزية للقاعدة
+const categories = [
+  { id: 'electronics', name: 'الإلكترونيات' },
+  { id: 'fashion', name: 'الأزياء والموضة' },
+  { id: 'beauty', name: 'الجمال والعناية' },
+  { id: 'vehicles', name: 'السيارات وقطع الغيار' },
+  { id: 'home', name: 'البيت والمطبخ' },
+  { id: 'baby', name: 'الأم والطفل' },
+  { id: 'grocery', name: 'السوبر ماركت' },
+  { id: 'books', name: 'الكتب والقرطاسية' },
+  { id: 'pets', name: 'الحيوانات الأليفة' }
+]
 
 export default function AddProductPage() {
   const { user, profile } = useAuth()
@@ -19,7 +30,7 @@ export default function AddProductPage() {
     description: '',
     price: '',
     discount_percentage: 0,
-    category: categories[0],
+    category: categories[0].id, // القيمة الإنجليزية
     stock_quantity: '',
     city: '',
     contact_number: '',
@@ -63,7 +74,7 @@ export default function AddProductPage() {
         price: parseFloat(formData.price),
         compare_at_price: compare_at_price,
         stock_quantity: parseInt(formData.stock_quantity) || 0,
-        category: formData.category,
+        category: formData.category, // القيمة الإنجليزية
         city: formData.city,
         condition: formData.condition,
         is_featured: formData.is_featured,
@@ -171,7 +182,9 @@ export default function AddProductPage() {
               className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200"
             >
               {categories.map(cat => (
-                <option key={cat} value={cat} className="bg-white">{cat}</option>
+                <option key={cat.id} value={cat.id} className="bg-white">
+                  {cat.name}
+                </option>
               ))}
             </select>
           </div>
