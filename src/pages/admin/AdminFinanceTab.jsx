@@ -65,52 +65,60 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
   }, [selectedSeller]);
 
   const calculateFinance = async () => {
-    if (!selectedSeller?.id) return;
-    try {
-      const sellerId = selectedSeller.id;
-      const { data: products } = await supabase
-     .from('products')
-     .select('id')
-     .eq('seller_id', sellerId);
-      const productIds = products?.map(p => p.id) || [];
-      let totalSales = 0, totalReturns = 0;
-      if (productIds.length) {
-        const { data: orderItemsData } = await supabase
-       .from('order_items')
-       .select('order_id, product_price, quantity')
-       .in('product_id', productIds);
-        if (orderItemsData?.length) {
-          const orderIds = [...new Set(orderItemsData.map(i => i.order_id))];
-          const { data: orders } = await supabase
-         .from('orders')
-         .select('id, status, return_status')
-         .in('id', orderIds);
-          const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
-          for (const item of orderItemsData) {
-            const order = orderMap.get(item.order_id);
-            if (order) {
-              if (order.status === 'completed' || order.status === 'delivered')
-                totalSales += item.product_price * item.quantity;
-              if (order.return_status === 'approved')
-                totalReturns += item.product_price * item.quantity;
+  if (!selectedSeller?.id) return;
+  try {
+    const sellerId = selectedSeller.id;
+    const { data: products } = await supabase
+      .from('products')
+      .select('id')
+      .eq('seller_id', sellerId);
+    const productIds = products?.map(p => p.id) || [];
+    let totalSales = 0, totalReturns = 0;
+    if (productIds.length) {
+      const { data: orderItemsData, error: oiErr } = await supabase
+        .from('order_items')
+        .select('order_id, product_price, quantity')
+        .in('product_id', productIds);
+      if (oiErr) throw oiErr;
+      if (orderItemsData?.length) {
+        const orderIds = [...new Set(orderItemsData.map(i => i.order_id))];
+        const { data: orders, error: ordersErr } = await supabase
+          .from('orders')
+          .select('id, status, completed_at, finalized_at, return_status')
+          .in('id', orderIds);
+        if (ordersErr) throw ordersErr;
+        const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
+        const now = new Date().toISOString();
+
+        for (const item of orderItemsData) {
+          const order = orderMap.get(item.order_id);
+          if (order) {
+            const isEligible = (order.status === 'completed' && order.finalized_at && order.finalized_at <= now && order.return_status !== 'approved')
+                            || (order.status === 'delivered' && order.completed_at && (new Date(order.completed_at) < new Date(Date.now() - 3*24*60*60*1000)) && order.return_status !== 'approved');
+            if (isEligible) {
+              totalSales += item.product_price * item.quantity;
+            }
+            if (order.return_status === 'approved') {
+              totalReturns += item.product_price * item.quantity;
             }
           }
         }
       }
-      const netAfterReturns = totalSales - totalReturns;
-      const commissionAmount = netAfterReturns * (sellerCommissionPercent / 100);
-      const { data: transfers } = await supabase
-     .from('seller_transfers')
-     .select('amount')
-     .eq('seller_id', sellerId);
-      const totalReceived = transfers?.reduce((s, t) => s + (t.amount || 0), 0) || 0;
-      const remaining = netAfterReturns - commissionAmount - totalReceived;
-      setSellerFinance({ totalSales, totalReturns, commissionAmount, totalReceived, remaining });
-    } catch (err) {
-      console.error(err);
-      toast.error('خطأ في حساب المالية');
     }
-  };
+    const netAfterReturns = totalSales - totalReturns;
+    const commissionAmount = netAfterReturns * (sellerCommissionPercent / 100);
+    const { data: transfers } = await supabase
+      .from('seller_transfers')
+      .select('amount')
+      .eq('seller_id', sellerId);
+    const totalReceived = transfers?.reduce((s, t) => s + (t.amount || 0), 0) || 0;
+    const remaining = netAfterReturns - commissionAmount - totalReceived;
+    setSellerFinance({ totalSales, totalReturns, commissionAmount, totalReceived, remaining });
+  } catch (err) {
+    console.error(err);
+    toast.error('خطأ في حساب المالية');
+  }
+};
 
   const updateUserMutation = async ({ userId, updates }) => {
     const { error } = await supabase.from('profiles').update(updates).eq('id', userId);

@@ -24,26 +24,25 @@ export const createOrder = async (orderData) => {
   }
 
   // إنشاء الطلب
-  // إنشاء الطلب
-const { data: order, error: orderError } = await supabase
-  .from('orders')
-  .insert({
-    user_id: buyer_id,
-    total_amount: total_amount,
-    original_amount: orderData.original_amount || total_amount,
-    discount_amount: orderData.discount_amount || 0,
-    coupon_id: orderData.coupon_id || null,
-    shipping_address: shipping_address,
-    shipping_city: shipping_city,
-    payment_method: payment_method,
-    notes: notes,
-    status: 'pending',
-    payment_status: 'unpaid',
-    created_at: new Date().toISOString()
-  })
-  .select()
-  .single()
-if (orderError) throw orderError
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .insert({
+      user_id: buyer_id,
+      total_amount: total_amount,
+      original_amount: orderData.original_amount || total_amount,
+      discount_amount: orderData.discount_amount || 0,
+      coupon_id: orderData.coupon_id || null,
+      shipping_address: shipping_address,
+      shipping_city: shipping_city,
+      payment_method: payment_method,
+      notes: notes,
+      status: 'pending',
+      payment_status: 'unpaid',
+      created_at: new Date().toISOString()
+    })
+    .select()
+    .single()
+  if (orderError) throw orderError
 
   // إضافة عناصر الطلب
   const itemsWithNames = await Promise.all(items.map(async (item) => {
@@ -151,6 +150,7 @@ export const getSellerOrders = async (sellerId) => {
           return_status: row.return_status,
           return_reason: row.return_reason,
           completed_at: row.completed_at,
+          finalized_at: row.finalized_at,
           status: row.order_status
         });
       }
@@ -188,13 +188,16 @@ export const updateOrderStatus = async (orderId, status) => {
   return data
 }
 
-// 5️⃣ تأكيد الاستلام
+// 5️⃣ تأكيد الاستلام (مع تعيين finalized_at بعد 3 أيام)
 export const confirmDelivery = async (orderId) => {
+  const completedAt = new Date().toISOString();
+  const finalizedAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('orders')
     .update({
       status: 'completed',
-      completed_at: new Date().toISOString()
+      completed_at: completedAt,
+      finalized_at: finalizedAt
     })
     .eq('id', orderId)
     .eq('status', 'delivered')
@@ -301,7 +304,7 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
   return publicUrl
 }
 
-// 9️⃣ إحصائيات البائع
+// 9️⃣ إحصائيات البائع (معدلة لتحتسب فقط المستحق)
 export const getSellerStats = async (sellerId) => {
   console.log('📊 getSellerStats called for seller:', sellerId);
   try {
@@ -351,11 +354,12 @@ export const getSellerStats = async (sellerId) => {
     const orderIds = [...new Set(orderItems.map(oi => oi.order_id))];
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
-      .select('id, status')
+      .select('id, status, completed_at, finalized_at, return_status')
       .in('id', orderIds);
     if (ordersError) throw ordersError;
 
-    const orderStatusMap = new Map(orders?.map(o => [o.id, o.status]) || []);
+    const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
+    const now = new Date().toISOString();
 
     let totalSales = 0;
     let pendingOrders = 0;
@@ -363,20 +367,24 @@ export const getSellerStats = async (sellerId) => {
     let completedOrders = 0;
 
     for (const item of orderItems) {
-      const status = orderStatusMap.get(item.order_id);
-      if (!status) continue;
+      const order = orderMap.get(item.order_id);
+      if (!order) continue;
 
       const saleAmount = item.product_price * item.quantity;
 
-      if (status === 'completed' || status === 'delivered') {
+      // حساب المبيعات المستحقة للبائع (المبلغ الذي يستحق دفعه)
+      const isEligible = (order.status === 'completed' && order.finalized_at && order.finalized_at <= now && order.return_status !== 'approved')
+                      || (order.status === 'delivered' && order.completed_at && (new Date(order.completed_at) < new Date(Date.now() - 3*24*60*60*1000)) && order.return_status !== 'approved');
+      if (isEligible) {
         totalSales += saleAmount;
       }
 
-      if (status === 'pending' || status === 'pending_payment_review') {
+      // إحصائيات إضافية (للشاشة)
+      if (order.status === 'pending' || order.status === 'pending_payment_review') {
         pendingOrders++;
-      } else if (status === 'payment_approved' || status === 'processing' || status === 'shipped') {
+      } else if (order.status === 'payment_approved' || order.status === 'processing' || order.status === 'shipped') {
         processingOrders++;
-      } else if (status === 'delivered' || status === 'completed') {
+      } else if (order.status === 'delivered' || order.status === 'completed') {
         completedOrders++;
       }
     }
@@ -406,5 +414,4 @@ export const getSellerStats = async (sellerId) => {
 export const getMonthlySales = async (sellerId) => {
   return []
 }
-
 
