@@ -225,21 +225,22 @@ const { error: insertError } = await supabase.from('seller_transfers').insert({
       <div className="mb-6">
         <label className="block text-gold font-medium mb-2">اختر البائع لتسوية حسابه:</label>
         <Select
-          value={selectedSeller?.id || ''}
-          onChange={e => {
-            const sellerId = e.target.value;
-            const seller = sellerUsers.find(u => u.id === sellerId);
-            setSelectedSeller(seller || null);
-          }}
-          className="w-full md:w-1/2 bg-white text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold"
-        >
-          <option value="" className="text-black">-- اختر بائعاً --</option>
-          {sellerUsers.map(s => (
-            <option key={s.id} value={s.id} className="text-black">
-              {s.store_name || s.full_name} ({s.email})
-            </option>
-          ))}
-        </Select>
+  value={selectedSeller?.id || ''}
+  onChange={e => {
+    const sellerId = e.target.value;
+    const seller = sellerUsers.find(u => u.id === sellerId);
+    setSelectedSeller(seller || null);
+  }}
+  textColor="text-black"             // 🔹 هنا أيضًا
+  className="w-full md:w-1/2 bg-white border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold"
+>
+  <option value="" className="text-black">-- اختر بائعاً --</option>
+  {sellerUsers.map(s => (
+    <option key={s.id} value={s.id} className="text-black">
+      {s.store_name || s.full_name} ({s.email})
+    </option>
+  ))}
+</Select>
       </div>
 
       {selectedSeller? (
