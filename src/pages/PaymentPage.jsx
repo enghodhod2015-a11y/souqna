@@ -5,41 +5,33 @@ import { uploadReceipt } from '../services/orderService'
 import { addNotification } from '../services/notificationService'
 import { Button } from '../components/ui/Button'
 import toast from 'react-hot-toast'
+import { useAuth } from '../contexts/AuthContext'
 
 const PaymentInstructionsBlock = () => (
   <div className="mt-2 bg-primary-card/50 p-3 rounded-lg border border-gold/20 space-y-2">
-    {/* القسم الأول: بنك الكريمي */}
     <div>
       <p className="text-gold text-sm font-semibold mb-1">🏦 عبر بنك الكريمي</p>
-      <p className="text-white text-sm font-mono select-all">
-        رقم الحساب: 3005499158
-      </p>
-      <p className="text-white text-sm font-mono select-all">
-        أو الرقم المميز: 1802716
-      </p>
+      <p className="text-white text-sm font-mono select-all">رقم الحساب: 3005499158</p>
+      <p className="text-white text-sm font-mono select-all">أو الرقم المميز: 1802716</p>
     </div>
-
     <hr className="border-gold/20" />
-
-    {/* القسم الثاني: شبكة الموحدة */}
     <div>
       <p className="text-gold text-sm font-semibold mb-1">📱 عبر شبكة الموحدة</p>
-      <p className="text-white text-sm font-mono select-all">
-        حساب الفنيع: 231011
-      </p>
+      <p className="text-white text-sm font-mono select-all">حساب الفنيع: 231011</p>
     </div>
   </div>
-);
+)
 
 export default function PaymentPage() {
   const { orderId } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth() // ✅ إضافة useAuth للتحقق من المستخدم
+  
   const [order, setOrder] = useState(null)
-  const [productTitle, setProductTitle] = useState(null)
+  const [productTitle, setProductTitle] = useState('')
   const [file, setFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [fetchingOrder, setFetchingOrder] = useState(true)
-  // CHANGED: حالة تتبع تقدم رفع الإيصال
   const [uploadProgress, setUploadProgress] = useState(0)
   
   const [transferNumber, setTransferNumber] = useState('')
@@ -53,25 +45,40 @@ export default function PaymentPage() {
   const loadOrder = async () => {
     try {
       setFetchingOrder(true)
+      
+      // 1. جلب الطلب بدون العلاقة الخاطئة
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
-        .select('*, product:order_items(product_name)')
+        .select('*')
         .eq('id', orderId)
         .single()
-
       if (orderError) throw orderError
       if (!orderData) throw new Error('الطلب غير موجود')
 
+      // 2. التحقق من ملكية الطلب (أمان)
+      if (orderData.user_id !== user?.id) {
+        toast.error('هذا الطلب لا يخصك، لا يمكنك الدفع له')
+        navigate('/')
+        return
+      }
+
+      // 3. جلب عناصر الطلب (قد تكون متعددة)
       const { data: items, error: itemsError } = await supabase
         .from('order_items')
         .select('product_name')
         .eq('order_id', orderId)
-        .maybeSingle()
-
+      
       if (itemsError) throw itemsError
+      
+      // 4. عرض أسماء المنتجات كلها
+      if (items && items.length > 0) {
+        const names = items.map(item => item.product_name).join(', ')
+        setProductTitle(names)
+      } else {
+        setProductTitle('منتج غير متوفر')
+      }
 
       setOrder(orderData)
-      setProductTitle(items?.product_name || 'منتج غير متوفر')
     } catch (error) {
       console.error('Error loading order:', error)
       toast.error(error.message || 'لم يتم العثور على الطلب')
@@ -112,7 +119,6 @@ export default function PaymentPage() {
     setLoading(true)
     setUploadProgress(0)
     try {
-      // CHANGED: محاكاة تقدم رفع الملف (نظراً لأن uploadReceipt لا يدعم onProgress حالياً، نستخدم وهمي)
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => (prev >= 90 ? 90 : prev + 10))
       }, 200)
@@ -126,21 +132,29 @@ export default function PaymentPage() {
       clearInterval(progressInterval)
       setUploadProgress(100)
       
-      const { data: orderData } = await supabase
-        .from('orders')
-        .select('user_id, seller:products(seller_id)')
-        .eq('id', orderId)
-        .single()
-      
-      const { data: orderItems } = await supabase
+      // ✅ استعلام صحيح لجلب seller_id عبر order_items -> products
+      const { data: orderItems, error: itemsFetchError } = await supabase
         .from('order_items')
-        .select('product:products(seller_id)')
+        .select('product_id')
         .eq('order_id', orderId)
-        .maybeSingle()
+        .limit(1)  // نأخذ أول منتج فقط (يمكن تعديله لإرسال إشعار لجميع البائعين)
       
-      const sellerId = orderItems?.product?.seller_id
-      if (sellerId) {
-        await addNotification(sellerId, 'payment', 'إيصال دفع جديد', `تم رفع إيصال دفع للطلب #${orderId}، يرجى مراجعته`, orderId)
+      if (!itemsFetchError && orderItems && orderItems.length > 0) {
+        const { data: product } = await supabase
+          .from('products')
+          .select('seller_id')
+          .eq('id', orderItems[0].product_id)
+          .single()
+        
+        if (product?.seller_id) {
+          await addNotification(
+            product.seller_id,
+            'payment',
+            'إيصال دفع جديد',
+            `تم رفع إيصال دفع للطلب #${orderId}، يرجى مراجعته`,
+            orderId
+          )
+        }
       }
       
       toast.success('تم رفع الإيصال بنجاح، سيتم مراجعته قريباً')
@@ -165,10 +179,10 @@ export default function PaymentPage() {
         <p><strong className="text-gold">المبلغ المطلوب:</strong> {order.total_amount} ريال</p>
         <hr className="border-gold/20 my-3" />
         <p className="text-sm bg-gold/5 p-3 rounded-lg border border-gold/10 text-text-secondary leading-relaxed">
-  <strong className="text-gold block mb-1">تعليمات التحويل البنكي:</strong>
-  قم بتحويل المبلغ إلى أحد الحسابات التالية وأرفق صورة واضحة من إيصال التحويل:
-  <PaymentInstructionsBlock />
-</p>
+          <strong className="text-gold block mb-1">تعليمات التحويل البنكي:</strong>
+          قم بتحويل المبلغ إلى أحد الحسابات التالية وأرفق صورة واضحة من إيصال التحويل:
+          <PaymentInstructionsBlock />
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-primary-card p-6 rounded-2xl border border-gold/30 space-y-4">
@@ -217,7 +231,6 @@ export default function PaymentPage() {
             className="w-full text-sm text-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gold file:text-primary-blue hover:file:bg-gold-light cursor-pointer"
             required 
           />
-          {/* CHANGED: شريط تقدم رفع الإيصال */}
           {uploadProgress > 0 && uploadProgress < 100 && (
             <div className="mt-2">
               <div className="bg-gray-200 rounded-full h-2.5">
@@ -237,5 +250,4 @@ export default function PaymentPage() {
     </div>
   )
 }
-
 
