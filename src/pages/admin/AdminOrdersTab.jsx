@@ -13,7 +13,6 @@ export default function AdminOrdersTab({ navigate }) {
     queryKey: ['adminConversations'],
     queryFn: async () => {
       try {
-        // 1. جلب جميع المحادثات
         const { data: conversations, error: convError } = await supabase
           .from('conversations')
           .select('*')
@@ -31,10 +30,7 @@ export default function AdminOrdersTab({ navigate }) {
           if (!prodError) productsMap = new Map(products.map(p => [p.id, p]));
         }
 
-        const userIds = [...new Set([
-          ...conversations.map(c => c.buyer_id),
-          ...conversations.map(c => c.seller_id)
-        ].filter(Boolean))];
+        const userIds = [...new Set([...conversations.map(c => c.buyer_id), ...conversations.map(c => c.seller_id)].filter(Boolean))];
         let profilesMap = new Map();
         if (userIds.length) {
           const { data: profiles, error: profError } = await supabase
@@ -44,7 +40,6 @@ export default function AdminOrdersTab({ navigate }) {
           if (!profError) profilesMap = new Map(profiles.map(p => [p.id, p]));
         }
 
-        // 2. جلب آخر رسالة لكل محادثة (معرفة المرسل)
         const conversationIds = conversations.map(c => c.id);
         const lastMessageMap = new Map();
         for (const convId of conversationIds) {
@@ -62,7 +57,6 @@ export default function AdminOrdersTab({ navigate }) {
           }
         }
 
-        // إضافة بيانات المحادثة مع الحالة
         const enrichedConversations = conversations.map(conv => {
           const lastMsg = lastMessageMap.get(conv.id);
           let status = 'في انتظار رد البائع';
@@ -238,7 +232,6 @@ export default function AdminOrdersTab({ navigate }) {
     );
   }
 
-  // إعداد بيانات التصدير
   const exportData = conversations.map(conv => ({
     'المنتج': conv.product?.title || conv.product?.name || 'منتج غير متوفر',
     'المشتري': conv.buyer?.full_name || conv.buyer_name || 'غير معروف',
@@ -294,7 +287,7 @@ export default function AdminOrdersTab({ navigate }) {
                 <th className="p-3 text-gold">التاريخ</th>
                 <th className="p-3 text-gold">الحالة</th>
                 <th className="p-3 text-gold">الإجراءات</th>
-              </table>
+              </tr>
             </thead>
             <tbody>
               {conversations.map(conv => (
@@ -334,5 +327,4 @@ export default function AdminOrdersTab({ navigate }) {
     </div>
   );
 }
-
 

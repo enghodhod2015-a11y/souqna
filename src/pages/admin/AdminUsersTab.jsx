@@ -79,7 +79,8 @@ export default function AdminUsersTab({
     toast.success(approved ? 'تم قبول البائع' : 'تم رفض البائع');
     refetchPendingSellers();
     refetchUsers();
-    queryClient.invalidateQueries({ queryKey: ['adminUsers'], queryKey: ['pendingSellers'] });
+    queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+    queryClient.invalidateQueries({ queryKey: ['pendingSellers'] });
   };
 
   const sendNotificationToUser = async (userId, message, title = 'إشعار من الإدارة', type = 'info', relatedId = null) => {
