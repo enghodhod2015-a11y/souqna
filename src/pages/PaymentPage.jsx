@@ -143,7 +143,7 @@ export default function PaymentPage() {
           <strong className="text-gold block mb-1">تعليمات التحويل البنكي:</strong>
           قم بتحويل المبلغ إلى الحساب التالي وأرفق صورة واضحة من إيصال التحويل:
           <span className="block font-mono text-white mt-1 select-all bg-primary-card p-2 rounded border border-gold/20 text-center">
-            SA12 3456 7890 1234 5678
+            1802716-3005499158
           </span>
         </p>
       </div>
