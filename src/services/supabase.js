@@ -11,10 +11,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: localStorage,  // ✅ تم التغيير من sessionStorage إلى localStorage
+    storage: localStorage,        // ✅ تغيير جوهري: استخدام localStorage بدلاً من sessionStorage
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false
+    detectSessionInUrl: false,
+    flowType: 'pkce'              // ✅ إضافة لضمان التوافق مع المنصات الحديثة
   }
 });
 
