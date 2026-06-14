@@ -12,7 +12,7 @@ import { ExportButtons } from '../../components/ui/ExportButtons';
 
 export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, navigate }) {
   const queryClient = useQueryClient();
-  
+
   // Finance related
   const [transferAmount, setTransferAmount] = useState('');
   const [transferNote, setTransferNote] = useState('');
@@ -34,10 +34,10 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     queryKey: ['adminUsersForFinance'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, store_name, commission_percent')
-        .eq('account_type', 'seller')
-        .order('created_at', { ascending: false });
+       .from('profiles')
+       .select('id, full_name, email, store_name, commission_percent')
+       .eq('account_type', 'seller')
+       .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -50,7 +50,7 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
   useEffect(() => {
     if (selectedSeller) {
       const savedPercent = selectedSeller.commission_percent;
-      setSellerCommissionPercent(savedPercent !== undefined && savedPercent !== null ? savedPercent : 10);
+      setSellerCommissionPercent(savedPercent!== undefined && savedPercent!== null? savedPercent : 10);
       calculateFinance();
     } else {
       // إعادة تعيين البيانات إذا لم يكن هناك بائع محدد
@@ -69,22 +69,22 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     try {
       const sellerId = selectedSeller.id;
       const { data: products } = await supabase
-        .from('products')
-        .select('id')
-        .eq('seller_id', sellerId);
+       .from('products')
+       .select('id')
+       .eq('seller_id', sellerId);
       const productIds = products?.map(p => p.id) || [];
       let totalSales = 0, totalReturns = 0;
       if (productIds.length) {
         const { data: orderItemsData } = await supabase
-          .from('order_items')
-          .select('order_id, product_price, quantity')
-          .in('product_id', productIds);
+         .from('order_items')
+         .select('order_id, product_price, quantity')
+         .in('product_id', productIds);
         if (orderItemsData?.length) {
           const orderIds = [...new Set(orderItemsData.map(i => i.order_id))];
           const { data: orders } = await supabase
-            .from('orders')
-            .select('id, status, return_status')
-            .in('id', orderIds);
+           .from('orders')
+           .select('id, status, return_status')
+           .in('id', orderIds);
           const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
           for (const item of orderItemsData) {
             const order = orderMap.get(item.order_id);
@@ -100,9 +100,9 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
       const netAfterReturns = totalSales - totalReturns;
       const commissionAmount = netAfterReturns * (sellerCommissionPercent / 100);
       const { data: transfers } = await supabase
-        .from('seller_transfers')
-        .select('amount')
-        .eq('seller_id', sellerId);
+       .from('seller_transfers')
+       .select('amount')
+       .eq('seller_id', sellerId);
       const totalReceived = transfers?.reduce((s, t) => s + (t.amount || 0), 0) || 0;
       const remaining = netAfterReturns - commissionAmount - totalReceived;
       setSellerFinance({ totalSales, totalReturns, commissionAmount, totalReceived, remaining });
@@ -117,8 +117,8 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     if (error) throw error;
     toast.success('تم تحديث نسبة العمولة');
     if (selectedSeller?.id === userId) {
-      setSelectedSeller(prev => ({ ...prev, ...updates }));
-      if (updates.commission_percent !== undefined) {
+      setSelectedSeller(prev => ({...prev,...updates }));
+      if (updates.commission_percent!== undefined) {
         setSellerCommissionPercent(updates.commission_percent);
         await calculateFinance();
       }
@@ -137,10 +137,10 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
       const fileExt = receiptFile.name.split('.').pop();
       const fileName = `seller_transfers/${selectedSeller.id}/${Date.now()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage
-        .from('receipts')
-        .upload(fileName, receiptFile);
+       .from('receipts')
+       .upload(fileName, receiptFile);
       if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(fileName);
+      const { data: { publicUrl } = supabase.storage.from('receipts').getPublicUrl(fileName);
       const { error: insertError } = await supabase.from('seller_transfers').insert({
         seller_id: selectedSeller.id,
         amount: amountNum,
@@ -164,10 +164,10 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
   const loadSellerReceipts = async () => {
     if (!selectedSeller) return;
     const { data } = await supabase
-      .from('seller_transfers')
-      .select('*')
-      .eq('seller_id', selectedSeller.id)
-      .order('created_at', { ascending: false });
+     .from('seller_transfers')
+     .select('*')
+     .eq('seller_id', selectedSeller.id)
+     .order('created_at', { ascending: false });
     setSellerReceiptsList(data || []);
     setShowReceiptsModal(true);
   };
@@ -180,14 +180,14 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
           <Skeleton className="w-full md:w-1/2 h-12 rounded-lg" />
         </div>
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20 space-y-3">
+          <div className="bg-primary-card p-5 rounded-2xl shadow-lg border-gold/20 space-y-3">
             <SkeletonText width="w-36" height="h-6" />
             <SkeletonText width="w-full" height="h-10" />
             <SkeletonText width="w-full" height="h-10" />
             <Skeleton className="h-24 rounded-lg" />
             <Skeleton className="w-full h-12 rounded-lg" />
           </div>
-          <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20 space-y-3">
+          <div className="bg-primary-card p-5 rounded-2xl shadow-lg border-gold/20 space-y-3">
             <div className="flex justify-between">
               <SkeletonText width="w-32" height="h-6" />
               <Skeleton className="w-24 h-8 rounded-lg" />
@@ -209,7 +209,7 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     );
   }
 
-  const financeRows = selectedSeller ? [
+  const financeRows = selectedSeller? [
     { 'القسم': 'إجمالي المبيعات', 'المبلغ': formatCurrency(sellerFinance.totalSales), 'العملة': 'ريال يمني' },
     { 'القسم': 'إجمالي المرتجعات', 'المبلغ': formatCurrency(sellerFinance.totalReturns), 'العملة': 'ريال يمني' },
     { 'القسم': `نسبة الموقع (${sellerCommissionPercent}%)`, 'المبلغ': formatCurrency(sellerFinance.commissionAmount), 'العملة': 'ريال يمني' },
@@ -226,26 +226,22 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
           onChange={e => {
             const sellerId = e.target.value;
             const seller = sellerUsers.find(u => u.id === sellerId);
-            if (seller) {
-              setSelectedSeller(seller);
-            } else {
-              setSelectedSeller(null);
-            }
+            setSelectedSeller(seller || null);
           }}
-          className="w-full md:w-1/2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold"
+          className="w-full md:w-1/2 bg-white text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold"
         >
-          <option value="" className="text-gray-900">-- اختر بائعاً --</option>
+          <option value="" className="text-black">-- اختر بائعاً --</option>
           {sellerUsers.map(s => (
-            <option key={s.id} value={s.id} className="text-gray-900">
+            <option key={s.id} value={s.id} className="text-black">
               {s.store_name || s.full_name} ({s.email})
             </option>
           ))}
         </Select>
       </div>
 
-      {selectedSeller ? (
+      {selectedSeller? (
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20">
+          <div className="bg-primary-card p-5 rounded-2xl shadow-lg border-gold/20">
             <h3 className="text-lg font-bold text-gold mb-4">تسديد حساب البائع</h3>
             <div className="space-y-3">
               <Input
@@ -270,21 +266,21 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
                   accept="image/*"
                   id="receiptFileInput"
                   onChange={e => setReceiptFile(e.target.files[0])}
-                  className="bg-white text-gray-900 rounded-lg px-3 py-2 w-full border border-gray-300 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:bg-gold file:text-primary-blue hover:file:bg-gold/90"
+                  className="bg-white text-gray-900 rounded-lg px-3 py-2 w-full border-gray-300 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:bg-gold file:text-primary-blue hover:file:bg-gold/90"
                 />
               </div>
               <Button onClick={handleAddTransfer} disabled={uploading} className="w-full bg-gold text-primary-blue shadow-md hover:bg-gold/90 transition-all">
-                {uploading ? 'جاري الرفع...' : 'إدخال'}
+                {uploading? 'جاري الرفع...' : 'إدخال'}
               </Button>
             </div>
           </div>
 
-          <div className="bg-primary-card p-5 rounded-2xl shadow-lg border border-gold/20">
+          <div className="bg-primary-card p-5 rounded-2xl shadow-lg border-gold/20">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-bold text-gold">ملخص حسابات البائع</h3>
               <div className="flex gap-2">
-                <ExportButtons 
-                  data={financeRows} 
+                <ExportButtons
+                  data={financeRows}
                   filename={`seller_finance_${selectedSeller.id}`}
                   title={`ملخص حسابات البائع: ${selectedSeller.full_name}`}
                   columns={[
@@ -311,7 +307,7 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
                     const newPercent = parseFloat(e.target.value) || 0;
                     setSellerCommissionPercent(newPercent);
                   }}
-                  className="flex-1 bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-gold focus:border-gold"
+                  className="flex-1 bg-white text-gray-900 rounded-lg px-3 py-2 border-gray-300 focus:ring-2 focus:ring-gold focus:border-gold"
                 />
                 <Button
                   onClick={async () => {
