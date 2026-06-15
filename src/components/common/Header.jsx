@@ -148,7 +148,6 @@ export const Header = () => {
               >
                 لوحة الأدمن
               </Link>
-              {/* 🔽 إضافة رابط القسائم للأدمن */}
               <Link 
                 to="/admin/coupons" 
                 className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 transition text-sm whitespace-nowrap"
@@ -224,7 +223,7 @@ export const Header = () => {
   )
 
   return (
-    <header className="bg-header-blue border-b-2 border-gold py-4 px-6 md:px-12">
+    <header className="bg-header-blue border-b-2 border-gold py-4 px-6 md:px-12 relative z-40">
       <div className="container mx-auto flex justify-between items-center">
         <Link to="/" className="text-2xl font-bold text-gold">سوقنا</Link>
 
@@ -233,21 +232,22 @@ export const Header = () => {
           {navLinks}
         </div>
 
-        {/* زر الهامبورجر للموبايل */}
+        {/* زر الهامبورجر للموبايل - يظهر فقط على الشاشات الصغيرة */}
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="lg:hidden text-gold p-2 rounded-lg hover:bg-primary-card transition-colors"
+          className="lg:hidden text-gold p-2 rounded-lg hover:bg-primary-card transition-colors z-50 focus:outline-none"
           aria-label={isMobileMenuOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
         >
           {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
 
-      {/* القائمة المنسدلة للموبايل */}
+      {/* القائمة المنسدلة للموبايل - تظهر عند النقر على الزر */}
       {isMobileMenuOpen && (
         <div 
           ref={mobileMenuRef}
-          className="lg:hidden absolute top-20 left-0 right-0 bg-header-blue border-b border-gold/30 shadow-xl z-50 p-4 flex flex-col gap-3"
+          className="fixed top-16 left-0 right-0 bg-primary-card border-b border-gold/30 shadow-2xl z-50 p-4 flex flex-col gap-3 max-h-[80vh] overflow-y-auto"
+          style={{ backgroundColor: '#0a2a4a' }} /* لون خلفية آمن */
         >
           {navLinks}
           
@@ -265,5 +265,4 @@ export const Header = () => {
     </header>
   )
 }
-
 
