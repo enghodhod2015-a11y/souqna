@@ -123,15 +123,22 @@ export default function ProductDetailsPage() {
 
   const handleEdit = () => navigate(`/edit-product/${product.id}`)
   
-  // ✅ تغيير دالة الحذف إلى إخفاء بنفس منطق MyProductsPage
+  // ✅ دالة الإخفاء مع إضافة تشخيص
   const handleHide = async () => {
+    // 🟢 طباعة معلومات التشخيص
+    console.log('🔍 تشخيص الإخفاء:');
+    console.log('Current user ID:', user?.id);
+    console.log('Product seller ID:', product?.seller_id);
+    console.log('Is owner?', user?.id === product?.seller_id);
+    
     const confirmed = window.confirm('هل أنت متأكد من إخفاء هذا المنتج؟ سيبقى في المحادثات والطلبات القديمة لكن لن يظهر في المتجر.')
     if (!confirmed) return
     try {
-      await deleteProduct(product.id) // deleteProduct تقوم بالإخفاء (is_hidden=true)
+      await deleteProduct(product.id)
       toast.success('تم إخفاء المنتج بنجاح')
-      navigate('/my-products') // التوجيه إلى صفحة منتجاتي بعد الإخفاء
+      navigate('/my-products')
     } catch (err) {
+      console.error('❌ فشل الإخفاء:', err);
       toast.error(err.message)
     }
   }
@@ -283,4 +290,5 @@ export default function ProductDetailsPage() {
     </div>
   )
 }
+
 
