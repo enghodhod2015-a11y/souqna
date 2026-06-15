@@ -30,9 +30,24 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null)
     setLoading(true)
     try {
+      // 1. محاولة الحصول على الجلسة من Supabase
       const { data: { session } } = await supabase.auth.getSession()
+      let currentUser = session?.user ?? null
+
+      // 2. إذا لم توجد جلسة، حاول استعادة الرمز من localStorage يدوياً (كحل بديل)
+      if (!currentUser && typeof window !== 'undefined') {
+        const storedToken = localStorage.getItem('supabase.auth.token')
+        if (storedToken) {
+          console.log('🔄 محاولة استعادة الجلسة من localStorage...')
+          const { data: { session: recoveredSession }, error } = await supabase.auth.setSession(JSON.parse(storedToken))
+          if (!error && recoveredSession) {
+            currentUser = recoveredSession.user
+            console.log('✅ تم استعادة الجلسة بنجاح')
+          }
+        }
+      }
+
       if (!isMounted.current) return
-      const currentUser = session?.user ?? null
       setUser(currentUser)
 
       if (currentUser) {
@@ -66,14 +81,12 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     isMounted.current = true
-    if (typeof window !== 'undefined') {
-      const oldSession = localStorage.getItem('supabase.auth.token')
-      if (oldSession) {
-        localStorage.removeItem('supabase.auth.token')
-        console.log('تم مسح جلسة localStorage القديمة')
-      }
+    // تأخير بسيط لضمان تهيئة Supabase
+    const init = async () => {
+      await new Promise(resolve => setTimeout(resolve, 100))
+      await loadAuth()
     }
-    loadAuth()
+    init()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted.current) return
@@ -81,16 +94,14 @@ export const AuthProvider = ({ children }) => {
       setUser(currentUser)
       
       if (currentUser) {
-        setTimeout(async () => {
-          if (!isMounted.current) return
-          const profileData = await fetchProfile(currentUser.id)
-          if (!isMounted.current) return
-          setProfile(profileData || {
-            id: currentUser.id,
-            full_name: currentUser.user_metadata?.full_name || currentUser.email,
-            account_type: currentUser.user_metadata?.account_type || 'buyer'
-          })
-        }, 0)
+        // عند تسجيل الدخول، تحديث الملف الشخصي فوراً
+        const profileData = await fetchProfile(currentUser.id)
+        if (!isMounted.current) return
+        setProfile(profileData || {
+          id: currentUser.id,
+          full_name: currentUser.user_metadata?.full_name || currentUser.email,
+          account_type: currentUser.user_metadata?.account_type || 'buyer'
+        })
       } else {
         setProfile(null)
       }
@@ -102,27 +113,19 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
-  // ✅ دالة تحديث الملف الشخصي
   const updateProfile = async (updates) => {
     if (!user) throw new Error('لا يوجد مستخدم مسجل')
-
-    // منع تغيير البريد الإلكتروني (لأسباب أمنية)
     if (updates.email) {
       delete updates.email
       toast.warning('لا يمكن تغيير البريد الإلكتروني')
     }
-
-    // تحديث قاعدة البيانات
     const { data, error } = await supabase
       .from('profiles')
       .update(updates)
       .eq('id', user.id)
       .select()
       .single()
-
     if (error) throw error
-
-    // تحديث الـ State المحلي
     setProfile(prev => ({ ...prev, ...data }))
     toast.success('تم تحديث الملف الشخصي بنجاح')
     return data
@@ -157,12 +160,7 @@ export const AuthProvider = ({ children }) => {
         <div className="text-center bg-primary-card p-6 rounded-2xl border border-gold/30 max-w-md">
           <p className="text-red-400 mb-4">⚠️ {authError}</p>
           <p className="text-text-secondary mb-4">يرجى التحقق من اتصالك بالإنترنت أو تحديث الصفحة.</p>
-          <button
-            onClick={() => loadAuth()}
-            className="px-4 py-2 bg-gold text-primary-blue rounded-lg font-bold hover:bg-gold/90"
-          >
-            إعادة المحاولة
-          </button>
+          <button onClick={() => loadAuth()} className="px-4 py-2 bg-gold text-primary-blue rounded-lg font-bold hover:bg-gold/90">إعادة المحاولة</button>
         </div>
       </div>
     )
