@@ -9,7 +9,7 @@ import {
   Menu,
   X,
   Heart,
-  ShoppingBag   // ✅ أضفنا أيقونة الطلبات
+  ShoppingBag
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
@@ -52,7 +52,6 @@ export const Header = () => {
     return () => supabase.removeChannel(channel)
   }, [user])
 
-  // إغلاق القائمة المنسدلة للمستخدم عند النقر خارجها
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false)
@@ -61,7 +60,6 @@ export const Header = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // إغلاق قائمة الموبايل عند تغيير حجم الشاشة لأكبر من 1024px
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 1024 && isMobileMenuOpen) setIsMobileMenuOpen(false)
@@ -80,7 +78,7 @@ export const Header = () => {
     }
   }
 
-  // روابط سطح المكتب (أفقية)
+  // روابط سطح المكتب (بدون NotificationBell)
   const desktopLinks = (
     <>
       <Link to="/search" className="flex items-center gap-2 bg-gold/10 border border-gold text-gold px-4 py-2 rounded-lg font-bold hover:bg-gold hover:text-primary-blue transition text-sm">
@@ -113,6 +111,7 @@ export const Header = () => {
           <Link to="/wishlist" className="p-2 rounded-full hover:bg-primary-card transition-colors" title="المفضلة">
             <Heart size={20} className="text-gold" />
           </Link>
+          {/* ✅ NotificationBell يظهر هنا فقط لسطح المكتب */}
           <NotificationBell />
           <div className="relative" ref={dropdownRef}>
             <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center gap-2 bg-primary-card rounded-full px-4 py-2 hover:bg-secondary-blue transition-colors">
@@ -137,7 +136,7 @@ export const Header = () => {
     </>
   )
 
-  // روابط الجوال (عمودية مع إغلاق القائمة تلقائياً عند النقر)
+  // روابط الجوال (القائمة المنبثقة – بدون NotificationBell)
   const mobileLinks = (
     <div className="flex flex-col gap-3 w-full">
       <Link to="/search" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center justify-end gap-2 bg-gold/10 border border-gold text-gold px-4 py-2 rounded-lg font-bold">
@@ -171,7 +170,7 @@ export const Header = () => {
             <Link to="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className="p-2 rounded-full hover:bg-primary-card">
               <Heart size={22} className="text-gold" />
             </Link>
-            <NotificationBell />
+            {/* ✅ تم إزالة NotificationBell من هنا */}
             <div className="flex items-center gap-2 bg-primary-card rounded-full px-3 py-1">
               <User size={18} className="text-gold" />
               <span className="text-sm">{profile?.full_name || user.email?.split('@')[0]}</span>
@@ -200,10 +199,10 @@ export const Header = () => {
       <div className="container mx-auto flex justify-between items-center">
         <Link to="/" className="text-2xl font-bold text-gold">سوقنا</Link>
 
-        {/* سطح المكتب: كل الأزرار النصية */}
+        {/* سطح المكتب: جميع الأزرار (بما فيها NotificationBell) */}
         <div className="hidden lg:flex items-center gap-3">{desktopLinks}</div>
 
-        {/* الجوال: أيقونات مختصرة + زر الهامبورجر */}
+        {/* الجوال: أيقونات مختصرة + NotificationBell + زر الهامبورجر */}
         <div className="flex lg:hidden items-center gap-2">
           {user && (
             <>
@@ -213,6 +212,7 @@ export const Header = () => {
               <Link to="/wishlist" className="p-2 rounded-full hover:bg-primary-card transition-colors">
                 <Heart size={20} className="text-gold" />
               </Link>
+              {/* ✅ NotificationBell يظهر مرة واحدة فقط هنا على الجوال */}
               <NotificationBell />
               <Link to="/profile" className="p-2 rounded-full hover:bg-primary-card transition-colors">
                 <User size={20} className="text-gold" />
@@ -228,7 +228,6 @@ export const Header = () => {
         </div>
       </div>
 
-      {/* القائمة المنبثقة للجوال (تبقى كما هي) */}
       {isMobileMenuOpen && (
         <>
           <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />

@@ -14,6 +14,7 @@ export const NotificationBell = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const channelRef = useRef(null); // ✅ مرجع للقناة
 
   const handleAuthError = async (err) => {
     if (err?.code === 'PGRST303' || err?.message?.includes('JWT expired')) {
@@ -27,18 +28,17 @@ export const NotificationBell = () => {
   };
 
   const loadNotifications = useCallback(async () => {
-  if (!user) return;
-  try {
-    const result = await getUserNotifications(user.id);
-    // result = { notifications: [], unreadCount: number }
-    setNotifications(result.notifications.slice(0, 5));
-    setUnreadCount(result.unreadCount);
-    console.log(`📬 تم جلب الإشعارات: ${result.notifications.length} (أحدث 50)، ${result.unreadCount} غير مقروء (الحقيقي)`);
-  } catch (err) {
-    const handled = await handleAuthError(err);
-    if (!handled) console.error('خطأ في جلب الإشعارات:', err);
-  }
-}, [user, navigate]);
+    if (!user) return;
+    try {
+      const result = await getUserNotifications(user.id);
+      setNotifications(result.notifications.slice(0, 5));
+      setUnreadCount(result.unreadCount);
+      console.log(`📬 تم جلب الإشعارات: ${result.notifications.length} (أحدث 50)، ${result.unreadCount} غير مقروء`);
+    } catch (err) {
+      const handled = await handleAuthError(err);
+      if (!handled) console.error('خطأ في جلب الإشعارات:', err);
+    }
+  }, [user, navigate]);
 
   // تحميل أولي وإعادة تحميل كل 30 ثانية
   useEffect(() => {
@@ -48,9 +48,15 @@ export const NotificationBell = () => {
     return () => clearInterval(interval);
   }, [user, loadNotifications]);
 
-  // Realtime
+  // ✅ إعداد Realtime بشكل آمن (مرة واحدة)
   useEffect(() => {
     if (!user) return;
+
+    // إلغاء القناة السابقة إذا كانت موجودة
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
     const channel = supabase
       .channel(`notifications-dropdown-${user.id}`)
       .on('postgres_changes', {
@@ -62,8 +68,20 @@ export const NotificationBell = () => {
         console.log('🔔 [NotificationBell] حدث INSERT:', payload);
         loadNotifications();
       })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ [NotificationBell] مشترك في القناة بنجاح');
+        }
+      });
+
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
   }, [user, loadNotifications]);
 
   // عند فتح القائمة نعيد الجلب
@@ -208,5 +226,4 @@ export const NotificationBell = () => {
     </div>
   );
 };
-
 

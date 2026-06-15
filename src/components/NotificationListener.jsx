@@ -6,9 +6,15 @@ import { playNotificationSound, audioCtx, enableAudio } from '../services/notifi
 export const NotificationListener = ({ children }) => {
   const { user } = useAuth();
   const lastNotifIdRef = useRef(null);
+  const channelRef = useRef(null);
 
   useEffect(() => {
     if (!user) return;
+
+    // إلغاء القناة السابقة إذا كانت موجودة
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
 
     const channel = supabase
       .channel(`user-notifications-${user.id}`)
@@ -27,7 +33,6 @@ export const NotificationListener = ({ children }) => {
         console.log('🎵 audioCtx state:', audioCtx ? audioCtx.state : 'null');
         console.log('🔔 Notification.permission:', Notification.permission);
 
-        // محاولة إعادة تفعيل الصوت إذا كان مفقوداً ولكن الإذن ممنوح
         if (!audioCtx && Notification.permission === 'granted') {
           await enableAudio();
         }
@@ -46,10 +51,19 @@ export const NotificationListener = ({ children }) => {
         }
         await playNotificationSound();
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ [NotificationListener] مشترك في القناة بنجاح');
+        }
+      });
+
+    channelRef.current = channel;
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [user]);
 
