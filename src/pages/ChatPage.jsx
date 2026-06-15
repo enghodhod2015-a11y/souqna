@@ -32,7 +32,12 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (user) initChat()
-    return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
+    }
   }, [productId, conversationId, user])
 
   const initChat = async () => {
@@ -70,40 +75,94 @@ export default function ChatPage() {
     finally { setLoading(false) }
   }
 
+  // ✅ إعداد الاستماع للرسائل الجديدة بشكل صحيح
   useEffect(() => {
     if (!conversation?.id || !user?.id) return
-    if (channelRef.current) supabase.removeChannel(channelRef.current)
-    const channel = supabase.channel(`messages:${conversation.id}`).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversation.id}` }, (payload) => {
-      if (payload?.new) {
-        setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new])
-        if (payload.new.receiver_id === user.id) markMessagesAsRead(conversation.id, user.id).then(() => setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, is_read: true } : m)))
-      }
-    }).subscribe()
-    const readChannel = supabase.channel(`read:${conversation.id}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversation.id}` }, (payload) => {
-      if (payload.new && payload.new.is_read === true) setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, is_read: true } : m))
-    }).subscribe()
-    channelRef.current = channel
-    return () => { supabase.removeChannel(channel); supabase.removeChannel(readChannel); channelRef.current = null }
-  }, [conversation?.id, user?.id])
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+    // إلغاء القناة السابقة
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current)
+      channelRef.current = null
+    }
+
+    console.log(`🟢 إنشاء قناة للمحادثة: ${conversation.id}`)
+
+    const channel = supabase
+      .channel(`chat:${conversation.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `conversation_id=eq.${conversation.id}`
+      }, (payload) => {
+        console.log('📩 رسالة جديدة مستلمة في الوقت الفعلي:', payload.new)
+        const newMsg = payload.new
+        if (newMsg && !messages.some(m => m.id === newMsg.id)) {
+          setMessages(prev => [...prev, newMsg])
+          // إذا كانت الرسالة للمستخدم الحالي، نضعها كمقروءة فوراً
+          if (newMsg.receiver_id === user.id) {
+            markMessagesAsRead(conversation.id, user.id).catch(console.error)
+          }
+        }
+      })
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ تم الاشتراك في قناة الشات بنجاح')
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ خطأ في قناة الشات:', err)
+        } else if (status === 'TIMED_OUT') {
+          console.warn('⚠️ انتهت مهلة القناة، سيتم إعادة المحاولة قريباً')
+        }
+      })
+
+    channelRef.current = channel
+
+    return () => {
+      if (channelRef.current) {
+        console.log(`🔴 إلغاء الاشتراك من قناة المحادثة: ${conversation.id}`)
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
+    }
+  }, [conversation?.id, user?.id]) // يعاد الاشتراك فقط عندما تتغير المحادثة أو المستخدم
+
+  // التمرير إلى آخر رسالة
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   const handleSend = async () => {
     if (!newMessage.trim() || !conversation) return
     setSending(true)
     const messageText = newMessage.trim()
     const tempId = Date.now()
-    const optimisticMessage = { id: tempId, conversation_id: conversation.id, sender_id: user.id, receiver_id: conversation.buyer_id === user.id ? conversation.seller_id : conversation.buyer_id, message: messageText, created_at: new Date().toISOString(), is_read: false }
+    const receiverId = conversation.buyer_id === user.id ? conversation.seller_id : conversation.buyer_id
+    const optimisticMessage = {
+      id: tempId,
+      conversation_id: conversation.id,
+      sender_id: user.id,
+      receiver_id: receiverId,
+      message: messageText,
+      created_at: new Date().toISOString(),
+      is_read: false
+    }
     setMessages(prev => [...prev, optimisticMessage])
     setNewMessage('')
     try {
-      const sent = await sendMessage(conversation.id, user.id, optimisticMessage.receiver_id, messageText)
+      const sent = await sendMessage(conversation.id, user.id, receiverId, messageText)
       setMessages(prev => prev.map(m => m.id === tempId ? sent : m))
-    } catch (err) { setMessages(prev => prev.filter(m => m.id !== tempId)); toast.error(err.message) }
-    finally { setSending(false) }
+    } catch (err) {
+      setMessages(prev => prev.filter(m => m.id !== tempId))
+      toast.error(err.message)
+    } finally {
+      setSending(false)
+    }
   }
 
-  const handleClose = () => { if (window.history.length > 1) navigate(-1); else navigate('/inbox') }
+  const handleClose = () => {
+    if (window.history.length > 1) navigate(-1)
+    else navigate('/inbox')
+  }
 
   if (loading) {
     return (
@@ -134,7 +193,11 @@ export default function ChatPage() {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="bg-white rounded-2xl border border-gold/40 shadow-xl overflow-hidden">
         <div className="p-5 border-b border-gold/30 bg-gradient-to-r from-gray-50 to-white flex justify-between items-center">
-          <div className="flex-1"><h2 className="text-2xl font-bold text-gold flex items-center gap-2">{pageTitle}</h2>{productInfo && <p className="text-sm text-gray-600 mt-1">بخصوص منتج: <span className="text-gold font-medium">{productInfo.title}</span></p>}{isAdminChat && <p className="text-sm text-gray-600 mt-1">هذه محادثة مع فريق الدعم والإدارة</p>}</div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-gold flex items-center gap-2">{pageTitle}</h2>
+            {productInfo && <p className="text-sm text-gray-600 mt-1">بخصوص منتج: <span className="text-gold font-medium">{productInfo.title}</span></p>}
+            {isAdminChat && <p className="text-sm text-gray-600 mt-1">هذه محادثة مع فريق الدعم والإدارة</p>}
+          </div>
           <button onClick={handleClose} className="p-2 rounded-full hover:bg-gray-200 transition-colors text-gray-600" title="إغلاق"><X size={24} /></button>
         </div>
         <div className="h-[500px] overflow-y-auto p-5 space-y-4 bg-gray-50">
@@ -162,12 +225,22 @@ export default function ChatPage() {
         </div>
         <div className="p-4 border-t border-gold/30 bg-white">
           <div className="flex gap-3 items-center">
-            <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="اكتب رسالتك..." className="flex-1 px-5 py-3 rounded-full bg-gray-100 text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400" onKeyPress={(e) => e.key === 'Enter' && !sending && handleSend()} />
-            <Button onClick={handleSend} disabled={sending} className="!rounded-full !px-5 !py-3 bg-gold text-gray-900 hover:bg-amber-500 transition-all duration-200 shadow-md flex items-center gap-2"><Send size={18} /><span>إرسال</span></Button>
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="اكتب رسالتك..."
+              className="flex-1 px-5 py-3 rounded-full bg-gray-100 text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
+              onKeyPress={(e) => e.key === 'Enter' && !sending && handleSend()}
+            />
+            <Button onClick={handleSend} disabled={sending} className="!rounded-full !px-5 !py-3 bg-gold text-gray-900 hover:bg-amber-500 transition-all duration-200 shadow-md flex items-center gap-2">
+              <Send size={18} /><span>إرسال</span>
+            </Button>
           </div>
         </div>
       </div>
     </div>
   )
 }
+
 
