@@ -7,7 +7,7 @@ import { getUserNotifications, markNotificationAsRead, requestNotificationPermis
 import toast from 'react-hot-toast';
 
 export const NotificationBell = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
@@ -124,9 +124,21 @@ export const NotificationBell = () => {
       const relatedId = notif.related_id;
       const type = notif.type;
       const isValidConversationUUID = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-      if (relatedId && isValidConversationUUID(relatedId)) navigate(`/chat/c/${relatedId}`);
-      else if (type === 'payment' || type === 'order_status') navigate('/orders');
-      else navigate('/inbox');
+      
+      if (relatedId && isValidConversationUUID(relatedId)) {
+        navigate(`/chat/c/${relatedId}`);
+      } 
+      else if (type === 'payment' || type === 'order_status') {
+        // ✅ التوجيه حسب دور المستخدم (بائع أم مشتري)
+        if (profile?.account_type === 'seller') {
+          navigate('/seller-orders');
+        } else {
+          navigate('/orders');
+        }
+      } 
+      else {
+        navigate('/inbox');
+      }
       setDropdownOpen(false);
     } catch (err) {
       const handled = await handleAuthError(err);
@@ -175,6 +187,7 @@ export const NotificationBell = () => {
           </button>
         )}
       </div>
+
       {dropdownOpen && (
         <div className="absolute left-0 mt-2 w-80 bg-[#0a2a4a] backdrop-blur-sm rounded-xl shadow-2xl border border-gold/40 z-50 overflow-hidden">
           <div className="p-3 border-b border-gold/30 flex justify-between items-center">
