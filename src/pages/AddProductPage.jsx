@@ -23,17 +23,16 @@ export default function AddProductPage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
-  // CHANGED: حالة لتتبع تقدم رفع الصور
   const [uploadProgress, setUploadProgress] = useState(0)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     price: '',
     discount_percentage: 0,
-    category: categories[0].id, // القيمة الإنجليزية
+    category: categories[0].id,
     stock_quantity: '',
     city: '',
-    contact_number: '',
+    // ✅ تم إزالة contact_number من هنا
     condition: 'new',
     is_featured: false
   })
@@ -58,7 +57,7 @@ export default function AddProductPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-    setUploadProgress(0) // CHANGED: إعادة تعيين التقدم
+    setUploadProgress(0)
     try {
       let compare_at_price = null
       if (formData.discount_percentage > 0 && formData.price) {
@@ -74,7 +73,7 @@ export default function AddProductPage() {
         price: parseFloat(formData.price),
         compare_at_price: compare_at_price,
         stock_quantity: parseInt(formData.stock_quantity) || 0,
-        category: formData.category, // القيمة الإنجليزية
+        category: formData.category,
         city: formData.city,
         condition: formData.condition,
         is_featured: formData.is_featured,
@@ -83,13 +82,13 @@ export default function AddProductPage() {
         is_active: true,
         images: [],
         cover_image: ''
+        // ✅ تم حذف contact_number
       }
 
       const newProduct = await addProduct(productData)
       if (!newProduct?.id) throw new Error('لم يتم استلام معرف المنتج')
 
       if (imageFiles.length > 0) {
-        // CHANGED: رفع الصور مع تتبع التقدم
         const imageUrls = await uploadProductImages(imageFiles, newProduct.id, (progress) => {
           setUploadProgress(progress)
         })
@@ -202,30 +201,17 @@ export default function AddProductPage() {
           </div>
         </div>
 
-        {/* المدينة ورقم التواصل */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div>
-            <label className="block text-gold font-medium mb-2 text-right">المدينة</label>
-            <input
-              type="text"
-              name="city"
-              value={formData.city}
-              onChange={handleChange}
-              className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
-              placeholder="مثال: الرياض"
-            />
-          </div>
-          <div>
-            <label className="block text-gold font-medium mb-2 text-right">رقم التواصل (اختياري)</label>
-            <input
-              type="tel"
-              name="contact_number"
-              value={formData.contact_number}
-              onChange={handleChange}
-              className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
-              placeholder="05xxxxxxxx"
-            />
-          </div>
+        {/* المدينة (تم إزالة حقل رقم التواصل) */}
+        <div className="mb-6">
+          <label className="block text-gold font-medium mb-2 text-right">المدينة</label>
+          <input
+            type="text"
+            name="city"
+            value={formData.city}
+            onChange={handleChange}
+            className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
+            placeholder="مثال: الرياض"
+          />
         </div>
 
         {/* حالة المنتج */}
@@ -290,7 +276,6 @@ export default function AddProductPage() {
               ))}
             </div>
           )}
-          {/* CHANGED: شريط تقدم رفع الصور */}
           {uploadProgress > 0 && uploadProgress < 100 && (
             <div className="mt-4">
               <div className="bg-gray-200 rounded-full h-2.5">

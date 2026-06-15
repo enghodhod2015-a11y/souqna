@@ -50,28 +50,41 @@ export const addNotification = async (userId, type, title, message, relatedId = 
   return data;
 };
 
-export const getUserNotifications = async (userId) => {
-  // 1. الحصول على العدد الحقيقي للإشعارات غير المقروءة
-  const { count, error: countError } = await supabase
-    .from('notifications')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('is_read', false);
-  if (countError) throw countError;
+// ✅ improved getUserNotifications with retry logic
+export const getUserNotifications = async (userId, retryCount = 0) => {
+  const MAX_RETRIES = 2;
+  const RETRY_DELAY = 500;
+  try {
+    // 1. الحصول على العدد الحقيقي للإشعارات غير المقروءة
+    const { count, error: countError } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false);
+    if (countError) throw countError;
 
-  // 2. الحصول على أحدث 50 إشعاراً لعرضها في القائمة
-  const { data: recent, error: recentError } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(50);
-  if (recentError) throw recentError;
+    // 2. الحصول على أحدث 50 إشعاراً
+    const { data: recent, error: recentError } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (recentError) throw recentError;
 
-  return {
-    notifications: recent || [],
-    unreadCount: count || 0
-  };
+    return {
+      notifications: recent || [],
+      unreadCount: count || 0
+    };
+  } catch (error) {
+    // إذا كان الخطأ بسبب قطع الاتصال (ERR_CONNECTION_CLOSED) أو الشبكة، نحاول إعادة المحاولة
+    if ((error.message?.includes('Connection closed') || error.message?.includes('Failed to fetch')) && retryCount < MAX_RETRIES) {
+      console.warn(`⚠️ فشل جلب الإشعارات، إعادة المحاولة ${retryCount + 1}/${MAX_RETRIES}...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      return getUserNotifications(userId, retryCount + 1);
+    }
+    throw error;
+  }
 };
 
 export const markNotificationAsRead = async (notificationId) => {

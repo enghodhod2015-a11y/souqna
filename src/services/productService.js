@@ -1,6 +1,5 @@
 import { supabase } from './supabase'
 
-// استبدل دالة fixImageUrl الموجودة بهذه النسخة المحسنة
 const fixImageUrl = (url, width = 400) => {
   if (!url) return null
   if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -138,13 +137,12 @@ export const getProductById = async (id) => {
   }
 }
 
-// ✅ دالة addProduct المعدلة (تضمن وجود slug)
+// ✅ addProduct بدون contact_number
 export const addProduct = async (productData) => {
   try {
-    const { title, discount_percentage, final_price, contact_number, ...rest } = productData
+    const { title, discount_percentage, final_price, ...rest } = productData
     const name = title || rest.name
     
-    // إنشاء slug من name إذا لم يتم توفيره
     let slug = rest.slug
     if (!slug && name) {
       slug = name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now()
@@ -164,8 +162,8 @@ export const addProduct = async (productData) => {
       is_approved: rest.is_approved !== undefined ? rest.is_approved : true,
       is_active: rest.is_active !== undefined ? rest.is_active : true,
       images: rest.images || [],
-      cover_image: rest.cover_image || '',
-      contact_number: rest.contact_number || null
+      cover_image: rest.cover_image || ''
+      // ✅ تم حذف contact_number
     }
     
     const { data, error } = await supabase
@@ -183,9 +181,10 @@ export const addProduct = async (productData) => {
 
 export const updateProduct = async (id, updates) => {
   try {
-    const { title, discount_percentage, final_price, contact_number, ...rest } = updates
+    const { title, discount_percentage, final_price, ...rest } = updates
     const cleanUpdates = { ...rest }
     if (title) cleanUpdates.name = title
+    // ✅ التأكد من عدم وجود contact_number
     const { data, error } = await supabase
       .from('products')
       .update(cleanUpdates)
@@ -200,7 +199,6 @@ export const updateProduct = async (id, updates) => {
   }
 }
 
-// ✅ إخفاء المنتج (Soft Delete)
 export const deleteProduct = async (id) => {
   try {
     const { error } = await supabase
@@ -218,7 +216,6 @@ export const deleteProduct = async (id) => {
   }
 }
 
-// ✅ إعادة تنشيط منتج مخفي (Restore)
 export const restoreProduct = async (id) => {
   try {
     const { error } = await supabase
@@ -258,7 +255,6 @@ export const uploadProductImages = async (files, productId, onProgress = null) =
   }
 }
 
-// ✅ تحديث مخزون منتج معين (زيادة أو نقصان)
 export const updateProductStock = async (productId, quantityChange) => {
   if (!productId || typeof quantityChange !== 'number') {
     throw new Error('معرف المنتج وقيمة التغيير مطلوبة')
@@ -284,5 +280,4 @@ export const updateProductStock = async (productId, quantityChange) => {
     throw error
   }
 }
-
 
