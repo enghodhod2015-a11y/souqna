@@ -26,6 +26,38 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  // ✅ دالة مضمونة لإنشاء/تحديث الملف الشخصي
+  const ensureProfile = async (userId, email, metadata) => {
+    const newProfile = {
+      id: userId,
+      full_name: metadata?.full_name || email?.split('@')[0] || 'مستخدم',
+      email: email,
+      account_type: metadata?.account_type || 'buyer',
+      phone: metadata?.phone || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+
+    // استخدام upsert لتجنب مشكلة التكرار ولمراعاة RLS (إذا كان مسموحًا للمستخدم بإدراج صف نفسه)
+    const { error } = await supabase
+      .from('profiles')
+      .upsert(newProfile, { onConflict: 'id' })
+
+    if (error) {
+      console.error('⚠️ فشل upsert في profiles:', error.message)
+      // في حال فشل قاعدة البيانات، نستخدم الكائن المحلي كملاذ أخير
+      return newProfile
+    }
+
+    // إعادة جلب البيانات للتأكد من الحصول على أحدث إصدار
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+    return data || newProfile
+  }
+
   const loadAuth = async () => {
     setAuthError(null)
     setLoading(true)
@@ -36,29 +68,26 @@ export const AuthProvider = ({ children }) => {
       setUser(currentUser)
 
       if (currentUser) {
-        const profileData = await fetchProfile(currentUser.id)
-        if (!isMounted.current) return
-        if (profileData) {
-          setProfile(profileData)
-        } else {
-          const newProfile = {
-            id: currentUser.id,
-            full_name: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0],
-            email: currentUser.email,
-            account_type: currentUser.user_metadata?.account_type || 'buyer',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-          const { error: insertError } = await supabase.from('profiles').insert([newProfile])
-          if (!insertError) setProfile(newProfile)
-          else setProfile(newProfile)
+        let profileData = await fetchProfile(currentUser.id)
+        if (!profileData) {
+          // محاولة إنشاء profile إذا لم يكن موجوداً
+          profileData = await ensureProfile(
+            currentUser.id,
+            currentUser.email,
+            currentUser.user_metadata
+          )
         }
+        if (!isMounted.current) return
+        setProfile(profileData)
       } else {
         setProfile(null)
       }
     } catch (err) {
       console.error('خطأ في المصادقة:', err)
-      if (isMounted.current) setAuthError(err.message || 'فشل الاتصال بخادم المصادقة')
+      if (isMounted.current) {
+        setAuthError(err.message || 'فشل الاتصال بخادم المصادقة')
+        // في حالة حدوث خطأ فادح، ننشئ profile افتراضي للمستخدم الحالي إذا كان موجوداً في user (لن يحدث هنا)
+      }
     } finally {
       if (isMounted.current) setLoading(false)
     }
@@ -66,6 +95,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     isMounted.current = true
+    // تنظيف أي جلسة قديمة بشكل آمن
     if (typeof window !== 'undefined') {
       const oldSession = localStorage.getItem('supabase.auth.token')
       if (oldSession) {
@@ -79,17 +109,21 @@ export const AuthProvider = ({ children }) => {
       if (!isMounted.current) return
       const currentUser = session?.user ?? null
       setUser(currentUser)
-      
+
       if (currentUser) {
+        // استخدام setTimeout لتجنب تعارض التحديثات
         setTimeout(async () => {
           if (!isMounted.current) return
-          const profileData = await fetchProfile(currentUser.id)
+          let profileData = await fetchProfile(currentUser.id)
+          if (!profileData) {
+            profileData = await ensureProfile(
+              currentUser.id,
+              currentUser.email,
+              currentUser.user_metadata
+            )
+          }
           if (!isMounted.current) return
-          setProfile(profileData || {
-            id: currentUser.id,
-            full_name: currentUser.user_metadata?.full_name || currentUser.email,
-            account_type: currentUser.user_metadata?.account_type || 'buyer'
-          })
+          setProfile(profileData)
         }, 0)
       } else {
         setProfile(null)
@@ -102,17 +136,13 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
-  // ✅ دالة تحديث الملف الشخصي
   const updateProfile = async (updates) => {
     if (!user) throw new Error('لا يوجد مستخدم مسجل')
-
-    // منع تغيير البريد الإلكتروني (لأسباب أمنية)
     if (updates.email) {
       delete updates.email
       toast.warning('لا يمكن تغيير البريد الإلكتروني')
     }
 
-    // تحديث قاعدة البيانات
     const { data, error } = await supabase
       .from('profiles')
       .update(updates)
@@ -121,8 +151,6 @@ export const AuthProvider = ({ children }) => {
       .single()
 
     if (error) throw error
-
-    // تحديث الـ State المحلي
     setProfile(prev => ({ ...prev, ...data }))
     toast.success('تم تحديث الملف الشخصي بنجاح')
     return data
