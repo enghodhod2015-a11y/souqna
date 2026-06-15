@@ -249,6 +249,10 @@ export const Header = () => {
           className="fixed top-16 left-0 right-0 bg-primary-card border-b border-gold/30 shadow-2xl z-50 p-4 flex flex-col gap-3 max-h-[80vh] overflow-y-auto"
           style={{ backgroundColor: '#0a2a4a' }} /* لون خلفية آمن */
         >
+          {/* ✅ سطر التصحيح: يظهر البريد الإلكتروني للمستخدم إذا كان مسجلاً */}
+          <div className="text-xs text-red-300 text-center py-1 border-b border-gold/20 mb-2">
+            DEBUG: {user ? user.email : 'NO USER'}
+          </div>
           {navLinks}
           
           {/* زر تفعيل الإشعارات (إذا كان المستخدم مسجلاً) */}
