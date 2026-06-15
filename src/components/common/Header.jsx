@@ -77,7 +77,7 @@ export const Header = () => {
     }
   }
 
-  // روابط سطح المكتب (مع أيقونة الجرس)
+  // روابط سطح المكتب (نصوص فقط – بدون أيقونة الجرس)
   const desktopLinks = (
     <>
       <Link to="/search" className="flex items-center gap-2 bg-gold/10 border border-gold text-gold px-4 py-2 rounded-lg font-bold hover:bg-gold hover:text-primary-blue transition text-sm">
@@ -110,8 +110,7 @@ export const Header = () => {
           <Link to="/wishlist" className="p-2 rounded-full hover:bg-primary-card transition-colors" title="المفضلة">
             <Heart size={20} className="text-gold" />
           </Link>
-          {/* ✅ أيقونة الجرس لسطح المكتب */}
-          <NotificationBell />
+          {/* ❌ تم إزالة NotificationBell من هنا */}
           <div className="relative" ref={dropdownRef}>
             <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center gap-2 bg-primary-card rounded-full px-4 py-2 hover:bg-secondary-blue transition-colors">
               <User size={18} className="text-gold" />
@@ -135,7 +134,7 @@ export const Header = () => {
     </>
   )
 
-  // روابط الجوال (القائمة المنبثقة – مع أيقونات مختصرة وبدون تكرار الجرس؟ نعم الجرس موجود في الشريط السفلي للجوال)
+  // روابط الجوال (القائمة المنبثقة – بدون أيقونات مكررة)
   const mobileLinks = (
     <div className="flex flex-col gap-3 w-full">
       <Link to="/search" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center justify-end gap-2 bg-gold/10 border border-gold text-gold px-4 py-2 rounded-lg font-bold">
@@ -197,28 +196,32 @@ export const Header = () => {
       <div className="container mx-auto flex justify-between items-center">
         <Link to="/" className="text-2xl font-bold text-gold">سوقنا</Link>
 
-        {/* سطح المكتب: جميع الأزرار النصية + الجرس */}
-        <div className="hidden lg:flex items-center gap-3">{desktopLinks}</div>
+        {/* شريط الروابط والأيقونات المشترك (لجميع الشاشات) */}
+        <div className="flex items-center gap-3">
+          {/* على سطح المكتب: إظهار الروابط النصية (desktopLinks) */}
+          <div className="hidden lg:flex items-center gap-3">{desktopLinks}</div>
 
-        {/* الجوال: أيقونات مختصرة + جرس + زر القائمة */}
-        <div className="flex lg:hidden items-center gap-2">
+          {/* أيقونات مختصرة + الجرس (تظهر للجميع، ولكن قد تختلف الأيقونات حسب الشاشة) */}
           {user && (
-            <>
-              <Link to="/orders" className="p-2 rounded-full hover:bg-primary-card transition-colors">
+            <div className="flex items-center gap-2">
+              <Link to="/orders" className="p-2 rounded-full hover:bg-primary-card transition-colors" title="طلباتي">
                 <ShoppingBag size={20} className="text-gold" />
               </Link>
-              <Link to="/wishlist" className="p-2 rounded-full hover:bg-primary-card transition-colors">
+              <Link to="/wishlist" className="p-2 rounded-full hover:bg-primary-card transition-colors" title="المفضلة">
                 <Heart size={20} className="text-gold" />
               </Link>
+              {/* ✅ أيقونة الجرس – تظهر مرة واحدة فقط لجميع الشاشات */}
               <NotificationBell />
-              <Link to="/profile" className="p-2 rounded-full hover:bg-primary-card transition-colors">
+              <Link to="/profile" className="p-2 rounded-full hover:bg-primary-card transition-colors" title="الملف الشخصي">
                 <User size={20} className="text-gold" />
               </Link>
-            </>
+            </div>
           )}
+
+          {/* زر القائمة (للجوال) */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="text-gold p-2 rounded-lg hover:bg-primary-card transition-colors z-50"
+            className="lg:hidden text-gold p-2 rounded-lg hover:bg-primary-card transition-colors z-50"
           >
             {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
