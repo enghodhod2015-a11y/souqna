@@ -28,7 +28,6 @@ export const Header = () => {
   const isSeller = profile?.account_type === 'seller' || profile?.account_type === 'admin'
   const isAdmin = profile?.account_type === 'admin'
 
-  // جلب عدد الرسائل غير المقروءة
   useEffect(() => {
     if (!user) return
     const fetchUnreadCount = async () => {
@@ -78,7 +77,7 @@ export const Header = () => {
     }
   }
 
-  // روابط سطح المكتب (بدون NotificationBell - يظهر مرة واحدة فقط في شريط الجوال)
+  // روابط سطح المكتب (مع أيقونة الجرس)
   const desktopLinks = (
     <>
       <Link to="/search" className="flex items-center gap-2 bg-gold/10 border border-gold text-gold px-4 py-2 rounded-lg font-bold hover:bg-gold hover:text-primary-blue transition text-sm">
@@ -111,7 +110,8 @@ export const Header = () => {
           <Link to="/wishlist" className="p-2 rounded-full hover:bg-primary-card transition-colors" title="المفضلة">
             <Heart size={20} className="text-gold" />
           </Link>
-          {/* سطح المكتب لا يحتاج NotificationBell لأنه سيظهر في شريط الجوال العام */}
+          {/* ✅ أيقونة الجرس لسطح المكتب */}
+          <NotificationBell />
           <div className="relative" ref={dropdownRef}>
             <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center gap-2 bg-primary-card rounded-full px-4 py-2 hover:bg-secondary-blue transition-colors">
               <User size={18} className="text-gold" />
@@ -135,7 +135,7 @@ export const Header = () => {
     </>
   )
 
-  // روابط الجوال (القائمة المنبثقة – بدون أيقونات مكررة)
+  // روابط الجوال (القائمة المنبثقة – مع أيقونات مختصرة وبدون تكرار الجرس؟ نعم الجرس موجود في الشريط السفلي للجوال)
   const mobileLinks = (
     <div className="flex flex-col gap-3 w-full">
       <Link to="/search" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center justify-end gap-2 bg-gold/10 border border-gold text-gold px-4 py-2 rounded-lg font-bold">
@@ -197,10 +197,10 @@ export const Header = () => {
       <div className="container mx-auto flex justify-between items-center">
         <Link to="/" className="text-2xl font-bold text-gold">سوقنا</Link>
 
-        {/* سطح المكتب: جميع الأزرار النصية */}
+        {/* سطح المكتب: جميع الأزرار النصية + الجرس */}
         <div className="hidden lg:flex items-center gap-3">{desktopLinks}</div>
 
-        {/* الجوال: أيقونات مختصرة + جرس الإشعارات + زر القائمة */}
+        {/* الجوال: أيقونات مختصرة + جرس + زر القائمة */}
         <div className="flex lg:hidden items-center gap-2">
           {user && (
             <>
@@ -210,7 +210,6 @@ export const Header = () => {
               <Link to="/wishlist" className="p-2 rounded-full hover:bg-primary-card transition-colors">
                 <Heart size={20} className="text-gold" />
               </Link>
-              {/* ✅ أيقونة الجرس - تظهر هنا على الجوال */}
               <NotificationBell />
               <Link to="/profile" className="p-2 rounded-full hover:bg-primary-card transition-colors">
                 <User size={20} className="text-gold" />
@@ -240,4 +239,5 @@ export const Header = () => {
     </header>
   )
 }
+
 
