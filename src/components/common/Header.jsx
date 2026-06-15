@@ -78,7 +78,7 @@ export const Header = () => {
     }
   }
 
-  // روابط سطح المكتب (بدون NotificationBell)
+  // روابط سطح المكتب (بدون NotificationBell - يظهر مرة واحدة فقط في شريط الجوال)
   const desktopLinks = (
     <>
       <Link to="/search" className="flex items-center gap-2 bg-gold/10 border border-gold text-gold px-4 py-2 rounded-lg font-bold hover:bg-gold hover:text-primary-blue transition text-sm">
@@ -111,7 +111,7 @@ export const Header = () => {
           <Link to="/wishlist" className="p-2 rounded-full hover:bg-primary-card transition-colors" title="المفضلة">
             <Heart size={20} className="text-gold" />
           </Link>
-          {/* ✅ تم إزالة NotificationBell من هنا */}
+          {/* سطح المكتب لا يحتاج NotificationBell لأنه سيظهر في شريط الجوال العام */}
           <div className="relative" ref={dropdownRef}>
             <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center gap-2 bg-primary-card rounded-full px-4 py-2 hover:bg-secondary-blue transition-colors">
               <User size={18} className="text-gold" />
@@ -135,7 +135,7 @@ export const Header = () => {
     </>
   )
 
-  // روابط الجوال (القائمة المنبثقة – بدون NotificationBell)
+  // روابط الجوال (القائمة المنبثقة – بدون أيقونات مكررة)
   const mobileLinks = (
     <div className="flex flex-col gap-3 w-full">
       <Link to="/search" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center justify-end gap-2 bg-gold/10 border border-gold text-gold px-4 py-2 rounded-lg font-bold">
@@ -169,7 +169,6 @@ export const Header = () => {
             <Link to="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className="p-2 rounded-full hover:bg-primary-card">
               <Heart size={22} className="text-gold" />
             </Link>
-            {/* ✅ تم إزالة NotificationBell من هنا */}
             <div className="flex items-center gap-2 bg-primary-card rounded-full px-3 py-1">
               <User size={18} className="text-gold" />
               <span className="text-sm">{profile?.full_name || user.email?.split('@')[0]}</span>
@@ -198,10 +197,10 @@ export const Header = () => {
       <div className="container mx-auto flex justify-between items-center">
         <Link to="/" className="text-2xl font-bold text-gold">سوقنا</Link>
 
-        {/* سطح المكتب: جميع الأزرار النصية (بدون NotificationBell) */}
+        {/* سطح المكتب: جميع الأزرار النصية */}
         <div className="hidden lg:flex items-center gap-3">{desktopLinks}</div>
 
-        {/* الجوال: أيقونات مختصرة + NotificationBell (مرة واحدة) + زر الهامبورجر */}
+        {/* الجوال: أيقونات مختصرة + جرس الإشعارات + زر القائمة */}
         <div className="flex lg:hidden items-center gap-2">
           {user && (
             <>
@@ -211,7 +210,7 @@ export const Header = () => {
               <Link to="/wishlist" className="p-2 rounded-full hover:bg-primary-card transition-colors">
                 <Heart size={20} className="text-gold" />
               </Link>
-              {/* ✅ NotificationBell يظهر مرة واحدة هنا (للموبايل) */}
+              {/* ✅ أيقونة الجرس - تظهر هنا على الجوال */}
               <NotificationBell />
               <Link to="/profile" className="p-2 rounded-full hover:bg-primary-card transition-colors">
                 <User size={20} className="text-gold" />

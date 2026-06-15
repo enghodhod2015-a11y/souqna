@@ -33,7 +33,6 @@ export const NotificationBell = () => {
       const result = await getUserNotifications(user.id);
       setNotifications(result.notifications.slice(0, 5));
       setUnreadCount(result.unreadCount);
-      console.log(`📬 تم جلب الإشعارات: ${result.notifications.length} (أحدث 50)، ${result.unreadCount} غير مقروء`);
     } catch (err) {
       const handled = await handleAuthError(err);
       if (!handled) console.error('خطأ في جلب الإشعارات:', err);
@@ -47,29 +46,31 @@ export const NotificationBell = () => {
     return () => clearInterval(interval);
   }, [user, loadNotifications]);
 
-  // ✅ إعداد Realtime بشكل آمن
   useEffect(() => {
     if (!user) return;
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
     }
-    const channel = supabase
-      .channel(`notifications-dropdown-${user.id}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${user.id}`
-      }, (payload) => {
-        console.log('🔔 [NotificationBell] حدث INSERT:', payload);
-        loadNotifications();
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ [NotificationBell] مشترك في القناة بنجاح');
-        }
-      });
-    channelRef.current = channel;
+    try {
+      const channel = supabase
+        .channel(`notifications-dropdown-${user.id}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        }, () => {
+          loadNotifications();
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ [NotificationBell] مشترك');
+          }
+        });
+      channelRef.current = channel;
+    } catch (err) {
+      console.error('فشل إنشاء قناة الإشعارات:', err);
+    }
     return () => {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
@@ -109,7 +110,7 @@ export const NotificationBell = () => {
       toast.success('✅ تم تفعيل الإشعارات والصوت');
       playNotificationSound();
     } else {
-      toast.error('❌ لم يتم التفعيل، يمكنك المحاولة لاحقاً من إعدادات المتصفح');
+      toast.error('❌ لم يتم التفعيل');
     }
   };
 
@@ -122,11 +123,7 @@ export const NotificationBell = () => {
       }
       const relatedId = notif.related_id;
       const type = notif.type;
-      const isValidConversationUUID = (id) => {
-        if (!id) return false;
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        return uuidRegex.test(id);
-      };
+      const isValidConversationUUID = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
       if (relatedId && isValidConversationUUID(relatedId)) navigate(`/chat/c/${relatedId}`);
       else if (type === 'payment' || type === 'order_status') navigate('/orders');
       else navigate('/inbox');
@@ -164,7 +161,7 @@ export const NotificationBell = () => {
         <button
           onClick={loadNotifications}
           className="p-2 rounded-full bg-gray-700/50 text-gray-300 hover:bg-gray-600 transition"
-          title="تحديث الإشعارات"
+          title="تحديث"
         >
           <RefreshCw size={16} />
         </button>
@@ -172,13 +169,12 @@ export const NotificationBell = () => {
           <button
             onClick={handleEnableNotifications}
             className="p-2 rounded-full bg-gold/20 text-gold hover:bg-gold/40 transition"
-            title="تفعيل الإشعارات والصوت"
+            title="تفعيل الإشعارات"
           >
             <Volume2 size={18} />
           </button>
         )}
       </div>
-
       {dropdownOpen && (
         <div className="absolute left-0 mt-2 w-80 bg-[#0a2a4a] backdrop-blur-sm rounded-xl shadow-2xl border border-gold/40 z-50 overflow-hidden">
           <div className="p-3 border-b border-gold/30 flex justify-between items-center">
@@ -194,7 +190,7 @@ export const NotificationBell = () => {
               notifications.map(notif => (
                 <div
                   key={notif.id}
-                  onClick={(e) => { e.stopPropagation(); handleNotificationClick(notif); }}
+                  onClick={() => handleNotificationClick(notif)}
                   className={`p-3 border-b border-gold/20 cursor-pointer hover:bg-secondary-blue/30 transition ${!notif.is_read ? 'bg-secondary-blue/10' : ''}`}
                 >
                   <div className="flex items-start gap-2">
