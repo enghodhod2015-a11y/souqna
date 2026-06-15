@@ -25,7 +25,7 @@ const PaymentInstructionsBlock = () => (
 export default function PaymentPage() {
   const { orderId } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth() // ✅ إضافة useAuth للتحقق من المستخدم
+  const { user } = useAuth()
   
   const [order, setOrder] = useState(null)
   const [productTitle, setProductTitle] = useState('')
@@ -46,7 +46,6 @@ export default function PaymentPage() {
     try {
       setFetchingOrder(true)
       
-      // 1. جلب الطلب بدون العلاقة الخاطئة
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select('*')
@@ -55,14 +54,12 @@ export default function PaymentPage() {
       if (orderError) throw orderError
       if (!orderData) throw new Error('الطلب غير موجود')
 
-      // 2. التحقق من ملكية الطلب (أمان)
       if (orderData.user_id !== user?.id) {
         toast.error('هذا الطلب لا يخصك، لا يمكنك الدفع له')
         navigate('/')
         return
       }
 
-      // 3. جلب عناصر الطلب (قد تكون متعددة)
       const { data: items, error: itemsError } = await supabase
         .from('order_items')
         .select('product_name')
@@ -70,7 +67,6 @@ export default function PaymentPage() {
       
       if (itemsError) throw itemsError
       
-      // 4. عرض أسماء المنتجات كلها
       if (items && items.length > 0) {
         const names = items.map(item => item.product_name).join(', ')
         setProductTitle(names)
@@ -132,12 +128,12 @@ export default function PaymentPage() {
       clearInterval(progressInterval)
       setUploadProgress(100)
       
-      // ✅ استعلام صحيح لجلب seller_id عبر order_items -> products
+      // استعلام لجلب seller_id لإشعار البائع (اختياري)
       const { data: orderItems, error: itemsFetchError } = await supabase
         .from('order_items')
         .select('product_id')
         .eq('order_id', orderId)
-        .limit(1)  // نأخذ أول منتج فقط (يمكن تعديله لإرسال إشعار لجميع البائعين)
+        .limit(1)
       
       if (!itemsFetchError && orderItems && orderItems.length > 0) {
         const { data: product } = await supabase
@@ -157,7 +153,8 @@ export default function PaymentPage() {
         }
       }
       
-      toast.success('تم رفع الإيصال بنجاح، سيتم مراجعته قريباً')
+      // ✅ تغيير رسالة النجاح
+      toast.success('تم رفع الإيصال بنجاح، سيتم مراجعته من قبل الإدارة قريباً')
       navigate('/orders')
     } catch (err) {
       toast.error(err.message || 'حدث خطأ أثناء رفع الإيصال')

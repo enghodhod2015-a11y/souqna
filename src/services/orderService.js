@@ -272,7 +272,7 @@ export const approveReturn = async (orderId, approve, adminNotes = '') => {
   return data
 }
 
-// 8️⃣ رفع إيصال الدفع
+// 8️⃣ رفع إيصال الدفع (معدل لمراجعة الأدمن)
 export const uploadReceipt = async (orderId, file, transferData = {}) => {
   const { transfer_number, transfer_name, buyer_phone } = transferData
 
@@ -286,14 +286,16 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
     .from('receipts')
     .getPublicUrl(fileName)
 
+  // ✅ تغيير الحالة إلى "pending_admin_review" بدلاً من "processing"
   const updates = {
     receipt_image: publicUrl,
-    payment_status: 'paid',
-    status: 'processing'
+    payment_status: 'pending_review',   // جديد
+    status: 'pending_admin_review',      // جديد
+    transfer_number: transfer_number || null,
+    transfer_name: transfer_name || null,
+    buyer_phone: buyer_phone || null,
+    receipt_uploaded_at: new Date().toISOString()
   }
-  if (transfer_number) updates.transfer_number = transfer_number
-  if (transfer_name) updates.transfer_name = transfer_name
-  if (buyer_phone) updates.buyer_phone = buyer_phone
 
   const { error: updateError } = await supabase
     .from('orders')
@@ -302,6 +304,102 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
   if (updateError) throw updateError
 
   return publicUrl
+}
+
+// 🆕 جلب الطلبات المنتظرة مراجعة الأدمن
+export const getPendingAdminReceipts = async () => {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      buyer:profiles!orders_user_id_fkey(id, full_name, email, phone),
+      order_items(product_id, quantity, product_price, product_name)
+    `)
+    .eq('status', 'pending_admin_review')
+    .order('receipt_uploaded_at', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+// 🆕 قبول أو رفض الإيصال من الأدمن
+export const reviewReceiptByAdmin = async (orderId, approved, rejectionReason = '') => {
+  if (approved) {
+    // قبول الإيصال → يصبح الطلب "processing" للبائع
+    const { error } = await supabase
+      .from('orders')
+      .update({
+        status: 'processing',
+        payment_status: 'approved',
+        admin_reviewed_at: new Date().toISOString(),
+        admin_notes: null
+      })
+      .eq('id', orderId)
+    if (error) throw error
+
+    // إرسال إشعار للبائع
+    const { data: items } = await supabase
+      .from('order_items')
+      .select('product_id')
+      .eq('order_id', orderId)
+      .limit(1)
+    if (items && items.length > 0) {
+      const { data: product } = await supabase
+        .from('products')
+        .select('seller_id')
+        .eq('id', items[0].product_id)
+        .single()
+      if (product?.seller_id) {
+        const { addNotification } = await import('./notificationService')
+        await addNotification(
+          product.seller_id,
+          'order_status',
+          'تم قبول إيصال الدفع',
+          `الطلب #${orderId} أصبح قيد التجهيز`,
+          orderId
+        )
+      }
+    }
+  } else {
+    // رفض الإيصال → إلغاء الطلب مع إعادة المخزون
+    const { data: items, error: itemsError } = await supabase
+      .from('order_items')
+      .select('product_id, quantity')
+      .eq('order_id', orderId)
+    if (!itemsError && items) {
+      for (const item of items) {
+        await updateProductStock(item.product_id, item.quantity)
+      }
+    }
+
+    const { error } = await supabase
+      .from('orders')
+      .update({
+        status: 'cancelled',
+        payment_status: 'rejected',
+        admin_reviewed_at: new Date().toISOString(),
+        admin_notes: rejectionReason
+      })
+      .eq('id', orderId)
+    if (error) throw error
+
+    // إرسال إشعار للمشتري بالرفض
+    const { data: order } = await supabase
+      .from('orders')
+      .select('user_id')
+      .eq('id', orderId)
+      .single()
+    if (order?.user_id) {
+      const { addNotification } = await import('./notificationService')
+      await addNotification(
+        order.user_id,
+        'payment',
+        'تم رفض إيصال الدفع',
+        rejectionReason || `الطلب #${orderId} تم رفضه، يرجى التواصل مع الدعم`,
+        orderId
+      )
+    }
+  }
+  return { success: true }
 }
 
 // 9️⃣ إحصائيات البائع (معدلة لتحتسب فقط المستحق)

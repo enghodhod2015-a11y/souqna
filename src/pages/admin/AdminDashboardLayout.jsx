@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { BarChart3, Users, Package, DollarSign, ShoppingBag, RefreshCw } from 'lucide-react';
+import { BarChart3, Users, Package, DollarSign, ShoppingBag, RefreshCw, Receipt } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import AdminDashboardHomeTab from './AdminDashboardHomeTab';
 import AdminUsersTab from './AdminUsersTab';
 import AdminProductsTab from './AdminProductsTab';
 import AdminFinanceTab from './AdminFinanceTab';
 import AdminOrdersTab from './AdminOrdersTab';
+import AdminReceiptsReviewTab from './AdminReceiptsReviewTab';
 
 export default function AdminDashboardLayout() {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ export default function AdminDashboardLayout() {
     await queryClient.invalidateQueries({ queryKey: ['pendingSellers'] });
     await queryClient.invalidateQueries({ queryKey: ['adminOrderItems'] });
     await queryClient.invalidateQueries({ queryKey: ['adminConversations'] });
+    await queryClient.invalidateQueries({ queryKey: ['pendingAdminReceipts'] });
   };
 
   return (
@@ -38,7 +40,7 @@ export default function AdminDashboardLayout() {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-6 border-b border-gold/30 pb-2">
-        {['dashboard', 'users', 'products', 'finance', 'orders'].map(tab => (
+        {['dashboard', 'users', 'products', 'finance', 'receipts', 'orders'].map(tab => (
           <button
             key={tab}
             onClick={() => {
@@ -55,11 +57,13 @@ export default function AdminDashboardLayout() {
             {tab === 'users' && <Users size={18} />}
             {tab === 'products' && <Package size={18} />}
             {tab === 'finance' && <DollarSign size={18} />}
+            {tab === 'receipts' && <Receipt size={18} />}
             {tab === 'orders' && <ShoppingBag size={18} />}
             {tab === 'dashboard' && ' لوحة المعلومات'}
             {tab === 'users' && ' المستخدمين'}
             {tab === 'products' && ' إدارة المنتجات'}
             {tab === 'finance' && ' المالية'}
+            {tab === 'receipts' && ' مراجعة الإيصالات'}
             {tab === 'orders' && ' الطلبات والاستفسارات'}
           </button>
         ))}
@@ -95,8 +99,10 @@ export default function AdminDashboardLayout() {
           navigate={navigate}
         />
       )}
+      {activeMainTab === 'receipts' && <AdminReceiptsReviewTab />}
       {activeMainTab === 'orders' && <AdminOrdersTab navigate={navigate} />}
     </div>
   );
 }
+
 
