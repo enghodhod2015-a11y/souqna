@@ -122,17 +122,20 @@ export default function ProductDetailsPage() {
   }
 
   const handleEdit = () => navigate(`/edit-product/${product.id}`)
-  const handleDelete = async () => {
-    const confirmed = window.confirm('هل أنت متأكد من حذف هذا المنتج؟ لا يمكن التراجع.')
+  
+  // ✅ تغيير دالة الحذف إلى إخفاء بنفس منطق MyProductsPage
+  const handleHide = async () => {
+    const confirmed = window.confirm('هل أنت متأكد من إخفاء هذا المنتج؟ سيبقى في المحادثات والطلبات القديمة لكن لن يظهر في المتجر.')
     if (!confirmed) return
     try {
-      await deleteProduct(product.id)
-      toast.success('تم حذف المنتج بنجاح')
-      navigate('/')
+      await deleteProduct(product.id) // deleteProduct تقوم بالإخفاء (is_hidden=true)
+      toast.success('تم إخفاء المنتج بنجاح')
+      navigate('/my-products') // التوجيه إلى صفحة منتجاتي بعد الإخفاء
     } catch (err) {
       toast.error(err.message)
     }
   }
+
   const handleShare = () => {
     const url = `${window.location.origin}/product/${product.id}`
     navigator.clipboard.writeText(url)
@@ -141,7 +144,7 @@ export default function ProductDetailsPage() {
 
   const isOwner = user && user.id === product?.seller_id
   const isAdmin = profile?.account_type === 'admin'
-  const showEditDelete = isOwner || isAdmin
+  const showEditHide = isOwner || isAdmin
 
   if (loading) {
     return (
@@ -204,9 +207,9 @@ export default function ProductDetailsPage() {
               <button onClick={handleInquiry} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-md">💬 استعلام</button>
               <button onClick={handleBuy} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 transition-all shadow-md">🛒 شراء</button>
               <button onClick={handleShare} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white bg-purple-600 hover:bg-purple-700 transition-all shadow-md">🔗 مشاركة</button>
-              {showEditDelete && (<>
+              {showEditHide && (<>
                 <button onClick={handleEdit} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white bg-amber-500 hover:bg-amber-600 transition-all shadow-md">✏️ تعديل</button>
-                <button onClick={handleDelete} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-all shadow-md">🗑️ حذف</button>
+                <button onClick={handleHide} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-all shadow-md">👁️ إخفاء</button>
               </>)}
             </div>
 
@@ -280,5 +283,4 @@ export default function ProductDetailsPage() {
     </div>
   )
 }
-
 
