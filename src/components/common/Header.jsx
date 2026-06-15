@@ -77,7 +77,7 @@ export const Header = () => {
     }
   }
 
-  // روابط سطح المكتب (نصوص فقط – بدون أيقونة الجرس وبدون زر المستخدم المنسدل)
+  // روابط سطح المكتب (نصوص فقط – بدون أيقونة الجرس وبدون أيقونة المفضلة المكررة)
   const desktopLinks = (
     <>
       <Link to="/search" className="flex items-center gap-2 bg-gold/10 border border-gold text-gold px-4 py-2 rounded-lg font-bold hover:bg-gold hover:text-primary-blue transition text-sm">
@@ -107,9 +107,7 @@ export const Header = () => {
               </span>
             )}
           </Link>
-          <Link to="/wishlist" className="p-2 rounded-full hover:bg-primary-card transition-colors" title="المفضلة">
-            <Heart size={20} className="text-gold" />
-          </Link>
+          {/* ❌ تم إزالة أيقونة المفضلة المكررة من هنا */}
         </>
       ) : (
         <div className="flex gap-3">
@@ -249,5 +247,4 @@ export const Header = () => {
     </header>
   )
 }
-
 
