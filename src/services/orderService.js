@@ -306,13 +306,13 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
   return publicUrl
 }
 
-// 🆕 جلب الطلبات المنتظرة مراجعة الأدمن (التي رفع فيها إيصال)
+// 🆕 جلب الطلبات المنتظرة مراجعة الأدمن (التي رفع فيها إيصال) - تم إصلاح العلاقة
 export const getPendingAdminReceipts = async () => {
   const { data, error } = await supabase
     .from('orders')
     .select(`
       *,
-      buyer:profiles!orders_user_id_fkey(id, full_name, email, phone),
+      buyer:profiles!user_id(id, full_name, email, phone),
       order_items(product_id, quantity, product_price, product_name)
     `)
     .eq('status', 'pending_payment_review')
