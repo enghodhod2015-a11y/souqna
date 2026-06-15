@@ -272,7 +272,7 @@ export const approveReturn = async (orderId, approve, adminNotes = '') => {
   return data
 }
 
-// 8️⃣ رفع إيصال الدفع (معدل لمراجعة الأدمن)
+// 8️⃣ رفع إيصال الدفع (معدل لمراجعة الأدمن - يتوافق مع قيود قاعدة البيانات)
 export const uploadReceipt = async (orderId, file, transferData = {}) => {
   const { transfer_number, transfer_name, buyer_phone } = transferData
 
@@ -286,11 +286,11 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
     .from('receipts')
     .getPublicUrl(fileName)
 
-  // ✅ تغيير الحالة إلى "pending_admin_review" بدلاً من "processing"
+  // ✅ استخدام القيم المسموح بها في قيود قاعدة البيانات
   const updates = {
     receipt_image: publicUrl,
-    payment_status: 'pending_review',   // جديد
-    status: 'pending_admin_review',      // جديد
+    status: 'pending_payment_review',   // ينتظر مراجعة الأدمن
+    payment_status: 'unpaid',            // لا يزال غير مدفوع حتى الموافقة
     transfer_number: transfer_number || null,
     transfer_name: transfer_name || null,
     buyer_phone: buyer_phone || null,
@@ -306,7 +306,7 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
   return publicUrl
 }
 
-// 🆕 جلب الطلبات المنتظرة مراجعة الأدمن
+// 🆕 جلب الطلبات المنتظرة مراجعة الأدمن (التي رفع فيها إيصال)
 export const getPendingAdminReceipts = async () => {
   const { data, error } = await supabase
     .from('orders')
@@ -315,21 +315,22 @@ export const getPendingAdminReceipts = async () => {
       buyer:profiles!orders_user_id_fkey(id, full_name, email, phone),
       order_items(product_id, quantity, product_price, product_name)
     `)
-    .eq('status', 'pending_admin_review')
+    .eq('status', 'pending_payment_review')
+    .not('receipt_image', 'is', null)
     .order('receipt_uploaded_at', { ascending: true })
   if (error) throw error
   return data || []
 }
 
-// 🆕 قبول أو رفض الإيصال من الأدمن
+// 🆕 قبول أو رفض الإيصال من الأدمن (يتوافق مع قيود قاعدة البيانات)
 export const reviewReceiptByAdmin = async (orderId, approved, rejectionReason = '') => {
   if (approved) {
-    // قبول الإيصال → يصبح الطلب "processing" للبائع
+    // قبول الإيصال → يصبح الطلب قيد التجهيز والدفع مؤكد
     const { error } = await supabase
       .from('orders')
       .update({
         status: 'processing',
-        payment_status: 'approved',
+        payment_status: 'paid',
         admin_reviewed_at: new Date().toISOString(),
         admin_notes: null
       })
@@ -375,7 +376,7 @@ export const reviewReceiptByAdmin = async (orderId, approved, rejectionReason = 
       .from('orders')
       .update({
         status: 'cancelled',
-        payment_status: 'rejected',
+        payment_status: 'unpaid',
         admin_reviewed_at: new Date().toISOString(),
         admin_notes: rejectionReason
       })
@@ -512,4 +513,5 @@ export const getSellerStats = async (sellerId) => {
 export const getMonthlySales = async (sellerId) => {
   return []
 }
+
 
