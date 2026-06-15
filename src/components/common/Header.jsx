@@ -8,7 +8,8 @@ import {
   Search,
   Menu,
   X,
-  Heart
+  Heart,
+  ShoppingBag   // ✅ أضفنا أيقونة الطلبات
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
@@ -198,11 +199,36 @@ export const Header = () => {
     <header className="bg-header-blue border-b-2 border-gold py-4 px-6 md:px-12 relative z-40">
       <div className="container mx-auto flex justify-between items-center">
         <Link to="/" className="text-2xl font-bold text-gold">سوقنا</Link>
+
+        {/* سطح المكتب: كل الأزرار النصية */}
         <div className="hidden lg:flex items-center gap-3">{desktopLinks}</div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="lg:hidden text-gold p-2 rounded-lg hover:bg-primary-card transition-colors z-50">
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+
+        {/* الجوال: أيقونات مختصرة + زر الهامبورجر */}
+        <div className="flex lg:hidden items-center gap-2">
+          {user && (
+            <>
+              <Link to="/orders" className="p-2 rounded-full hover:bg-primary-card transition-colors">
+                <ShoppingBag size={20} className="text-gold" />
+              </Link>
+              <Link to="/wishlist" className="p-2 rounded-full hover:bg-primary-card transition-colors">
+                <Heart size={20} className="text-gold" />
+              </Link>
+              <NotificationBell />
+              <Link to="/profile" className="p-2 rounded-full hover:bg-primary-card transition-colors">
+                <User size={20} className="text-gold" />
+              </Link>
+            </>
+          )}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="text-gold p-2 rounded-lg hover:bg-primary-card transition-colors z-50"
+          >
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
       </div>
+
+      {/* القائمة المنبثقة للجوال (تبقى كما هي) */}
       {isMobileMenuOpen && (
         <>
           <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />
