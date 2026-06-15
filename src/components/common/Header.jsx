@@ -111,8 +111,7 @@ export const Header = () => {
           <Link to="/wishlist" className="p-2 rounded-full hover:bg-primary-card transition-colors" title="المفضلة">
             <Heart size={20} className="text-gold" />
           </Link>
-          {/* ✅ NotificationBell يظهر هنا فقط لسطح المكتب */}
-          <NotificationBell />
+          {/* ✅ تم إزالة NotificationBell من هنا */}
           <div className="relative" ref={dropdownRef}>
             <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center gap-2 bg-primary-card rounded-full px-4 py-2 hover:bg-secondary-blue transition-colors">
               <User size={18} className="text-gold" />
@@ -199,10 +198,10 @@ export const Header = () => {
       <div className="container mx-auto flex justify-between items-center">
         <Link to="/" className="text-2xl font-bold text-gold">سوقنا</Link>
 
-        {/* سطح المكتب: جميع الأزرار (بما فيها NotificationBell) */}
+        {/* سطح المكتب: جميع الأزرار النصية (بدون NotificationBell) */}
         <div className="hidden lg:flex items-center gap-3">{desktopLinks}</div>
 
-        {/* الجوال: أيقونات مختصرة + NotificationBell + زر الهامبورجر */}
+        {/* الجوال: أيقونات مختصرة + NotificationBell (مرة واحدة) + زر الهامبورجر */}
         <div className="flex lg:hidden items-center gap-2">
           {user && (
             <>
@@ -212,7 +211,7 @@ export const Header = () => {
               <Link to="/wishlist" className="p-2 rounded-full hover:bg-primary-card transition-colors">
                 <Heart size={20} className="text-gold" />
               </Link>
-              {/* ✅ NotificationBell يظهر مرة واحدة فقط هنا على الجوال */}
+              {/* ✅ NotificationBell يظهر مرة واحدة هنا (للموبايل) */}
               <NotificationBell />
               <Link to="/profile" className="p-2 rounded-full hover:bg-primary-card transition-colors">
                 <User size={20} className="text-gold" />

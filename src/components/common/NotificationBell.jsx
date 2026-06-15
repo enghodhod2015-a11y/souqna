@@ -14,7 +14,7 @@ export const NotificationBell = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const channelRef = useRef(null); // ✅ مرجع للقناة
+  const channelRef = useRef(null);
 
   const handleAuthError = async (err) => {
     if (err?.code === 'PGRST303' || err?.message?.includes('JWT expired')) {
@@ -40,7 +40,6 @@ export const NotificationBell = () => {
     }
   }, [user, navigate]);
 
-  // تحميل أولي وإعادة تحميل كل 30 ثانية
   useEffect(() => {
     if (!user) return;
     loadNotifications();
@@ -48,15 +47,12 @@ export const NotificationBell = () => {
     return () => clearInterval(interval);
   }, [user, loadNotifications]);
 
-  // ✅ إعداد Realtime بشكل آمن (مرة واحدة)
+  // ✅ إعداد Realtime بشكل آمن
   useEffect(() => {
     if (!user) return;
-
-    // إلغاء القناة السابقة إذا كانت موجودة
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
     }
-
     const channel = supabase
       .channel(`notifications-dropdown-${user.id}`)
       .on('postgres_changes', {
@@ -73,9 +69,7 @@ export const NotificationBell = () => {
           console.log('✅ [NotificationBell] مشترك في القناة بنجاح');
         }
       });
-
     channelRef.current = channel;
-
     return () => {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
@@ -84,12 +78,10 @@ export const NotificationBell = () => {
     };
   }, [user, loadNotifications]);
 
-  // عند فتح القائمة نعيد الجلب
   useEffect(() => {
     if (dropdownOpen) loadNotifications();
   }, [dropdownOpen, loadNotifications]);
 
-  // إعادة تهيئة الصوت إذا كان الإذن ممنوحاً
   useEffect(() => {
     if (!user) return;
     const init = async () => {
@@ -101,7 +93,6 @@ export const NotificationBell = () => {
     init();
   }, [user]);
 
-  // إغلاق القائمة عند النقر خارجها
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false);

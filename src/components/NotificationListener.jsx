@@ -10,12 +10,9 @@ export const NotificationListener = ({ children }) => {
 
   useEffect(() => {
     if (!user) return;
-
-    // إلغاء القناة السابقة إذا كانت موجودة
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
     }
-
     const channel = supabase
       .channel(`user-notifications-${user.id}`)
       .on('postgres_changes', {
@@ -28,15 +25,8 @@ export const NotificationListener = ({ children }) => {
         if (!newNotif) return;
         if (lastNotifIdRef.current === newNotif.id) return;
         lastNotifIdRef.current = newNotif.id;
-
         console.log('🔔 إشعار جديد:', newNotif);
-        console.log('🎵 audioCtx state:', audioCtx ? audioCtx.state : 'null');
-        console.log('🔔 Notification.permission:', Notification.permission);
-
-        if (!audioCtx && Notification.permission === 'granted') {
-          await enableAudio();
-        }
-
+        if (!audioCtx && Notification.permission === 'granted') await enableAudio();
         if (Notification.permission === 'granted') {
           const notification = new Notification(newNotif.title, {
             body: newNotif.message,
@@ -44,21 +34,15 @@ export const NotificationListener = ({ children }) => {
           });
           notification.onclick = () => {
             window.focus();
-            if (newNotif.related_id) {
-              window.location.href = `/chat/c/${newNotif.related_id}`;
-            }
+            if (newNotif.related_id) window.location.href = `/chat/c/${newNotif.related_id}`;
           };
         }
         await playNotificationSound();
       })
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ [NotificationListener] مشترك في القناة بنجاح');
-        }
+        if (status === 'SUBSCRIBED') console.log('✅ [NotificationListener] مشترك في القناة');
       });
-
     channelRef.current = channel;
-
     return () => {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
@@ -69,5 +53,4 @@ export const NotificationListener = ({ children }) => {
 
   return children;
 };
-
 
