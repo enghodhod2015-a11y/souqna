@@ -20,26 +20,43 @@ export default function AdminOrdersTab({ navigate }) {
         if (convError) throw convError;
         if (!conversations || conversations.length === 0) return [];
 
+        // جلب المنتجات - استخدام name فقط
         const productIds = [...new Set(conversations.map(c => c.product_id).filter(Boolean))];
         let productsMap = new Map();
         if (productIds.length) {
           const { data: products, error: prodError } = await supabase
             .from('products')
-            .select('id, name, title')
+            .select('id, name') // ✅ إزالة title غير الموجود
             .in('id', productIds);
-          if (!prodError) productsMap = new Map(products.map(p => [p.id, p]));
+          if (prodError) {
+            console.error('خطأ في جلب المنتجات:', prodError);
+          } else if (products) {
+            productsMap = new Map(products.map(p => [p.id, p]));
+            // تسجيل أي product_id غير موجود للمساعدة في التصحيح
+            const missingProducts = productIds.filter(id => !productsMap.has(id));
+            if (missingProducts.length > 0) {
+              console.warn('⚠️ منتجات غير موجودة في قاعدة البيانات:', missingProducts);
+            }
+          }
         }
 
-        const userIds = [...new Set([...conversations.map(c => c.buyer_id), ...conversations.map(c => c.seller_id)].filter(Boolean))];
+        // جلب بيانات المستخدمين
+        const userIds = [...new Set([
+          ...conversations.map(c => c.buyer_id),
+          ...conversations.map(c => c.seller_id)
+        ].filter(Boolean))];
         let profilesMap = new Map();
         if (userIds.length) {
           const { data: profiles, error: profError } = await supabase
             .from('profiles')
             .select('id, full_name, email')
             .in('id', userIds);
-          if (!profError) profilesMap = new Map(profiles.map(p => [p.id, p]));
+          if (!profError && profiles) {
+            profilesMap = new Map(profiles.map(p => [p.id, p]));
+          }
         }
 
+        // جلب آخر رسالة لكل محادثة
         const conversationIds = conversations.map(c => c.id);
         const lastMessageMap = new Map();
         for (const convId of conversationIds) {
@@ -78,9 +95,15 @@ export default function AdminOrdersTab({ navigate }) {
             statusColor = 'text-gray-500';
           }
 
+          const product = productsMap.get(conv.product_id) || null;
+          // إذا كان هناك product_id ولكن المنتج غير موجود، نسجل تحذير
+          if (conv.product_id && !product) {
+            console.warn(`⚠️ المحادثة ${conv.id} لها product_id=${conv.product_id} ولكن المنتج غير موجود`);
+          }
+
           return {
             ...conv,
-            product: productsMap.get(conv.product_id) || null,
+            product,
             buyer: profilesMap.get(conv.buyer_id) || null,
             seller: profilesMap.get(conv.seller_id) || null,
             last_message_sender_id: lastMsg?.sender_id,
@@ -207,6 +230,7 @@ export default function AdminOrdersTab({ navigate }) {
     );
     if (!adminMessage) return;
 
+    const productName = conv.product?.name || (conv.product_id ? 'منتج محذوف' : 'بدون منتج');
     const fullReminderMessage = `📌 **تذكير من الإدارة**\n\n` +
                                 `🔄 **آخر رسالة في المحادثة:**\n${lastMessageText}\n\n` +
                                 `✉️ **رسالة الإدارة:** ${adminMessage}`;
@@ -214,7 +238,7 @@ export default function AdminOrdersTab({ navigate }) {
     await sendNotificationToUser(
       targetUserId,
       fullReminderMessage,
-      `تذكير بخصوص المحادثة (المنتج: ${conv.product?.title || conv.product?.name || 'غير معروف'})`,
+      `تذكير بخصوص المحادثة (${productName})`,
       'message',
       conv.id
     );
@@ -233,7 +257,7 @@ export default function AdminOrdersTab({ navigate }) {
   }
 
   const exportData = conversations.map(conv => ({
-    'المنتج': conv.product?.title || conv.product?.name || 'منتج غير متوفر',
+    'المنتج': conv.product?.name || (conv.product_id ? 'منتج محذوف' : 'بدون منتج'),
     'المشتري': conv.buyer?.full_name || conv.buyer_name || 'غير معروف',
     'البائع': conv.seller?.full_name || conv.seller_name || 'غير معروف',
     'آخر رسالة': conv.last_message || 'لا توجد رسائل',
@@ -292,7 +316,9 @@ export default function AdminOrdersTab({ navigate }) {
             <tbody>
               {conversations.map(conv => (
                 <tr key={conv.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
-                  <td className="p-3 text-white">{conv.product?.title || conv.product?.name || 'منتج غير متوفر'}</td>
+                  <td className="p-3 text-white">
+                    {conv.product?.name || (conv.product_id ? '⚠️ منتج محذوف' : 'بدون منتج')}
+                  </td>
                   <td className="p-3 text-white">{conv.buyer?.full_name || conv.buyer_name || 'غير معروف'}</td>
                   <td className="p-3 text-white">{conv.seller?.full_name || conv.seller_name || 'غير معروف'}</td>
                   <td className="p-3 text-white max-w-xs truncate">{conv.last_message || 'لا توجد رسائل'}</td>
@@ -301,7 +327,7 @@ export default function AdminOrdersTab({ navigate }) {
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${conv.statusColor} ${conv.status === 'تم الرد من البائع' ? 'bg-green-900/30' : 'bg-yellow-900/30'}`}>
                       {conv.status}
                     </span>
-                  </td>
+                   </td>
                   <td className="p-3">
                     <div className="flex gap-2">
                       <Link to={`/chat/c/${conv.id}`} className="bg-gold text-primary-blue px-3 py-1 rounded-lg text-sm shadow hover:bg-gold/90 transition inline-flex items-center gap-1">
@@ -327,4 +353,5 @@ export default function AdminOrdersTab({ navigate }) {
     </div>
   );
 }
+
 
