@@ -308,18 +308,38 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
 
 // 🆕 جلب الطلبات المنتظرة مراجعة الأدمن (التي رفع فيها إيصال) - تم إصلاح العلاقة
 export const getPendingAdminReceipts = async () => {
-  const { data, error } = await supabase
+  // 1. جلب الطلبات المعلقة مع order_items
+  const { data: orders, error: ordersError } = await supabase
     .from('orders')
     .select(`
       *,
-      buyer:profiles!user_id(id, full_name, email, phone),
       order_items(product_id, quantity, product_price, product_name)
     `)
     .eq('status', 'pending_payment_review')
     .not('receipt_image', 'is', null)
     .order('receipt_uploaded_at', { ascending: true })
-  if (error) throw error
-  return data || []
+  
+  if (ordersError) throw ordersError
+  if (!orders || orders.length === 0) return []
+
+  // 2. جلب بيانات المشترين بشكل منفصل باستخدام user_id
+  const buyerIds = orders.map(o => o.user_id).filter(Boolean)
+  let buyersMap = new Map()
+  if (buyerIds.length) {
+    const { data: buyers, error: buyersError } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, phone')
+      .in('id', buyerIds)
+    if (!buyersError && buyers) {
+      buyersMap = new Map(buyers.map(b => [b.id, b]))
+    }
+  }
+
+  // 3. دمج البيانات
+  return orders.map(order => ({
+    ...order,
+    buyer: buyersMap.get(order.user_id) || null
+  }))
 }
 
 // 🆕 قبول أو رفض الإيصال من الأدمن (يتوافق مع قيود قاعدة البيانات)
@@ -513,5 +533,4 @@ export const getSellerStats = async (sellerId) => {
 export const getMonthlySales = async (sellerId) => {
   return []
 }
-
 
