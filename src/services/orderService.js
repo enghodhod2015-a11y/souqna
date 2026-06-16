@@ -298,36 +298,34 @@ export const approveReturn = async (orderId, approve, adminNotes = '', itemsToAp
 
 // 8️⃣ رفع إيصال الدفع (معدل لمراجعة الأدمن)
 export const uploadReceipt = async (orderId, file, transferData = {}) => {
-  const { transfer_number, transfer_name, buyer_phone } = transferData
-
-  const fileName = `receipts/${orderId}/${Date.now()}_${file.name}`
-  const { error: uploadError } = await supabase.storage
-    .from('receipts')
-    .upload(fileName, file)
-  if (uploadError) throw uploadError
-
-  const { data: { publicUrl } } = supabase.storage
-    .from('receipts')
-    .getPublicUrl(fileName)
-
-  const updates = {
-    receipt_image: publicUrl,
-    status: 'pending_payment_review',
-    payment_status: 'unpaid',
-    transfer_number: transfer_number || null,
-    transfer_name: transfer_name || null,
-    buyer_phone: buyer_phone || null,
-    receipt_uploaded_at: new Date().toISOString()
+  console.log('📤 بدء رفع الإيصال للطلب:', orderId);
+  try {
+    const { transfer_number, transfer_name, buyer_phone } = transferData;
+    console.log('📦 بيانات التحويل:', { transfer_number, transfer_name, buyer_phone });
+    
+    const fileName = `receipts/${orderId}/${Date.now()}_${file.name}`;
+    console.log('📁 اسم الملف:', fileName);
+    
+    const { error: uploadError } = await supabase.storage
+      .from('receipts')
+      .upload(fileName, file);
+    if (uploadError) {
+      console.error('❌ فشل رفع الملف:', uploadError);
+      throw uploadError;
+    }
+    console.log('✅ تم رفع الملف بنجاح');
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from('receipts')
+      .getPublicUrl(fileName);
+    console.log('🔗 رابط الصورة:', publicUrl);
+    
+    // ... بقية الكود ...
+  } catch (error) {
+    console.error('💥 خطأ في uploadReceipt:', error);
+    throw error;
   }
-
-  const { error: updateError } = await supabase
-    .from('orders')
-    .update(updates)
-    .eq('id', orderId)
-  if (updateError) throw updateError
-
-  return publicUrl
-}
+};
 
 // 🆕 جلب الطلبات المنتظرة مراجعة الأدمن
 export const getPendingAdminReceipts = async () => {
