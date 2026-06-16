@@ -131,35 +131,52 @@ export default function PaymentPage() {
       clearInterval(progressInterval)
       setUploadProgress(100)
 
-      // استعلام لجلب seller_id لإشعار البائع (اختياري)
+      // ✅ إرسال إشعار للبائع
+      console.log('🔍 [PaymentPage] جلب بيانات المنتج لإرسال إشعار...');
       const { data: orderItems, error: itemsFetchError } = await supabase
         .from('order_items')
         .select('product_id')
         .eq('order_id', orderId)
         .limit(1)
 
+      console.log('📦 [PaymentPage] orderItems:', orderItems, 'error:', itemsFetchError);
+
       if (!itemsFetchError && orderItems && orderItems.length > 0) {
-        const { data: product } = await supabase
+        const { data: product, error: productError } = await supabase
           .from('products')
           .select('seller_id')
           .eq('id', orderItems[0].product_id)
           .single()
 
+        console.log('📦 [PaymentPage] product:', product, 'error:', productError);
+        console.log('📦 [PaymentPage] seller_id:', product?.seller_id);
+
         if (product?.seller_id) {
-          await addNotification(
-            product.seller_id,
-            'payment',
-            'إيصال دفع جديد',
-            `تم رفع إيصال دفع للطلب #${orderId}، يرجى مراجعته`,
-            orderId
-          )
+          console.log('🔔 [PaymentPage] إرسال إشعار للبائع:', product.seller_id);
+          try {
+            await addNotification(
+              product.seller_id,
+              'payment',
+              'إيصال دفع جديد',
+              `تم رفع إيصال دفع للطلب #${orderId}، يرجى مراجعته`,
+              orderId
+            )
+            console.log('✅ [PaymentPage] تم إرسال الإشعار بنجاح');
+          } catch (notifyErr) {
+            console.error('❌ [PaymentPage] فشل إرسال الإشعار:', notifyErr);
+            // لا نوقف العملية - الإيصال تم رفعه بنجاح
+          }
+        } else {
+          console.log('❌ [PaymentPage] لا يوجد seller_id، لن يتم إرسال إشعار');
         }
+      } else {
+        console.log('❌ [PaymentPage] لا يوجد orderItems، لن يتم إرسال إشعار');
       }
 
-      // ✅ تغيير رسالة النجاح
       toast.success('تم رفع الإيصال بنجاح، سيتم مراجعته من قبل الإدارة قريباً')
       navigate('/orders')
     } catch (err) {
+      console.error('❌ [PaymentPage] خطأ:', err);
       toast.error(err.message || 'حدث خطأ أثناء رفع الإيصال')
     } finally {
       setLoading(false)
