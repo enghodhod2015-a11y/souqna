@@ -127,20 +127,25 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     }
   };
 
-  const updateUserMutation = async ({ userId, updates }) => {
-    const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
-    if (error) throw error;
+  // استيراد الدوال
+import { isCurrentUserAdmin, adminUpdateProfile } from '../../services/adminGuard';
+
+// داخل المكون، عند زر تحديث النسبة:
+const handleUpdateCommission = async () => {
+  const isAdmin = await isCurrentUserAdmin();
+  if (!isAdmin) {
+    toast.error('غير مصرح: هذه العملية تتطلب صلاحيات أدمن');
+    return;
+  }
+  try {
+    await adminUpdateProfile(selectedSeller.id, { commission_percent: sellerCommissionPercent });
     toast.success('تم تحديث نسبة العمولة');
-    if (selectedSeller?.id === userId) {
-      setSelectedSeller(prev => ({ ...prev, ...updates }));
-      if (updates.commission_percent !== undefined) {
-        setSellerCommissionPercent(updates.commission_percent);
-        await calculateFinance();
-      }
-    }
+    await calculateFinance(); // إعادة حساب المالية
     refetchUsers();
-    queryClient.invalidateQueries({ queryKey: ['adminUsersForFinance'] });
-  };
+  } catch (err) {
+    toast.error(err.message);
+  }
+};
 
   const handleAddTransfer = async () => {
     if (!selectedSeller) return toast.error('اختر بائعاً أولاً');

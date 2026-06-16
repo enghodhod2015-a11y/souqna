@@ -63,15 +63,31 @@ export default function AdminUsersTab({
     if (selectedSeller) setSellerCommissionPercent(selectedSeller.commission_percent ?? 10);
   }, [selectedSeller]);
 
-  const updateUserMutation = async ({ userId, updates }) => {
-    const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
-    if (error) throw error;
+  // داخل AdminUsersTab
+import { isCurrentUserAdmin, adminUpdateProfile } from '../../services/adminGuard';
+
+// ... ثم داخل المكون
+
+const updateUserMutation = async ({ userId, updates }) => {
+  // التأكد من أن المستخدم الحالي أدمن قبل التحديث
+  const isAdmin = await isCurrentUserAdmin();
+  if (!isAdmin) {
+    toast.error('غير مصرح: ليس لديك صلاحية أدمن');
+    return;
+  }
+  
+  try {
+    // استخدام الدالة الآمنة
+    const result = await adminUpdateProfile(userId, updates);
     toast.success('تم تحديث المستخدم');
     refetchUsers();
     queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
-    if (selectedSeller?.id === userId) setSelectedSeller(prev => ({ ...prev, ...updates }));
-    if (selectedBuyer?.id === userId) setSelectedBuyer(prev => ({ ...prev, ...updates }));
-  };
+    if (selectedSeller?.id === userId) setSelectedSeller(prev => ({ ...prev, ...result }));
+    if (selectedBuyer?.id === userId) setSelectedBuyer(prev => ({ ...prev, ...result }));
+  } catch (err) {
+    toast.error(err.message);
+  }
+};
 
   const approveSellerMutation = async ({ sellerId, approved, notes }) => {
     const { error } = await supabase.from('profiles').update({ is_verified: approved, admin_notes: notes }).eq('id', sellerId);
