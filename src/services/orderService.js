@@ -6,7 +6,7 @@
 
 import { supabase } from './supabase'
 import { updateProductStock } from './productService'
-import { addNotification } from './notificationService'  // إضافة للإشعارات
+import { addNotification } from './notificationService'
 
 // 1️⃣ إنشاء طلب جديد (مع خصم المخزون)
 export const createOrder = async (orderData) => {
@@ -210,8 +210,6 @@ export const confirmDelivery = async (orderId) => {
 
 // 6️⃣ طلب استرجاع (تم التعديل: 3 دقائق، مع دعم عناصر متعددة)
 export const requestReturn = async (orderId, itemsToReturn) => {
-  // itemsToReturn: [{ product_id, quantity, reason }]
-  // التحقق من أن الطلب مكتمل وخلال 3 دقائق فقط
   const { data: order, error: fetchError } = await supabase
     .from('orders')
     .select('completed_at')
@@ -225,7 +223,6 @@ export const requestReturn = async (orderId, itemsToReturn) => {
   const diffMins = diffMs / (1000 * 60);
   if (diffMins > 3) throw new Error('انتهت مهلة الاسترجاع (3 دقائق فقط)');
 
-  // تحديث كل عنصر على حدة
   for (const item of itemsToReturn) {
     const { error: upError } = await supabase
       .from('order_items')
@@ -239,14 +236,12 @@ export const requestReturn = async (orderId, itemsToReturn) => {
     if (upError) throw upError;
   }
 
-  // تحديث حالة الطلب العامة إلى return_requested
   await supabase.from('orders').update({ return_status: 'requested' }).eq('id', orderId);
   return { success: true };
 };
 
 // 7️⃣ الموافقة على الاسترجاع (مع إعادة المخزون للمنتجات المقبولة فقط)
 export const approveReturn = async (orderId, approve, adminNotes = '', itemsToApprove = null) => {
-  // itemsToApprove: مصفوفة من product_ids (إذا كانت null، يتم تطبيق القرار على كل العناصر المطلوبة)
   let query = supabase.from('order_items').select('*').eq('order_id', orderId).eq('return_status', 'requested');
   if (itemsToApprove && itemsToApprove.length) {
     query = query.in('product_id', itemsToApprove);
@@ -256,7 +251,6 @@ export const approveReturn = async (orderId, approve, adminNotes = '', itemsToAp
   if (!items.length) throw new Error('لا توجد عناصر مطلوبة للاسترجاع');
 
   if (approve) {
-    // قبول الاسترجاع: إعادة المخزون وتحديث حالة العناصر
     for (const item of items) {
       await updateProductStock(item.product_id, item.return_quantity);
       await supabase
@@ -264,13 +258,11 @@ export const approveReturn = async (orderId, approve, adminNotes = '', itemsToAp
         .update({ return_status: 'approved', return_approved_at: new Date().toISOString() })
         .eq('id', item.id);
     }
-    // إشعار للمستخدم (اختياري)
     const { data: order } = await supabase.from('orders').select('user_id').eq('id', orderId).single();
     if (order?.user_id) {
       await addNotification(order.user_id, 'return', 'تم قبول الاسترجاع', 'تم قبول طلب استرجاع منتجك', orderId);
     }
   } else {
-    // رفض الاسترجاع: تحديث حالة العناصر إلى rejected
     for (const item of items) {
       await supabase
         .from('order_items')
@@ -279,7 +271,6 @@ export const approveReturn = async (orderId, approve, adminNotes = '', itemsToAp
     }
   }
 
-  // تحديث حالة الطلب العامة: إذا كانت كل العناصر المرتجعة أصبحت approved أو rejected
   const { data: allReturnItems } = await supabase
     .from('order_items')
     .select('return_status')
@@ -296,31 +287,61 @@ export const approveReturn = async (orderId, approve, adminNotes = '', itemsToAp
   return { success: true };
 };
 
-// 8️⃣ رفع إيصال الدفع (معدل لمراجعة الأدمن)
+// 8️⃣ رفع إيصال الدفع (معدل لمراجعة الأدمن) مع تسجيل تفصيلي
 export const uploadReceipt = async (orderId, file, transferData = {}) => {
-  console.log('📤 بدء رفع الإيصال للطلب:', orderId);
+  console.log('📤 ===== بدء uploadReceipt للطلب:', orderId, '=====');
   try {
     const { transfer_number, transfer_name, buyer_phone } = transferData;
     console.log('📦 بيانات التحويل:', { transfer_number, transfer_name, buyer_phone });
-    
+    console.log('📎 اسم الملف:', file?.name, '، حجم:', file?.size);
+
+    // 1. رفع الملف إلى Storage
     const fileName = `receipts/${orderId}/${Date.now()}_${file.name}`;
-    console.log('📁 اسم الملف:', fileName);
-    
+    console.log('📁 مسار الملف في Storage:', fileName);
+
+    console.log('⏳ جاري رفع الملف...');
     const { error: uploadError } = await supabase.storage
       .from('receipts')
       .upload(fileName, file);
     if (uploadError) {
       console.error('❌ فشل رفع الملف:', uploadError);
-      throw uploadError;
+      throw new Error(`فشل رفع الملف: ${uploadError.message}`);
     }
     console.log('✅ تم رفع الملف بنجاح');
-    
+
+    // 2. الحصول على الرابط العام
     const { data: { publicUrl } } = supabase.storage
       .from('receipts')
       .getPublicUrl(fileName);
-    console.log('🔗 رابط الصورة:', publicUrl);
-    
-    // ... بقية الكود ...
+    console.log('🔗 الرابط العام للصورة:', publicUrl);
+
+    // 3. تحديث جدول orders
+    const updates = {
+      receipt_image: publicUrl,
+      status: 'pending_payment_review',
+      payment_status: 'unpaid',
+      transfer_number: transfer_number || null,
+      transfer_name: transfer_name || null,
+      buyer_phone: buyer_phone || null,
+      receipt_uploaded_at: new Date().toISOString()
+    };
+    console.log('📝 بيانات التحديث للطلب:', updates);
+
+    console.log('⏳ جاري تحديث الطلب في قاعدة البيانات...');
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update(updates)
+      .eq('id', orderId)
+      .eq('user_id', (await supabase.auth.getUser()).data.user?.id); // تأكد من أن المستخدم هو المالك
+
+    if (updateError) {
+      console.error('❌ فشل تحديث الطلب:', updateError);
+      throw new Error(`فشل تحديث الطلب: ${updateError.message}`);
+    }
+    console.log('✅ تم تحديث الطلب بنجاح');
+
+    console.log('🎉 انتهت uploadReceipt بنجاح للطلب:', orderId);
+    return publicUrl;
   } catch (error) {
     console.error('💥 خطأ في uploadReceipt:', error);
     throw error;
@@ -374,7 +395,6 @@ export const reviewReceiptByAdmin = async (orderId, approved, rejectionReason = 
       .eq('id', orderId)
     if (error) throw error
 
-    // إرسال إشعار للبائع
     const { data: items } = await supabase
       .from('order_items')
       .select('product_id')
@@ -397,7 +417,6 @@ export const reviewReceiptByAdmin = async (orderId, approved, rejectionReason = 
       }
     }
   } else {
-    // رفض الإيصال → إلغاء الطلب مع إعادة المخزون
     const { data: items, error: itemsError } = await supabase
       .from('order_items')
       .select('product_id, quantity')
@@ -419,7 +438,6 @@ export const reviewReceiptByAdmin = async (orderId, approved, rejectionReason = 
       .eq('id', orderId)
     if (error) throw error
 
-    // إرسال إشعار للمشتري بالرفض
     const { data: order } = await supabase
       .from('orders')
       .select('user_id')
@@ -468,7 +486,6 @@ export const getSellerStats = async (sellerId) => {
       };
     }
 
-    // جلب order_items مع return_status و return_quantity
     const { data: orderItems, error: oiError } = await supabase
       .from('order_items')
       .select('order_id, product_price, quantity, return_status, return_quantity')
@@ -508,14 +525,12 @@ export const getSellerStats = async (sellerId) => {
       const isCompleted = (order.status === 'completed' || order.status === 'delivered');
       const isPastReturnWindow = order.completed_at && new Date(order.completed_at) <= threeMinutesAgo;
       
-      // حساب المبيعات المستحقة للبائع: المكتملة والتي مضى 3 دقائق، مع خصم الكميات المرتجعة المقبولة
       if (isCompleted && isPastReturnWindow) {
         const returnedQty = (item.return_status === 'approved') ? (item.return_quantity || 0) : 0;
         const soldQty = item.quantity - returnedQty;
         totalSales += item.product_price * soldQty;
       }
 
-      // إحصائيات إضافية (للشاشة)
       if (order.status === 'pending' || order.status === 'pending_payment_review') {
         pendingOrders++;
       } else if (order.status === 'payment_approved' || order.status === 'processing' || order.status === 'shipped') {
@@ -550,4 +565,5 @@ export const getSellerStats = async (sellerId) => {
 export const getMonthlySales = async (sellerId) => {
   return []
 }
+
 
