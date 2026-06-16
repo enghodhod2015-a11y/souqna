@@ -101,44 +101,45 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
       if (productIds.length) {
         const { data: orderItemsData, error: oiErr } = await supabase
           .from('order_items')
-          .select('order_id, product_price, quantity')
+          .select('order_id, product_price, quantity, return_status, return_quantity')
           .in('product_id', productIds);
         if (oiErr) throw oiErr;
         if (orderItemsData?.length) {
           const orderIds = [...new Set(orderItemsData.map(i => i.order_id))];
           const { data: orders, error: ordersErr } = await supabase
             .from('orders')
-            .select('id, status, completed_at, return_status')
+            .select('id, status, completed_at')
             .in('id', orderIds);
           if (ordersErr) throw ordersErr;
           const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
-          const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+          
+          const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000).toISOString();
 
           for (const item of orderItemsData) {
             const order = orderMap.get(item.order_id);
-            if (order) {
-              const isEligible = (order.status === 'completed' || order.status === 'delivered')
-                                 && order.completed_at
-                                 && order.completed_at <= threeDaysAgo
-                                 && order.return_status !== 'approved';
-              if (isEligible) {
-                totalSales += item.product_price * item.quantity;
-              }
-              if (order.return_status === 'approved') {
-                totalReturns += item.product_price * item.quantity;
-              }
+            if (!order) continue;
+            
+            const isCompleted = (order.status === 'completed' || order.status === 'delivered');
+            const isPastReturnWindow = order.completed_at && order.completed_at <= threeMinutesAgo;
+            
+            if (isCompleted && isPastReturnWindow) {
+              const effectiveQty = item.quantity - (item.return_status === 'approved' ? item.return_quantity : 0);
+              totalSales += item.product_price * effectiveQty;
+            }
+            if (item.return_status === 'approved') {
+              totalReturns += item.product_price * item.return_quantity;
             }
           }
         }
       }
-      const netAfterReturns = totalSales - totalReturns;
-      const commissionAmount = netAfterReturns > 0 ? netAfterReturns * (sellerCommissionPercent / 100) : 0;
+      const netSales = totalSales - totalReturns;
+      const commissionAmount = netSales > 0 ? netSales * (sellerCommissionPercent / 100) : 0;
       const { data: transfers } = await supabase
         .from('seller_transfers')
         .select('amount')
         .eq('seller_id', sellerId);
       const totalReceived = transfers?.reduce((s, t) => s + (t.amount || 0), 0) || 0;
-      const remaining = netAfterReturns - commissionAmount - totalReceived;
+      const remaining = netSales - commissionAmount - totalReceived;
       setSellerFinance({ totalSales, totalReturns, commissionAmount, totalReceived, remaining });
     } catch (err) {
       console.error(err);
@@ -175,6 +176,12 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     if (!selectedSeller) return toast.error('اختر بائعاً أولاً');
     const amountNum = parseFloat(transferAmount);
     if (isNaN(amountNum) || amountNum <= 0) return toast.error('أدخل مبلغاً صحيحاً');
+    
+    if (amountNum > sellerFinance.remaining) {
+      toast.error(`لا يمكن رفع إيصال أكبر من المبلغ المتبقي (${formatNumber(sellerFinance.remaining)} ريال)`);
+      return;
+    }
+    
     if (!receiptFile) return toast.error('يرجى اختيار صورة الإيصال');
     setUploading(true);
     try {
@@ -382,7 +389,7 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
                   <th className="py-2 text-gold">القسم</th>
                   <th className="py-2 text-gold">المبلغ</th>
                   <th className="py-2 text-gold">العملة</th>
-                </tr>
+                 </tr>
               </thead>
               <tbody>
                 <tr>

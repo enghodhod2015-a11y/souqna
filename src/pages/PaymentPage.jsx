@@ -118,7 +118,7 @@ export default function PaymentPage() {
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => (prev >= 90 ? 90 : prev + 10))
       }, 200)
-      
+      console.log('📤 رفع الإيصال للطلب:', orderId, transferData);
       await uploadReceipt(orderId, file, {
         transfer_number: transferNumber.trim(),
         transfer_name: transferName.trim(),
