@@ -9,7 +9,7 @@ import { formatDate, formatCurrency } from '../../utils/format';
 import toast from 'react-hot-toast';
 import { Skeleton, SkeletonText } from '../../components/ui/Skeleton';
 import { ExportButtons } from '../../components/ui/ExportButtons';
-import { isCurrentUserAdmin } from '../../services/adminGuard'; // فقط للتحقق المحلي
+import { isCurrentUserAdmin } from '../../services/adminGuard';
 
 const formatNumber = (amount) => {
   if (amount === undefined || amount === null) return '0.00';
@@ -21,7 +21,6 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
   const [isAdmin, setIsAdmin] = useState(false);
   const [checked, setChecked] = useState(false);
 
-  // ✅ التحقق من صلاحية الأدمن عند تحميل المكون
   useEffect(() => {
     const checkAdmin = async () => {
       try {
@@ -39,7 +38,6 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     checkAdmin();
   }, []);
 
-  // باقي الـ State hooks
   const [transferAmount, setTransferAmount] = useState('');
   const [transferNote, setTransferNote] = useState('');
   const [receiptFile, setReceiptFile] = useState(null);
@@ -55,7 +53,6 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
   const [showReceiptsModal, setShowReceiptsModal] = useState(false);
   const [sellerReceiptsList, setSellerReceiptsList] = useState([]);
 
-  // جلب المستخدمين (البائعين فقط) - فقط إذا كان أدمن
   const { data: users, isLoading: usersLoading, refetch: refetchUsers } = useQuery({
     queryKey: ['adminUsersForFinance'],
     queryFn: async () => {
@@ -67,7 +64,7 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
       if (error) throw error;
       return data || [];
     },
-    enabled: isAdmin, // ✅ فقط إذا كان أدمن
+    enabled: isAdmin,
     staleTime: 2 * 60 * 1000,
   });
 
@@ -149,13 +146,11 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     }
   };
 
-  // ✅ دالة تحديث العمولة باستخدام RPC الآمن
   const handleUpdateCommission = async () => {
     if (!selectedSeller) {
       toast.error('اختر بائعاً أولاً');
       return;
     }
-    // التحقق المحلي (لتحسين تجربة المستخدم)
     const admin = await isCurrentUserAdmin();
     if (!admin) {
       toast.error('غير مصرح: هذه العملية تتطلب صلاحيات أدمن');
@@ -168,7 +163,7 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
       });
       if (error) throw error;
       toast.success('تم تحديث نسبة العمولة');
-      await calculateFinance(); // إعادة حساب المالية
+      await calculateFinance();
       refetchUsers();
     } catch (err) {
       console.error(err);
@@ -221,12 +216,10 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     setShowReceiptsModal(true);
   };
 
-  // ✅ أثناء التحقق من الصلاحية
   if (!checked) {
     return <div className="text-center py-20 text-text-secondary">جاري التحقق من الصلاحيات...</div>;
   }
 
-  // ✅ إذا لم يكن أدمن، امنع العرض تماماً
   if (!isAdmin) {
     return (
       <div className="bg-red-900/20 border border-red-500 rounded-xl p-6 text-center">
@@ -237,7 +230,6 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     );
   }
 
-  // باقي الـ JSX كما هو (بدون تغيير)
   if (usersLoading) {
     return (
       <div className="space-y-6">
@@ -390,34 +382,34 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
                   <th className="py-2 text-gold">القسم</th>
                   <th className="py-2 text-gold">المبلغ</th>
                   <th className="py-2 text-gold">العملة</th>
-                 </>
+                </tr>
               </thead>
               <tbody>
                 <tr>
                   <td className="py-2 font-bold">إجمالي المبيعات</td>
                   <td className="text-white">{formatNumber(sellerFinance.totalSales)}</td>
                   <td className="text-white">ريال يمني</td>
-                 </>
+                </tr>
                 <tr>
                   <td className="py-2 font-bold">إجمالي المرتجعات</td>
                   <td className="text-white">{formatNumber(sellerFinance.totalReturns)}</td>
                   <td className="text-white">ريال يمني</td>
-                 </>
+                </tr>
                 <tr>
                   <td className="py-2 font-bold">نسبة الموقع ({sellerCommissionPercent}%)</td>
                   <td className="text-white">{formatNumber(sellerFinance.commissionAmount)}</td>
                   <td className="text-white">ريال يمني</td>
-                 </>
+                </tr>
                 <tr>
                   <td className="py-2 font-bold">إجمالي الاستلامات</td>
                   <td className="text-white">{formatNumber(sellerFinance.totalReceived)}</td>
                   <td className="text-white">ريال يمني</td>
-                 </>
+                </tr>
                 <tr className="border-t border-gold/30">
                   <td className="py-2 font-bold text-gold">المبلغ المتبقي</td>
                   <td className="font-bold text-gold">{formatNumber(sellerFinance.remaining)}</td>
                   <td className="text-gold">ريال يمني</td>
-                 </>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -435,7 +427,7 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
                 <th className="py-2 text-gold">التاريخ</th>
                 <th className="py-2 text-gold">الصورة</th>
                 <th className="py-2 text-gold">ملاحظات</th>
-               </>
+              </tr>
             </thead>
             <tbody>
               {sellerReceiptsList.map(r => (
@@ -446,12 +438,12 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
                     <a href={r.receipt_image} target="_blank" rel="noreferrer" className="text-blue-500 underline">عرض</a>
                   </td>
                   <td className="text-gray-800">{r.notes || '-'}</td>
-                 </>
+                </tr>
               ))}
               {sellerReceiptsList.length === 0 && (
                 <tr>
                   <td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td>
-                 </>
+                </tr>
               )}
             </tbody>
           </table>
