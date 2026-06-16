@@ -9,6 +9,7 @@ import { formatDate, formatCurrency } from '../../utils/format';
 import toast from 'react-hot-toast';
 import { Skeleton, SkeletonText } from '../../components/ui/Skeleton';
 import { ExportButtons } from '../../components/ui/ExportButtons';
+import { isCurrentUserAdmin, adminUpdateProfile } from '../../services/adminGuard'; // ✅ إضافة الاستيراد في الأعلى
 
 // دالة مساعدة لعرض الأرقام بدون رمز العملة وبأرقام إنجليزية
 const formatNumber = (amount) => {
@@ -127,25 +128,26 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     }
   };
 
-  // استيراد الدوال
-import { isCurrentUserAdmin, adminUpdateProfile } from '../../services/adminGuard';
-
-// داخل المكون، عند زر تحديث النسبة:
-const handleUpdateCommission = async () => {
-  const isAdmin = await isCurrentUserAdmin();
-  if (!isAdmin) {
-    toast.error('غير مصرح: هذه العملية تتطلب صلاحيات أدمن');
-    return;
-  }
-  try {
-    await adminUpdateProfile(selectedSeller.id, { commission_percent: sellerCommissionPercent });
-    toast.success('تم تحديث نسبة العمولة');
-    await calculateFinance(); // إعادة حساب المالية
-    refetchUsers();
-  } catch (err) {
-    toast.error(err.message);
-  }
-};
+  // ✅ دالة تحديث العمولة مع التحقق من صلاحية الأدمن
+  const handleUpdateCommission = async () => {
+    if (!selectedSeller) {
+      toast.error('اختر بائعاً أولاً');
+      return;
+    }
+    const isAdmin = await isCurrentUserAdmin();
+    if (!isAdmin) {
+      toast.error('غير مصرح: هذه العملية تتطلب صلاحيات أدمن');
+      return;
+    }
+    try {
+      await adminUpdateProfile(selectedSeller.id, { commission_percent: sellerCommissionPercent });
+      toast.success('تم تحديث نسبة العمولة');
+      await calculateFinance(); // إعادة حساب المالية
+      refetchUsers();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
 
   const handleAddTransfer = async () => {
     if (!selectedSeller) return toast.error('اختر بائعاً أولاً');
@@ -330,13 +332,7 @@ const handleUpdateCommission = async () => {
                   className="flex-1 bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-gold focus:border-gold"
                 />
                 <Button
-                  onClick={async () => {
-                    await updateUserMutation({
-                      userId: selectedSeller.id,
-                      updates: { commission_percent: sellerCommissionPercent }
-                    });
-                    toast.success('تم حفظ نسبة الموقع');
-                  }}
+                  onClick={handleUpdateCommission}  // ✅ استدعاء الدالة الصحيحة
                   className="bg-gold text-primary-blue shadow-md rounded-lg px-5 py-2 hover:bg-gold/90 transition-all whitespace-nowrap"
                 >
                   تحديث النسبة

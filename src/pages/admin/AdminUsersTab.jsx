@@ -10,6 +10,7 @@ import { formatDate, formatCurrency } from '../../utils/format';
 import toast from 'react-hot-toast';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ExportButtons } from '../../components/ui/ExportButtons';
+import { isCurrentUserAdmin, adminUpdateProfile } from '../../services/adminGuard';
 
 export default function AdminUsersTab({
   activeSubTab,
@@ -28,7 +29,6 @@ export default function AdminUsersTab({
   const [sellerDetailTab, setSellerDetailTab] = useState('profile');
   const [sellerCommissionPercent, setSellerCommissionPercent] = useState(10);
 
-  // جلب المستخدمين
   const { data: users = [], refetch: refetchUsers, isLoading: usersLoading } = useQuery({
     queryKey: ['adminUsers', searchTerm],
     queryFn: async () => {
@@ -63,33 +63,31 @@ export default function AdminUsersTab({
     if (selectedSeller) setSellerCommissionPercent(selectedSeller.commission_percent ?? 10);
   }, [selectedSeller]);
 
-  // داخل AdminUsersTab
-import { isCurrentUserAdmin, adminUpdateProfile } from '../../services/adminGuard';
-
-// ... ثم داخل المكون
-
-const updateUserMutation = async ({ userId, updates }) => {
-  // التأكد من أن المستخدم الحالي أدمن قبل التحديث
-  const isAdmin = await isCurrentUserAdmin();
-  if (!isAdmin) {
-    toast.error('غير مصرح: ليس لديك صلاحية أدمن');
-    return;
-  }
-  
-  try {
-    // استخدام الدالة الآمنة
-    const result = await adminUpdateProfile(userId, updates);
-    toast.success('تم تحديث المستخدم');
-    refetchUsers();
-    queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
-    if (selectedSeller?.id === userId) setSelectedSeller(prev => ({ ...prev, ...result }));
-    if (selectedBuyer?.id === userId) setSelectedBuyer(prev => ({ ...prev, ...result }));
-  } catch (err) {
-    toast.error(err.message);
-  }
-};
+  const updateUserMutation = async ({ userId, updates }) => {
+    // ✅ التحقق من صلاحية الأدمن
+    const isAdmin = await isCurrentUserAdmin();
+    if (!isAdmin) {
+      toast.error('غير مصرح: ليس لديك صلاحية أدمن');
+      return;
+    }
+    try {
+      const result = await adminUpdateProfile(userId, updates);
+      toast.success('تم تحديث المستخدم');
+      refetchUsers();
+      queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+      if (selectedSeller?.id === userId) setSelectedSeller(prev => ({ ...prev, ...result }));
+      if (selectedBuyer?.id === userId) setSelectedBuyer(prev => ({ ...prev, ...result }));
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
 
   const approveSellerMutation = async ({ sellerId, approved, notes }) => {
+    const isAdmin = await isCurrentUserAdmin();
+    if (!isAdmin) {
+      toast.error('غير مصرح: ليس لديك صلاحية أدمن');
+      return;
+    }
     const { error } = await supabase.from('profiles').update({ is_verified: approved, admin_notes: notes }).eq('id', sellerId);
     if (error) throw error;
     toast.success(approved ? 'تم قبول البائع' : 'تم رفض البائع');
@@ -165,23 +163,23 @@ const updateUserMutation = async ({ userId, updates }) => {
           <div className="mb-5">
             <label className="block text-gold font-medium mb-2">اختر البائع:</label>
             <Select
-  value={selectedSeller?.id || ''}
-  onChange={e => {
-    const seller = sellerUsers.find(u => u.id === e.target.value);
-    setSelectedSeller(seller);
-    setSellerDetailTab('profile');
-    setSellerFilterId(null);
-  }}
-  textColor="text-black"
-  className="w-full md:w-1/2 bg-white border border-gray-300 rounded-lg"
->
-  <option value="" className="text-black">-- اختر بائعاً --</option>
-  {sellerUsers.map(s => (
-    <option key={s.id} value={s.id} className="text-black">
-      {s.store_name || s.full_name} ({s.email})
-    </option>
-  ))}
-</Select>
+              value={selectedSeller?.id || ''}
+              onChange={e => {
+                const seller = sellerUsers.find(u => u.id === e.target.value);
+                setSelectedSeller(seller);
+                setSellerDetailTab('profile');
+                setSellerFilterId(null);
+              }}
+              textColor="text-black"
+              className="w-full md:w-1/2 bg-white border border-gray-300 rounded-lg"
+            >
+              <option value="" className="text-black">-- اختر بائعاً --</option>
+              {sellerUsers.map(s => (
+                <option key={s.id} value={s.id} className="text-black">
+                  {s.store_name || s.full_name} ({s.email})
+                </option>
+              ))}
+            </Select>
           </div>
           {selectedSeller && (
             <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-300">
@@ -253,7 +251,10 @@ const updateUserMutation = async ({ userId, updates }) => {
                       <input type="number" min="0" max="100" value={sellerCommissionPercent} onChange={e => setSellerCommissionPercent(parseFloat(e.target.value) || 0)} className="w-full bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300" />
                     </div>
                     <button
-                      onClick={async () => { await updateUserMutation({ userId: selectedSeller.id, updates: { commission_percent: sellerCommissionPercent } }); toast.success('تم حفظ نسبة الموقع'); }}
+                      onClick={async () => { 
+                        await updateUserMutation({ userId: selectedSeller.id, updates: { commission_percent: sellerCommissionPercent } });
+                        toast.success('تم حفظ نسبة الموقع');
+                      }}
                       className="px-5 py-2 rounded-lg font-bold shadow-md transition-all duration-200 bg-gold text-primary-blue hover:bg-gold/90"
                     >
                       تحديث النسبة
