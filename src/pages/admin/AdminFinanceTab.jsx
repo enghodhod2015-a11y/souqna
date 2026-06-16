@@ -9,7 +9,7 @@ import { formatDate, formatCurrency } from '../../utils/format';
 import toast from 'react-hot-toast';
 import { Skeleton, SkeletonText } from '../../components/ui/Skeleton';
 import { ExportButtons } from '../../components/ui/ExportButtons';
-import { isCurrentUserAdmin, adminUpdateProfile } from '../../services/adminGuard';
+import { isCurrentUserAdmin } from '../../services/adminGuard'; // فقط للتحقق المحلي
 
 const formatNumber = (amount) => {
   if (amount === undefined || amount === null) return '0.00';
@@ -149,23 +149,30 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     }
   };
 
+  // ✅ دالة تحديث العمولة باستخدام RPC الآمن
   const handleUpdateCommission = async () => {
     if (!selectedSeller) {
       toast.error('اختر بائعاً أولاً');
       return;
     }
+    // التحقق المحلي (لتحسين تجربة المستخدم)
     const admin = await isCurrentUserAdmin();
     if (!admin) {
       toast.error('غير مصرح: هذه العملية تتطلب صلاحيات أدمن');
       return;
     }
     try {
-      await adminUpdateProfile(selectedSeller.id, { commission_percent: sellerCommissionPercent });
+      const { data, error } = await supabase.rpc('admin_update_commission', {
+        p_seller_id: selectedSeller.id,
+        p_commission_percent: sellerCommissionPercent
+      });
+      if (error) throw error;
       toast.success('تم تحديث نسبة العمولة');
-      await calculateFinance();
+      await calculateFinance(); // إعادة حساب المالية
       refetchUsers();
     } catch (err) {
-      toast.error(err.message);
+      console.error(err);
+      toast.error(err.message || 'حدث خطأ أثناء تحديث العمولة');
     }
   };
 
@@ -230,7 +237,7 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     );
   }
 
-  // باقي الـ JSX كما هو (بدون تغيير بعد هذه النقطة)
+  // باقي الـ JSX كما هو (بدون تغيير)
   if (usersLoading) {
     return (
       <div className="space-y-6">
@@ -383,34 +390,34 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
                   <th className="py-2 text-gold">القسم</th>
                   <th className="py-2 text-gold">المبلغ</th>
                   <th className="py-2 text-gold">العملة</th>
-                </tr>
+                 </>
               </thead>
               <tbody>
                 <tr>
                   <td className="py-2 font-bold">إجمالي المبيعات</td>
                   <td className="text-white">{formatNumber(sellerFinance.totalSales)}</td>
                   <td className="text-white">ريال يمني</td>
-                </tr>
+                 </>
                 <tr>
                   <td className="py-2 font-bold">إجمالي المرتجعات</td>
                   <td className="text-white">{formatNumber(sellerFinance.totalReturns)}</td>
                   <td className="text-white">ريال يمني</td>
-                </tr>
+                 </>
                 <tr>
                   <td className="py-2 font-bold">نسبة الموقع ({sellerCommissionPercent}%)</td>
                   <td className="text-white">{formatNumber(sellerFinance.commissionAmount)}</td>
                   <td className="text-white">ريال يمني</td>
-                </tr>
+                 </>
                 <tr>
                   <td className="py-2 font-bold">إجمالي الاستلامات</td>
                   <td className="text-white">{formatNumber(sellerFinance.totalReceived)}</td>
                   <td className="text-white">ريال يمني</td>
-                </tr>
+                 </>
                 <tr className="border-t border-gold/30">
                   <td className="py-2 font-bold text-gold">المبلغ المتبقي</td>
                   <td className="font-bold text-gold">{formatNumber(sellerFinance.remaining)}</td>
                   <td className="text-gold">ريال يمني</td>
-                </tr>
+                 </>
               </tbody>
             </table>
           </div>
@@ -428,7 +435,7 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
                 <th className="py-2 text-gold">التاريخ</th>
                 <th className="py-2 text-gold">الصورة</th>
                 <th className="py-2 text-gold">ملاحظات</th>
-              </tr>
+               </>
             </thead>
             <tbody>
               {sellerReceiptsList.map(r => (
@@ -439,12 +446,12 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
                     <a href={r.receipt_image} target="_blank" rel="noreferrer" className="text-blue-500 underline">عرض</a>
                   </td>
                   <td className="text-gray-800">{r.notes || '-'}</td>
-                </tr>
+                 </>
               ))}
               {sellerReceiptsList.length === 0 && (
                 <tr>
                   <td colSpan="4" className="text-center text-gray-500">لا توجد إيصالات</td>
-                </tr>
+                 </>
               )}
             </tbody>
           </table>
@@ -456,5 +463,4 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     </div>
   );
 }
-
 
