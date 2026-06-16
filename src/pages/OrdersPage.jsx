@@ -108,11 +108,14 @@ export default function OrdersPage() {
                     )}
                   </div>
                   <div className="flex gap-2">
-                    {(order.status === 'pending_payment_review' || order.status === 'pending') && (
-                      <Link to={`/payment/${order.id}`}>
-                        <Button>رفع إيصال</Button>
-                      </Link>
-                    )}
+                    {(order.status === 'pending_payment_review' || order.status === 'pending') && !order.receipt_image && (
+  <Link to={`/payment/${order.id}`}>
+    <Button>رفع إيصال</Button>
+  </Link>
+)}
+{order.receipt_image && (order.status === 'pending_payment_review' || order.status === 'pending') && (
+  <span className="text-yellow-500 text-sm">⏳ الإيصال في انتظار مراجعة الأدمن</span>
+)}
                     {!['completed', 'cancelled', 'delivered', 'return_requested', 'return_approved', 'return_rejected'].includes(order.status) && (
                       <Button variant="danger" onClick={() => handleCancelOrder(order.id)}>إلغاء الطلب</Button>
                     )}

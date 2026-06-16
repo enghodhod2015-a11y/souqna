@@ -353,37 +353,46 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
 };
 
 // 🆕 جلب الطلبات المنتظرة مراجعة الأدمن
+// 🆕 جلب الطلبات المنتظرة مراجعة الأدمن (باستخدام RPC)
 export const getPendingAdminReceipts = async () => {
-  const { data: orders, error: ordersError } = await supabase
-    .from('orders')
-    .select(`
-      *,
-      order_items(product_id, quantity, product_price, product_name)
-    `)
-    .eq('status', 'pending_payment_review')
-    .not('receipt_image', 'is', null)
-    .order('receipt_uploaded_at', { ascending: true })
+  console.log('🔍 [getPendingAdminReceipts] بدء...');
   
-  if (ordersError) throw ordersError
-  if (!orders || orders.length === 0) return []
+  // استخدام RPC Function
+  const { data: receipts, error: receiptsError } = await supabase.rpc('get_pending_receipts');
+  
+  console.log('📊 [getPendingAdminReceipts] receipts:', receipts?.length);
+  console.log('❌ [getPendingAdminReceipts] error:', receiptsError);
+  
+  if (receiptsError) {
+    console.error('❌ [getPendingAdminReceipts] خطأ:', receiptsError);
+    throw receiptsError;
+  }
+  
+  if (!receipts || receipts.length === 0) {
+    console.log('⚠️ [getPendingAdminReceipts] لا توجد إيصالات');
+    return [];
+  }
 
-  const buyerIds = orders.map(o => o.user_id).filter(Boolean)
-  let buyersMap = new Map()
+  // جلب بيانات المشترين
+  const buyerIds = [...new Set(receipts.map(o => o.user_id).filter(Boolean))];
+  let buyersMap = new Map();
+  
   if (buyerIds.length) {
     const { data: buyers, error: buyersError } = await supabase
       .from('profiles')
       .select('id, full_name, email, phone')
-      .in('id', buyerIds)
+      .in('id', buyerIds);
+    
     if (!buyersError && buyers) {
-      buyersMap = new Map(buyers.map(b => [b.id, b]))
+      buyersMap = new Map(buyers.map(b => [b.id, b]));
     }
   }
 
-  return orders.map(order => ({
+  return receipts.map(order => ({
     ...order,
     buyer: buyersMap.get(order.user_id) || null
-  }))
-}
+  }));
+};
 
 // 🆕 قبول أو رفض الإيصال من الأدمن
 export const reviewReceiptByAdmin = async (orderId, approved, rejectionReason = '') => {
