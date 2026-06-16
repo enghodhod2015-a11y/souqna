@@ -208,7 +208,7 @@ export const confirmDelivery = async (orderId) => {
   return data
 }
 
-// 6️⃣ طلب استرجاع (تم التعديل: 3 دقائق، مع دعم عناصر متعددة)
+// 6️⃣ طلب استرجاع
 export const requestReturn = async (orderId, itemsToReturn) => {
   const { data: order, error: fetchError } = await supabase
     .from('orders')
@@ -240,7 +240,7 @@ export const requestReturn = async (orderId, itemsToReturn) => {
   return { success: true };
 };
 
-// 7️⃣ الموافقة على الاسترجاع (مع إعادة المخزون للمنتجات المقبولة فقط)
+// 7️⃣ الموافقة على الاسترجاع
 export const approveReturn = async (orderId, approve, adminNotes = '', itemsToApprove = null) => {
   let query = supabase.from('order_items').select('*').eq('order_id', orderId).eq('return_status', 'requested');
   if (itemsToApprove && itemsToApprove.length) {
@@ -287,7 +287,7 @@ export const approveReturn = async (orderId, approve, adminNotes = '', itemsToAp
   return { success: true };
 };
 
-// 8️⃣ رفع إيصال الدفع (معدل لمراجعة الأدمن) مع تسجيل تفصيلي
+// 8️⃣ رفع إيصال الدفع (معدل لمراجعة الأدمن) - تم إصلاح transferData
 export const uploadReceipt = async (orderId, file, transferData = {}) => {
   console.log('📤 ===== بدء uploadReceipt للطلب:', orderId, '=====');
   try {
@@ -295,7 +295,6 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
     console.log('📦 بيانات التحويل:', { transfer_number, transfer_name, buyer_phone });
     console.log('📎 اسم الملف:', file?.name, '، حجم:', file?.size);
 
-    // 1. رفع الملف إلى Storage
     const fileName = `receipts/${orderId}/${Date.now()}_${file.name}`;
     console.log('📁 مسار الملف في Storage:', fileName);
 
@@ -309,13 +308,11 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
     }
     console.log('✅ تم رفع الملف بنجاح');
 
-    // 2. الحصول على الرابط العام
     const { data: { publicUrl } } = supabase.storage
       .from('receipts')
       .getPublicUrl(fileName);
     console.log('🔗 الرابط العام للصورة:', publicUrl);
 
-    // 3. تحديث جدول orders
     const updates = {
       receipt_image: publicUrl,
       status: 'pending_payment_review',
@@ -328,11 +325,18 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
     console.log('📝 بيانات التحديث للطلب:', updates);
 
     console.log('⏳ جاري تحديث الطلب في قاعدة البيانات...');
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+      console.error('❌ فشل جلب المستخدم الحالي:', userError);
+      throw new Error(`فشل جلب المستخدم: ${userError.message}`);
+    }
+    console.log('👤 المستخدم الحالي:', userData.user?.id);
+
     const { error: updateError } = await supabase
       .from('orders')
       .update(updates)
       .eq('id', orderId)
-      .eq('user_id', (await supabase.auth.getUser()).data.user?.id); // تأكد من أن المستخدم هو المالك
+      .eq('user_id', userData.user?.id);
 
     if (updateError) {
       console.error('❌ فشل تحديث الطلب:', updateError);
@@ -456,7 +460,7 @@ export const reviewReceiptByAdmin = async (orderId, approved, rejectionReason = 
   return { success: true }
 }
 
-// 9️⃣ إحصائيات البائع (تم تعديلها لتأخذ بعين الاعتبار return_status في order_items)
+// 9️⃣ إحصائيات البائع
 export const getSellerStats = async (sellerId) => {
   console.log('📊 getSellerStats called for seller:', sellerId);
   try {
@@ -561,7 +565,7 @@ export const getSellerStats = async (sellerId) => {
   }
 };
 
-// 🔟 المبيعات الشهرية للبائع (غير مفعلة)
+// 🔟 المبيعات الشهرية للبائع
 export const getMonthlySales = async (sellerId) => {
   return []
 }
