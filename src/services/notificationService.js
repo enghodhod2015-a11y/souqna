@@ -36,19 +36,14 @@ export const playNotificationSound = async () => {
 };
 
 export const addNotification = async (userId, type, title, message, relatedId = null) => {
-  const insertData = {
-    user_id: userId,
-    type,
-    title,
-    message,
-    is_read: false,
-    created_at: new Date().toISOString()
-  };
-  if (relatedId !== null) {
-    insertData.related_id = String(relatedId);
-    insertData.related_order_id = Number(relatedId); // ✅ إضافة related_order_id
-  }
-  const { data, error } = await supabase.from('notifications').insert(insertData).select().single();
+  const { data, error } = await supabase.rpc('add_notification', {
+    p_user_id: userId,
+    p_type: type,
+    p_title: title,
+    p_message: message,
+    p_related_id: relatedId !== null ? String(relatedId) : null,
+    p_related_order_id: relatedId !== null ? Number(relatedId) : null
+  });
   if (error) throw error;
   return data;
 };
