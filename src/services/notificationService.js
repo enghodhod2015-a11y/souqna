@@ -44,7 +44,10 @@ export const addNotification = async (userId, type, title, message, relatedId = 
     is_read: false,
     created_at: new Date().toISOString()
   };
-  if (relatedId !== null) insertData.related_id = String(relatedId);
+  if (relatedId !== null) {
+    insertData.related_id = String(relatedId);
+    insertData.related_order_id = Number(relatedId); // ✅ إضافة related_order_id
+  }
   const { data, error } = await supabase.from('notifications').insert(insertData).select().single();
   if (error) throw error;
   return data;
