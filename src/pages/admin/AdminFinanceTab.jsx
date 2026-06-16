@@ -9,9 +9,8 @@ import { formatDate, formatCurrency } from '../../utils/format';
 import toast from 'react-hot-toast';
 import { Skeleton, SkeletonText } from '../../components/ui/Skeleton';
 import { ExportButtons } from '../../components/ui/ExportButtons';
-import { isCurrentUserAdmin, adminUpdateProfile } from '../../services/adminGuard'; // ✅ إضافة الاستيراد في الأعلى
+import { isCurrentUserAdmin, adminUpdateProfile } from '../../services/adminGuard';
 
-// دالة مساعدة لعرض الأرقام بدون رمز العملة وبأرقام إنجليزية
 const formatNumber = (amount) => {
   if (amount === undefined || amount === null) return '0.00';
   return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -19,8 +18,28 @@ const formatNumber = (amount) => {
 
 export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, navigate }) {
   const queryClient = useQueryClient();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checked, setChecked] = useState(false);
 
-  // Finance related
+  // ✅ التحقق من صلاحية الأدمن عند تحميل المكون
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const adminStatus = await isCurrentUserAdmin();
+        setIsAdmin(adminStatus);
+        if (!adminStatus) {
+          toast.error('⚠️ هذه الصفحة مخصصة للأدمن فقط');
+        }
+      } catch (err) {
+        console.error('خطأ في التحقق من صلاحية الأدمن:', err);
+      } finally {
+        setChecked(true);
+      }
+    };
+    checkAdmin();
+  }, []);
+
+  // باقي الـ State hooks
   const [transferAmount, setTransferAmount] = useState('');
   const [transferNote, setTransferNote] = useState('');
   const [receiptFile, setReceiptFile] = useState(null);
@@ -36,7 +55,7 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
   const [showReceiptsModal, setShowReceiptsModal] = useState(false);
   const [sellerReceiptsList, setSellerReceiptsList] = useState([]);
 
-  // جلب المستخدمين (البائعين فقط)
+  // جلب المستخدمين (البائعين فقط) - فقط إذا كان أدمن
   const { data: users, isLoading: usersLoading, refetch: refetchUsers } = useQuery({
     queryKey: ['adminUsersForFinance'],
     queryFn: async () => {
@@ -48,17 +67,19 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
       if (error) throw error;
       return data || [];
     },
+    enabled: isAdmin, // ✅ فقط إذا كان أدمن
     staleTime: 2 * 60 * 1000,
   });
 
   const sellerUsers = users || [];
 
-  // تحديث نسبة العمولة وإعادة الحساب عند تغيير البائع
   useEffect(() => {
-    if (selectedSeller) {
+    if (selectedSeller && isAdmin) {
       const savedPercent = selectedSeller.commission_percent;
       setSellerCommissionPercent(savedPercent !== undefined && savedPercent !== null ? savedPercent : 10);
       calculateFinance();
+    } else if (!isAdmin) {
+      // لا نحتاج لحساب شيء
     } else {
       setSellerFinance({
         totalSales: 0,
@@ -68,10 +89,10 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
         remaining: 0,
       });
     }
-  }, [selectedSeller]);
+  }, [selectedSeller, isAdmin]);
 
   const calculateFinance = async () => {
-    if (!selectedSeller?.id) return;
+    if (!selectedSeller?.id || !isAdmin) return;
     try {
       const sellerId = selectedSeller.id;
       const { data: products } = await supabase
@@ -128,21 +149,20 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     }
   };
 
-  // ✅ دالة تحديث العمولة مع التحقق من صلاحية الأدمن
   const handleUpdateCommission = async () => {
     if (!selectedSeller) {
       toast.error('اختر بائعاً أولاً');
       return;
     }
-    const isAdmin = await isCurrentUserAdmin();
-    if (!isAdmin) {
+    const admin = await isCurrentUserAdmin();
+    if (!admin) {
       toast.error('غير مصرح: هذه العملية تتطلب صلاحيات أدمن');
       return;
     }
     try {
       await adminUpdateProfile(selectedSeller.id, { commission_percent: sellerCommissionPercent });
       toast.success('تم تحديث نسبة العمولة');
-      await calculateFinance(); // إعادة حساب المالية
+      await calculateFinance();
       refetchUsers();
     } catch (err) {
       toast.error(err.message);
@@ -194,6 +214,23 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     setShowReceiptsModal(true);
   };
 
+  // ✅ أثناء التحقق من الصلاحية
+  if (!checked) {
+    return <div className="text-center py-20 text-text-secondary">جاري التحقق من الصلاحيات...</div>;
+  }
+
+  // ✅ إذا لم يكن أدمن، امنع العرض تماماً
+  if (!isAdmin) {
+    return (
+      <div className="bg-red-900/20 border border-red-500 rounded-xl p-6 text-center">
+        <p className="text-red-400 mb-2">⛔ غير مصرح بالوصول</p>
+        <p className="text-text-secondary text-sm">هذه الصفحة مخصصة للأدمن فقط</p>
+        <Button onClick={() => window.location.href = '/'} className="mt-4">العودة للرئيسية</Button>
+      </div>
+    );
+  }
+
+  // باقي الـ JSX كما هو (بدون تغيير بعد هذه النقطة)
   if (usersLoading) {
     return (
       <div className="space-y-6">
@@ -230,7 +267,6 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     );
   }
 
-  // بيانات التصدير (بدون رمز العملة)
   const financeRows = selectedSeller ? [
     { 'القسم': 'إجمالي المبيعات', 'المبلغ': formatNumber(sellerFinance.totalSales), 'العملة': '' },
     { 'القسم': 'إجمالي المرتجعات', 'المبلغ': formatNumber(sellerFinance.totalReturns), 'العملة': '' },
@@ -332,7 +368,7 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
                   className="flex-1 bg-white text-gray-900 rounded-lg px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-gold focus:border-gold"
                 />
                 <Button
-                  onClick={handleUpdateCommission}  // ✅ استدعاء الدالة الصحيحة
+                  onClick={handleUpdateCommission}
                   className="bg-gold text-primary-blue shadow-md rounded-lg px-5 py-2 hover:bg-gold/90 transition-all whitespace-nowrap"
                 >
                   تحديث النسبة
@@ -420,4 +456,5 @@ export default function AdminFinanceTab({ selectedSeller, setSelectedSeller, nav
     </div>
   );
 }
+
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { BarChart3, Users, Package, DollarSign, ShoppingBag, RefreshCw, Receipt } from 'lucide-react';
@@ -9,16 +9,39 @@ import AdminProductsTab from './AdminProductsTab';
 import AdminFinanceTab from './AdminFinanceTab';
 import AdminOrdersTab from './AdminOrdersTab';
 import AdminReceiptsReviewTab from './AdminReceiptsReviewTab';
+import { isCurrentUserAdmin } from '../../services/adminGuard';
+import toast from 'react-hot-toast';
 
 export default function AdminDashboardLayout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checked, setChecked] = useState(false);
   const [activeMainTab, setActiveMainTab] = useState('dashboard');
   const [activeSubTab, setActiveSubTab] = useState('sellers');
   const [selectedSeller, setSelectedSeller] = useState(null);
   const [selectedBuyer, setSelectedBuyer] = useState(null);
   const [sellerFilterId, setSellerFilterId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const adminStatus = await isCurrentUserAdmin();
+        setIsAdmin(adminStatus);
+        if (!adminStatus) {
+          toast.error('⚠️ هذه الصفحة مخصصة للأدمن فقط');
+          setTimeout(() => navigate('/'), 2000);
+        }
+      } catch (err) {
+        console.error('خطأ في التحقق من صلاحية الأدمن:', err);
+        toast.error('حدث خطأ في التحقق من الصلاحيات');
+      } finally {
+        setChecked(true);
+      }
+    };
+    checkAdmin();
+  }, [navigate]);
 
   const refreshAllData = async () => {
     await queryClient.invalidateQueries({ queryKey: ['adminDashboard'] });
@@ -29,6 +52,20 @@ export default function AdminDashboardLayout() {
     await queryClient.invalidateQueries({ queryKey: ['adminConversations'] });
     await queryClient.invalidateQueries({ queryKey: ['pendingAdminReceipts'] });
   };
+
+  if (!checked) {
+    return <div className="text-center py-20 text-text-secondary">جاري التحقق من الصلاحيات...</div>;
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="bg-red-900/20 border border-red-500 rounded-xl p-6 text-center max-w-md mx-auto mt-20">
+        <p className="text-red-400 mb-2 text-xl">⛔ غير مصرح بالوصول</p>
+        <p className="text-text-secondary mb-4">هذه الصفحة مخصصة للأدمن فقط. سيتم توجيهك إلى الرئيسية.</p>
+        <Button onClick={() => navigate('/')} className="bg-gold text-primary-blue">العودة للرئيسية</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 font-tajawal">
@@ -104,5 +141,4 @@ export default function AdminDashboardLayout() {
     </div>
   );
 }
-
 
