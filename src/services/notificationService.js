@@ -35,7 +35,7 @@ export const playNotificationSound = async () => {
   osc.stop(audioCtx.currentTime + 0.3);
 };
 
-// ✅ تعديل: استخدام RPC بدلاً من insert مباشر
+// ✅ تعديل: استخدام RPC بدلاً من insert مباشر لتجاوز RLS
 export const addNotification = async (userId, type, title, message, relatedId = null) => {
   const { data, error } = await supabase.rpc('add_notification', {
     p_user_id: userId,
@@ -54,6 +54,7 @@ export const getUserNotifications = async (userId, retryCount = 0) => {
   const MAX_RETRIES = 2;
   const RETRY_DELAY = 500;
   try {
+    // 1. الحصول على العدد الحقيقي للإشعارات غير المقروءة
     const { count, error: countError } = await supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
@@ -61,6 +62,7 @@ export const getUserNotifications = async (userId, retryCount = 0) => {
       .eq('is_read', false);
     if (countError) throw countError;
 
+    // 2. الحصول على أحدث 50 إشعاراً
     const { data: recent, error: recentError } = await supabase
       .from('notifications')
       .select('*')
@@ -74,6 +76,7 @@ export const getUserNotifications = async (userId, retryCount = 0) => {
       unreadCount: count || 0
     };
   } catch (error) {
+    // إذا كان الخطأ بسبب قطع الاتصال (ERR_CONNECTION_CLOSED) أو الشبكة، نحاول إعادة المحاولة
     if ((error.message?.includes('Connection closed') || error.message?.includes('Failed to fetch')) && retryCount < MAX_RETRIES) {
       console.warn(`⚠️ فشل جلب الإشعارات، إعادة المحاولة ${retryCount + 1}/${MAX_RETRIES}...`);
       await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));

@@ -108,14 +108,16 @@ export default function OrdersPage() {
                     )}
                   </div>
                   <div className="flex gap-2">
+                    {/* ✅ تعديل: إخفاء زر "رفع إيصال" إذا كان الإيصال مرفوع بالفعل */}
                     {(order.status === 'pending_payment_review' || order.status === 'pending') && !order.receipt_image && (
-  <Link to={`/payment/${order.id}`}>
-    <Button>رفع إيصال</Button>
-  </Link>
-)}
-{order.receipt_image && (order.status === 'pending_payment_review' || order.status === 'pending') && (
-  <span className="text-yellow-500 text-sm">⏳ الإيصال في انتظار مراجعة الأدمن</span>
-)}
+                      <Link to={`/payment/${order.id}`}>
+                        <Button>رفع إيصال</Button>
+                      </Link>
+                    )}
+                    {/* ✅ تعديل: إظهار حالة "في انتظار المراجعة" إذا كان الإيصال مرفوع */}
+                    {order.receipt_image && (order.status === 'pending_payment_review' || order.status === 'pending') && (
+                      <span className="text-yellow-500 text-sm font-medium">⏳ الإيصال في انتظار مراجعة الأدمن</span>
+                    )}
                     {!['completed', 'cancelled', 'delivered', 'return_requested', 'return_approved', 'return_rejected'].includes(order.status) && (
                       <Button variant="danger" onClick={() => handleCancelOrder(order.id)}>إلغاء الطلب</Button>
                     )}

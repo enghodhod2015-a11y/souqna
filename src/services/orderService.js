@@ -122,7 +122,7 @@ export const getSellerOrders = async (sellerId) => {
       return [];
     }
     console.log('✅ RPC returned rows:', data.length);
-    
+
     const ordersMap = new Map();
     for (const row of data) {
       if (!ordersMap.has(row.id)) {
@@ -217,7 +217,7 @@ export const requestReturn = async (orderId, itemsToReturn) => {
     .single();
   if (fetchError) throw fetchError;
   if (!order.completed_at) throw new Error('الطلب لم يكتمل بعد، لا يمكن الاسترجاع');
-  
+
   const completedDate = new Date(order.completed_at);
   const diffMs = (new Date() - completedDate);
   const diffMins = diffMs / (1000 * 60);
@@ -287,7 +287,7 @@ export const approveReturn = async (orderId, approve, adminNotes = '', itemsToAp
   return { success: true };
 };
 
-// 8️⃣ رفع إيصال الدفع (معدل لمراجعة الأدمن) - تم إصلاح transferData
+// 8️⃣ رفع إيصال الدفع (معدل لمراجعة الأدمن)
 export const uploadReceipt = async (orderId, file, transferData = {}) => {
   console.log('📤 ===== بدء uploadReceipt للطلب:', orderId, '=====');
   try {
@@ -352,22 +352,20 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
   }
 };
 
-// 🆕 جلب الطلبات المنتظرة مراجعة الأدمن
-// 🆕 جلب الطلبات المنتظرة مراجعة الأدمن (باستخدام RPC)
+// 🆕 جلب الطلبات المنتظرة مراجعة الأدمن (باستخدام RPC لتجاوز RLS)
 export const getPendingAdminReceipts = async () => {
   console.log('🔍 [getPendingAdminReceipts] بدء...');
-  
-  // استخدام RPC Function
+
   const { data: receipts, error: receiptsError } = await supabase.rpc('get_pending_receipts');
-  
+
   console.log('📊 [getPendingAdminReceipts] receipts:', receipts?.length);
   console.log('❌ [getPendingAdminReceipts] error:', receiptsError);
-  
+
   if (receiptsError) {
     console.error('❌ [getPendingAdminReceipts] خطأ:', receiptsError);
     throw receiptsError;
   }
-  
+
   if (!receipts || receipts.length === 0) {
     console.log('⚠️ [getPendingAdminReceipts] لا توجد إيصالات');
     return [];
@@ -376,13 +374,13 @@ export const getPendingAdminReceipts = async () => {
   // جلب بيانات المشترين
   const buyerIds = [...new Set(receipts.map(o => o.user_id).filter(Boolean))];
   let buyersMap = new Map();
-  
+
   if (buyerIds.length) {
     const { data: buyers, error: buyersError } = await supabase
       .from('profiles')
       .select('id, full_name, email, phone')
       .in('id', buyerIds);
-    
+
     if (!buyersError && buyers) {
       buyersMap = new Map(buyers.map(b => [b.id, b]));
     }
@@ -390,7 +388,8 @@ export const getPendingAdminReceipts = async () => {
 
   return receipts.map(order => ({
     ...order,
-    buyer: buyersMap.get(order.user_id) || null
+    buyer: buyersMap.get(order.user_id) || null,
+    order_items: order.product_name ? [{ product_name: order.product_name }] : []
   }));
 };
 
@@ -479,7 +478,7 @@ export const getSellerStats = async (sellerId) => {
       .eq('seller_id', sellerId);
     if (productsError) throw productsError;
     const productIds = products?.map(p => p.id) || [];
-    
+
     const productsCount = productIds.length;
 
     const { count: conversationsCount, error: convCountErr } = await supabase
@@ -537,7 +536,7 @@ export const getSellerStats = async (sellerId) => {
       const saleAmount = item.product_price * item.quantity;
       const isCompleted = (order.status === 'completed' || order.status === 'delivered');
       const isPastReturnWindow = order.completed_at && new Date(order.completed_at) <= threeMinutesAgo;
-      
+
       if (isCompleted && isPastReturnWindow) {
         const returnedQty = (item.return_status === 'approved') ? (item.return_quantity || 0) : 0;
         const soldQty = item.quantity - returnedQty;
