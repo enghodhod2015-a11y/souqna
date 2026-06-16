@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';  // ✅ إضافة useState, useEffect
+import { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabase';
 import { Button } from '../../components/ui/Button';
 import { MessageCircle, Send, RefreshCw } from 'lucide-react';
@@ -8,13 +8,12 @@ import { formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
 import { SkeletonConversationItem, Skeleton } from '../../components/ui/Skeleton';
 import { ExportButtons } from '../../components/ui/ExportButtons';
-import { isCurrentUserAdmin } from '../../services/adminGuard'; // ✅ التحقق من صلاحية الأدمن
+import { isCurrentUserAdmin } from '../../services/adminGuard';
 
 export default function AdminOrdersTab({ navigate }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [checked, setChecked] = useState(false);
 
-  // ✅ التحقق من صلاحية الأدمن عند تحميل المكون
   useEffect(() => {
     const checkAdmin = async () => {
       try {
@@ -22,7 +21,6 @@ export default function AdminOrdersTab({ navigate }) {
         setIsAdmin(adminStatus);
         if (!adminStatus) {
           toast.error('⚠️ هذه الصفحة مخصصة للأدمن فقط، سيتم توجيهك');
-          // يمكن إعادة التوجيه بعد 2 ثانية (اختياري)
           setTimeout(() => {
             if (navigate) navigate('/');
           }, 2000);
@@ -39,7 +37,6 @@ export default function AdminOrdersTab({ navigate }) {
   const { data: conversations = [], refetch: refetchConversations, isLoading } = useQuery({
     queryKey: ['adminConversations'],
     queryFn: async () => {
-      // ✅ إذا لم يكن أدمن، لا نجلب البيانات (لكن RLS ستمنع أصلاً)
       if (!isAdmin) return [];
 
       try {
@@ -50,7 +47,6 @@ export default function AdminOrdersTab({ navigate }) {
         if (convError) throw convError;
         if (!conversations || conversations.length === 0) return [];
 
-        // جلب المنتجات - استخدام name فقط
         const productIds = [...new Set(conversations.map(c => c.product_id).filter(Boolean))];
         let productsMap = new Map();
         if (productIds.length) {
@@ -69,7 +65,6 @@ export default function AdminOrdersTab({ navigate }) {
           }
         }
 
-        // جلب بيانات المستخدمين
         const userIds = [...new Set([
           ...conversations.map(c => c.buyer_id),
           ...conversations.map(c => c.seller_id)
@@ -85,7 +80,6 @@ export default function AdminOrdersTab({ navigate }) {
           }
         }
 
-        // جلب آخر رسالة لكل محادثة
         const conversationIds = conversations.map(c => c.id);
         const lastMessageMap = new Map();
         for (const convId of conversationIds) {
@@ -147,7 +141,7 @@ export default function AdminOrdersTab({ navigate }) {
         return [];
       }
     },
-    enabled: isAdmin, // ✅ فقط إذا كان أدمن ننفذ الاستعلام
+    enabled: isAdmin,
     staleTime: 1 * 60 * 1000,
   });
 
@@ -273,7 +267,6 @@ export default function AdminOrdersTab({ navigate }) {
     );
   };
 
-  // ✅ عرض مؤقت أثناء التحقق من الصلاحية
   if (!checked) {
     return <div className="text-center py-20 text-text-secondary">جاري التحقق من الصلاحيات...</div>;
   }
@@ -355,14 +348,14 @@ export default function AdminOrdersTab({ navigate }) {
                 <th className="p-3 text-gold">التاريخ</th>
                 <th className="p-3 text-gold">الحالة</th>
                 <th className="p-3 text-gold">الإجراءات</th>
-               </>
+              </tr>
             </thead>
             <tbody>
               {conversations.map(conv => (
                 <tr key={conv.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
                   <td className="p-3 text-white">
                     {conv.product?.name || (conv.product_id ? '⚠️ منتج محذوف' : 'بدون منتج')}
-                   </>
+                  </td>
                   <td className="p-3 text-white">{conv.buyer?.full_name || conv.buyer_name || 'غير معروف'}</td>
                   <td className="p-3 text-white">{conv.seller?.full_name || conv.seller_name || 'غير معروف'}</td>
                   <td className="p-3 text-white max-w-xs truncate">{conv.last_message || 'لا توجد رسائل'}</td>
@@ -371,7 +364,7 @@ export default function AdminOrdersTab({ navigate }) {
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${conv.statusColor} ${conv.status === 'تم الرد من البائع' ? 'bg-green-900/30' : 'bg-yellow-900/30'}`}>
                       {conv.status}
                     </span>
-                    </>
+                  </td>
                   <td className="p-3">
                     <div className="flex gap-2">
                       <Link to={`/chat/c/${conv.id}`} className="bg-gold text-primary-blue px-3 py-1 rounded-lg text-sm shadow hover:bg-gold/90 transition inline-flex items-center gap-1">
@@ -387,11 +380,11 @@ export default function AdminOrdersTab({ navigate }) {
                         </Button>
                       )}
                     </div>
-                   </>
-                 </>
+                  </td>
+                </tr>
               ))}
             </tbody>
-           </>
+          </table>
         </div>
       )}
     </div>
