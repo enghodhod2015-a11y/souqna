@@ -69,6 +69,7 @@ export const getUserNotifications = async (userId, retryCount = 0) => {
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(50);
+      console.log('🔔 [getUserNotifications] نتيجة:', { count: recent?.length, data: recent });
     if (recentError) throw recentError;
 
     return {
