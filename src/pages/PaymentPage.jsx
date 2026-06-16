@@ -26,14 +26,14 @@ export default function PaymentPage() {
   const { orderId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  
+
   const [order, setOrder] = useState(null)
   const [productTitle, setProductTitle] = useState('')
   const [file, setFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [fetchingOrder, setFetchingOrder] = useState(true)
   const [uploadProgress, setUploadProgress] = useState(0)
-  
+
   const [transferNumber, setTransferNumber] = useState('')
   const [transferName, setTransferName] = useState('')
   const [buyerPhone, setBuyerPhone] = useState('')
@@ -45,7 +45,7 @@ export default function PaymentPage() {
   const loadOrder = async () => {
     try {
       setFetchingOrder(true)
-      
+
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select('*')
@@ -64,9 +64,9 @@ export default function PaymentPage() {
         .from('order_items')
         .select('product_name')
         .eq('order_id', orderId)
-      
+
       if (itemsError) throw itemsError
-      
+
       if (items && items.length > 0) {
         const names = items.map(item => item.product_name).join(', ')
         setProductTitle(names)
@@ -90,7 +90,7 @@ export default function PaymentPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (!file) {
       toast.error('يرجى رفع صورة الإيصال أولاً')
       return
@@ -118,30 +118,33 @@ export default function PaymentPage() {
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => (prev >= 90 ? 90 : prev + 10))
       }, 200)
-      console.log('📤 رفع الإيصال للطلب:', orderId, transferData);
-      await uploadReceipt(orderId, file, {
+
+      const receiptData = {
         transfer_number: transferNumber.trim(),
         transfer_name: transferName.trim(),
         buyer_phone: buyerPhone.trim()
-      })
-      
+      }
+      console.log('📤 رفع الإيصال للطلب:', orderId, receiptData);
+
+      await uploadReceipt(orderId, file, receiptData)
+
       clearInterval(progressInterval)
       setUploadProgress(100)
-      
+
       // استعلام لجلب seller_id لإشعار البائع (اختياري)
       const { data: orderItems, error: itemsFetchError } = await supabase
         .from('order_items')
         .select('product_id')
         .eq('order_id', orderId)
         .limit(1)
-      
+
       if (!itemsFetchError && orderItems && orderItems.length > 0) {
         const { data: product } = await supabase
           .from('products')
           .select('seller_id')
           .eq('id', orderItems[0].product_id)
           .single()
-        
+
         if (product?.seller_id) {
           await addNotification(
             product.seller_id,
@@ -152,7 +155,7 @@ export default function PaymentPage() {
           )
         }
       }
-      
+
       // ✅ تغيير رسالة النجاح
       toast.success('تم رفع الإيصال بنجاح، سيتم مراجعته من قبل الإدارة قريباً')
       navigate('/orders')
@@ -170,7 +173,7 @@ export default function PaymentPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <h1 className="text-2xl font-bold text-gold mb-6">رفع إيصال الدفع</h1>
-      
+
       <div className="bg-primary-card p-6 rounded-2xl border border-gold/30 mb-6 space-y-2">
         <p><strong className="text-gold">المنتج:</strong> {productTitle}</p>
         <p><strong className="text-gold">المبلغ المطلوب:</strong> {order.total_amount} ريال</p>
@@ -247,4 +250,5 @@ export default function PaymentPage() {
     </div>
   )
 }
+
 
