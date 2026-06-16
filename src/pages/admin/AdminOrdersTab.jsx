@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';  // ✅ إضافة useState, useEffect
 import { supabase } from '../../services/supabase';
 import { Button } from '../../components/ui/Button';
 import { MessageCircle, Send, RefreshCw } from 'lucide-react';
@@ -7,11 +8,40 @@ import { formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
 import { SkeletonConversationItem, Skeleton } from '../../components/ui/Skeleton';
 import { ExportButtons } from '../../components/ui/ExportButtons';
+import { isCurrentUserAdmin } from '../../services/adminGuard'; // ✅ التحقق من صلاحية الأدمن
 
 export default function AdminOrdersTab({ navigate }) {
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checked, setChecked] = useState(false);
+
+  // ✅ التحقق من صلاحية الأدمن عند تحميل المكون
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const adminStatus = await isCurrentUserAdmin();
+        setIsAdmin(adminStatus);
+        if (!adminStatus) {
+          toast.error('⚠️ هذه الصفحة مخصصة للأدمن فقط، سيتم توجيهك');
+          // يمكن إعادة التوجيه بعد 2 ثانية (اختياري)
+          setTimeout(() => {
+            if (navigate) navigate('/');
+          }, 2000);
+        }
+      } catch (err) {
+        console.error('خطأ في التحقق من صلاحية الأدمن:', err);
+      } finally {
+        setChecked(true);
+      }
+    };
+    checkAdmin();
+  }, [navigate]);
+
   const { data: conversations = [], refetch: refetchConversations, isLoading } = useQuery({
     queryKey: ['adminConversations'],
     queryFn: async () => {
+      // ✅ إذا لم يكن أدمن، لا نجلب البيانات (لكن RLS ستمنع أصلاً)
+      if (!isAdmin) return [];
+
       try {
         const { data: conversations, error: convError } = await supabase
           .from('conversations')
@@ -26,13 +56,12 @@ export default function AdminOrdersTab({ navigate }) {
         if (productIds.length) {
           const { data: products, error: prodError } = await supabase
             .from('products')
-            .select('id, name') // ✅ إزالة title غير الموجود
+            .select('id, name')
             .in('id', productIds);
           if (prodError) {
             console.error('خطأ في جلب المنتجات:', prodError);
           } else if (products) {
             productsMap = new Map(products.map(p => [p.id, p]));
-            // تسجيل أي product_id غير موجود للمساعدة في التصحيح
             const missingProducts = productIds.filter(id => !productsMap.has(id));
             if (missingProducts.length > 0) {
               console.warn('⚠️ منتجات غير موجودة في قاعدة البيانات:', missingProducts);
@@ -96,7 +125,6 @@ export default function AdminOrdersTab({ navigate }) {
           }
 
           const product = productsMap.get(conv.product_id) || null;
-          // إذا كان هناك product_id ولكن المنتج غير موجود، نسجل تحذير
           if (conv.product_id && !product) {
             console.warn(`⚠️ المحادثة ${conv.id} لها product_id=${conv.product_id} ولكن المنتج غير موجود`);
           }
@@ -119,6 +147,7 @@ export default function AdminOrdersTab({ navigate }) {
         return [];
       }
     },
+    enabled: isAdmin, // ✅ فقط إذا كان أدمن ننفذ الاستعلام
     staleTime: 1 * 60 * 1000,
   });
 
@@ -244,6 +273,21 @@ export default function AdminOrdersTab({ navigate }) {
     );
   };
 
+  // ✅ عرض مؤقت أثناء التحقق من الصلاحية
+  if (!checked) {
+    return <div className="text-center py-20 text-text-secondary">جاري التحقق من الصلاحيات...</div>;
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="bg-red-900/20 border border-red-500 rounded-xl p-6 text-center">
+        <p className="text-red-400 mb-2">⛔ غير مصرح بالوصول</p>
+        <p className="text-text-secondary text-sm">هذه الصفحة مخصصة للأدمن فقط</p>
+        <Button onClick={() => window.location.href = '/'} className="mt-4">العودة للرئيسية</Button>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -311,14 +355,14 @@ export default function AdminOrdersTab({ navigate }) {
                 <th className="p-3 text-gold">التاريخ</th>
                 <th className="p-3 text-gold">الحالة</th>
                 <th className="p-3 text-gold">الإجراءات</th>
-              </tr>
+               </>
             </thead>
             <tbody>
               {conversations.map(conv => (
                 <tr key={conv.id} className="border-b border-gold/20 hover:bg-secondary-blue/10 transition">
                   <td className="p-3 text-white">
                     {conv.product?.name || (conv.product_id ? '⚠️ منتج محذوف' : 'بدون منتج')}
-                  </td>
+                   </>
                   <td className="p-3 text-white">{conv.buyer?.full_name || conv.buyer_name || 'غير معروف'}</td>
                   <td className="p-3 text-white">{conv.seller?.full_name || conv.seller_name || 'غير معروف'}</td>
                   <td className="p-3 text-white max-w-xs truncate">{conv.last_message || 'لا توجد رسائل'}</td>
@@ -327,7 +371,7 @@ export default function AdminOrdersTab({ navigate }) {
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${conv.statusColor} ${conv.status === 'تم الرد من البائع' ? 'bg-green-900/30' : 'bg-yellow-900/30'}`}>
                       {conv.status}
                     </span>
-                   </td>
+                    </>
                   <td className="p-3">
                     <div className="flex gap-2">
                       <Link to={`/chat/c/${conv.id}`} className="bg-gold text-primary-blue px-3 py-1 rounded-lg text-sm shadow hover:bg-gold/90 transition inline-flex items-center gap-1">
@@ -343,15 +387,14 @@ export default function AdminOrdersTab({ navigate }) {
                         </Button>
                       )}
                     </div>
-                  </td>
-                </tr>
+                   </>
+                 </>
               ))}
             </tbody>
-          </table>
+           </>
         </div>
       )}
     </div>
   );
 }
-
 
