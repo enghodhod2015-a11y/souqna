@@ -79,7 +79,10 @@ export const sendMessage = async (conversationId, senderId, receiverId, message)
 export const getMessages = async (conversationId) => {
   const { data, error } = await supabase
     .from('messages')
-    .select('*')
+    .select(`
+      *,
+      sender:profiles!messages_sender_id_fkey(full_name, account_type)
+    `)
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
   if (error) throw error

@@ -27,8 +27,6 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null)
   const [product, setProduct] = useState(null)
   const channelRef = useRef(null)
-  const [buyerDisplay, setBuyerDisplay] = useState('')
-  const [sellerDisplay, setSellerDisplay] = useState('')
 
   useEffect(() => {
     if (user) initChat()
@@ -60,12 +58,6 @@ export default function ChatPage() {
       setProduct(currentProduct)
       setConversation(currentConv)
       if (currentConv) {
-        const { data: buyerProfile } = await supabase.from('profiles').select('full_name, account_type').eq('id', currentConv.buyer_id).single()
-        const { data: sellerProfile } = await supabase.from('profiles').select('full_name, account_type').eq('id', currentConv.seller_id).single()
-        const buyerRole = buyerProfile?.account_type === 'seller' ? 'بائع' : (buyerProfile?.account_type === 'admin' ? 'أدمن' : 'مشتري')
-        const sellerRole = sellerProfile?.account_type === 'seller' ? 'بائع' : (sellerProfile?.account_type === 'admin' ? 'أدمن' : 'مشتري')
-        setBuyerDisplay(`${buyerProfile?.full_name || 'مشتري'} (${buyerRole})`)
-        setSellerDisplay(`${sellerProfile?.full_name || 'بائع'} (${sellerRole})`)
         const msgs = await getMessages(currentConv.id)
         setMessages(msgs || [])
         await markMessagesAsRead(currentConv.id, user.id)
@@ -79,7 +71,6 @@ export default function ChatPage() {
   useEffect(() => {
     if (!conversation?.id || !user?.id) return
 
-    // إلغاء القناة السابقة
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current)
       channelRef.current = null
@@ -99,7 +90,6 @@ export default function ChatPage() {
         const newMsg = payload.new
         if (newMsg && !messages.some(m => m.id === newMsg.id)) {
           setMessages(prev => [...prev, newMsg])
-          // إذا كانت الرسالة للمستخدم الحالي، نضعها كمقروءة فوراً
           if (newMsg.receiver_id === user.id) {
             markMessagesAsRead(conversation.id, user.id).catch(console.error)
           }
@@ -124,9 +114,8 @@ export default function ChatPage() {
         channelRef.current = null
       }
     }
-  }, [conversation?.id, user?.id]) // يعاد الاشتراك فقط عندما تتغير المحادثة أو المستخدم
+  }, [conversation?.id, user?.id])
 
-  // التمرير إلى آخر رسالة
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -203,13 +192,12 @@ export default function ChatPage() {
         <div className="h-[500px] overflow-y-auto p-5 space-y-4 bg-gray-50">
           {messages.map((msg) => {
             const isOwn = msg.sender_id === user.id
-            let senderDisplayName = ''
-            if (msg.sender_id === conversation?.buyer_id) senderDisplayName = buyerDisplay
-            else if (msg.sender_id === conversation?.seller_id) senderDisplayName = sellerDisplay
-            else senderDisplayName = 'مستخدم'
+            const senderName = msg.sender?.full_name || 'مستخدم'
+            const senderRole = msg.sender?.account_type === 'seller' ? 'بائع' : (msg.sender?.account_type === 'admin' ? 'أدمن' : 'مشتري')
+            const senderDisplayName = isOwn ? 'أنت' : `${senderName} (${senderRole})`
             return (
               <div key={msg.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} animate-fadeIn`}>
-                <div className={`text-xs text-gray-500 mb-1 ${isOwn ? 'text-right' : 'text-left'}`}>{isOwn ? 'أنت' : senderDisplayName}</div>
+                <div className={`text-xs text-gray-500 mb-1 ${isOwn ? 'text-right' : 'text-left'}`}>{senderDisplayName}</div>
                 <div className={`max-w-[70%] rounded-2xl px-5 py-3 shadow-sm transition-all ${isOwn ? 'bg-gold text-gray-900 rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none border border-gray-200'}`}>
                   <p className="text-base break-words leading-relaxed">{msg.message}</p>
                   <div className={`flex items-center justify-end gap-1 text-xs mt-1 ${isOwn ? 'text-gray-700/70' : 'text-gray-500'}`}>
