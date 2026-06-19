@@ -7,7 +7,6 @@ import { formatDate, formatCurrency } from '../../utils/format';
 import toast from 'react-hot-toast';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { CheckCircle, XCircle, Eye, RefreshCw } from 'lucide-react';
-import { supabase } from '../../services/supabase'
 
 export default function AdminReceiptsReviewTab() {
   const queryClient = useQueryClient();
@@ -19,12 +18,11 @@ export default function AdminReceiptsReviewTab() {
       console.log('📦 النتيجة:', result);
       return result;
     },
-    staleTime: 0, // ✅ لا تخزن البيانات مؤقتاً، اجلب دائماً
+    staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
 
-  // طباعة أي خطأ في console
   useEffect(() => {
     if (error) {
       console.error('❌ خطأ في جلب الإيصالات:', error);
@@ -32,24 +30,33 @@ export default function AdminReceiptsReviewTab() {
     }
   }, [error]);
 
-  // إعادة الجلب يدوياً
   const handleRefresh = () => {
     refetch();
     toast.success('تم تحديث القائمة');
   };
 
-  const handleApprove = async (orderId) => {
+  const handleApprove = async (order) => {
     if (window.confirm('هل أنت متأكد من قبول هذا الإيصال؟ سيتم إرسال الطلب للبائع.')) {
       try {
-        await reviewReceiptByAdmin(orderId, true);
-        await updateOrderStatus(orderId, 'payment_approved'); // ✅ الإصلاح الأساسي
-        const order = orders.find(o => o.id === orderId);
-        if (order?.seller_id) {
-          await addNotification(order.seller_id, 'order_status', 'دفعة مؤكدة', `تم تأكيد دفع الطلب #${orderId}، يمكنك تجهيزه الآن`, orderId);
+        // 1- قبول الإيصال (الخدمة تحدث الحالة وترسل إشعار للبائع)
+        await reviewReceiptByAdmin(order.id, true);
+
+        // 2- إشعار للمشتري فقط (غير موجود في الخدمة)
+        const buyerId = order.buyer?.id || order.user_id;
+        if (buyerId) {
+          await addNotification(
+            buyerId,
+            'order_status',
+            'تم قبول الإيصال',
+            'تم قبول إيصال الدفع وطلبك الآن قيد التجهيز',
+            order.id
+          );
         }
+
         toast.success('تم قبول الإيصال، أصبح الطلب قيد التجهيز للبائع');
-        refetch(); // تحديث القائمة
+        refetch();
         queryClient.invalidateQueries(['adminDashboard']);
+        queryClient.invalidateQueries(['sellerOrders']);
       } catch (err) {
         console.error(err);
         toast.error(err.message);
@@ -57,15 +64,16 @@ export default function AdminReceiptsReviewTab() {
     }
   };
 
-  const handleReject = async (orderId) => {
+  const handleReject = async (order) => {
     const reason = prompt('أدخل سبب الرفض (سيظهر للمشتري):');
     if (reason === null) return;
     if (window.confirm('هل أنت متأكد من رفض هذا الإيصال؟ سيتم إلغاء الطلب.')) {
       try {
-        await reviewReceiptByAdmin(orderId, false, reason);
-        await updateOrderStatus(orderId, 'cancelled'); // ✅ تحديث الحالة
+        // الخدمة تحدث الحالة إلى cancelled وترسل إشعار للمشتري
+        await reviewReceiptByAdmin(order.id, false, reason);
+
         toast.success('تم رفض الإيصال وتم إلغاء الطلب');
-        refetch(); // تحديث القائمة
+        refetch();
         queryClient.invalidateQueries(['adminDashboard']);
       } catch (err) {
         console.error(err);
@@ -105,15 +113,15 @@ export default function AdminReceiptsReviewTab() {
               </div>
               <div className="flex flex-col gap-2">
                 {order.receipt_image && (
-  <a href={order.receipt_image} target="_blank" rel="noreferrer" className="text-gold underline flex items-center gap-1">
-    <Eye size={16} /> عرض الإيصال
-  </a>
-)}
+                  <a href={order.receipt_image} target="_blank" rel="noreferrer" className="text-gold underline flex items-center gap-1">
+                    <Eye size={16} /> عرض الإيصال
+                  </a>
+                )}
                 <div className="flex gap-2 mt-2">
-                  <Button onClick={() => handleApprove(order.id)} className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1">
+                  <Button onClick={() => handleApprove(order)} className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1">
                     <CheckCircle size={16} /> قبول
                   </Button>
-                  <Button onClick={() => handleReject(order.id)} variant="danger" className="flex items-center gap-1">
+                  <Button onClick={() => handleReject(order)} variant="danger" className="flex items-center gap-1">
                     <XCircle size={16} /> رفض
                   </Button>
                 </div>
@@ -128,5 +136,6 @@ export default function AdminReceiptsReviewTab() {
     </div>
   );
 }
+
 
 

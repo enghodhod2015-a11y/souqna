@@ -1,6 +1,6 @@
 /**
  * services/orderService.js
- * 
+ *
  * دوال إدارة الطلبات (Orders)
  */
 
@@ -8,17 +8,17 @@ import { supabase } from './supabase'
 import { updateProductStock } from './productService'
 import { addNotification } from './notificationService'
 
-// 1️⃣ إنشاء طلب جديد (مع خصم المخزون)
+// 1⃣ إنشاء طلب جديد (مع خصم المخزون)
 export const createOrder = async (orderData) => {
   const { buyer_id, total_amount, shipping_address, shipping_city, payment_method, notes, items } = orderData
 
   // التحقق من توفر المخزون
   for (const item of items) {
     const { data: product } = await supabase
-      .from('products')
-      .select('stock_quantity')
-      .eq('id', item.product_id)
-      .single()
+     .from('products')
+     .select('stock_quantity')
+     .eq('id', item.product_id)
+     .maybeSingle()
     if (!product || product.stock_quantity < item.quantity) {
       throw new Error(`المنتج غير متوفر بالكمية المطلوبة (المتبقي: ${product?.stock_quantity || 0})`)
     }
@@ -26,8 +26,8 @@ export const createOrder = async (orderData) => {
 
   // إنشاء الطلب
   const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .insert({
+   .from('orders')
+   .insert({
       user_id: buyer_id,
       total_amount: total_amount,
       original_amount: orderData.original_amount || total_amount,
@@ -41,17 +41,17 @@ export const createOrder = async (orderData) => {
       payment_status: 'unpaid',
       created_at: new Date().toISOString()
     })
-    .select()
-    .single()
+   .select()
+   .maybeSingle()
   if (orderError) throw orderError
 
   // إضافة عناصر الطلب
   const itemsWithNames = await Promise.all(items.map(async (item) => {
     const { data: product, error: productError } = await supabase
-      .from('products')
-      .select('name')
-      .eq('id', item.product_id)
-      .single()
+     .from('products')
+     .select('name')
+     .eq('id', item.product_id)
+     .maybeSingle()
     if (productError) throw productError
     return {
       order_id: order.id,
@@ -63,8 +63,8 @@ export const createOrder = async (orderData) => {
   }))
 
   const { error: itemsError } = await supabase
-    .from('order_items')
-    .insert(itemsWithNames)
+   .from('order_items')
+   .insert(itemsWithNames)
 
   if (itemsError) {
     await supabase.from('orders').delete().eq('id', order.id)
@@ -79,36 +79,36 @@ export const createOrder = async (orderData) => {
   return { id: order.id }
 }
 
-// 2️⃣ جلب طلبات المشتري
+// 2⃣ جلب طلبات المشتري
 export const getBuyerOrders = async (buyerId) => {
   const { data: orders, error } = await supabase
-    .from('orders')
-    .select('*')
-    .eq('user_id', buyerId)
-    .order('created_at', { ascending: false })
+   .from('orders')
+   .select('*')
+   .eq('user_id', buyerId)
+   .order('created_at', { ascending: false })
   if (error) throw error
   if (!orders || orders.length === 0) return []
 
   const orderIds = orders.map(o => o.id)
   const { data: items, error: itemsError } = await supabase
-    .from('order_items')
-    .select('*, product:products(name, cover_image, seller_id)')
-    .in('order_id', orderIds)
+   .from('order_items')
+   .select('*, product:products(name, cover_image, seller_id)')
+   .in('order_id', orderIds)
   if (itemsError) throw itemsError
 
   return orders.map(order => {
     const orderItems = items.filter(i => i.order_id === order.id)
     const firstItem = orderItems[0]
     return {
-      ...order,
-      product: firstItem?.product ? { ...firstItem.product, title: firstItem.product.name } : null,
+     ...order,
+      product: firstItem?.product? {...firstItem.product, title: firstItem.product.name } : null,
       total_price: order.total_amount,
       order_status: order.status
     }
   })
 }
 
-// 3️⃣ جلب طلبات البائع (باستخدام RPC)
+// 3⃣ جلب طلبات البائع (باستخدام RPC)
 export const getSellerOrders = async (sellerId) => {
   console.log('🔍 getSellerOrders called with sellerId:', sellerId);
   try {
@@ -118,7 +118,7 @@ export const getSellerOrders = async (sellerId) => {
       return [];
     }
     if (!data || data.length === 0) {
-      console.log('⚠️ no data from RPC');
+      console.log('⚠ no data from RPC');
       return [];
     }
     console.log('✅ RPC returned rows:', data.length);
@@ -134,18 +134,18 @@ export const getSellerOrders = async (sellerId) => {
           total_amount: row.total_price,
           shipping_address: row.shipping_address,
           receipt_image: row.receipt_image,
-          buyer: row.buyer_id ? { 
-            id: row.buyer_id, 
-            full_name: row.buyer_name, 
-            email: row.buyer_email, 
-            phone: row.buyer_phone 
+          buyer: row.buyer_id? {
+            id: row.buyer_id,
+            full_name: row.buyer_name,
+            email: row.buyer_email,
+            phone: row.buyer_phone
           } : null,
           created_at: row.created_at,
-          product: { 
-            id: row.product_id, 
-            name: row.product_name, 
+          product: {
+            id: row.product_id,
+            name: row.product_name,
             title: row.product_name,
-            cover_image: row.product_cover_image 
+            cover_image: row.product_cover_image
           },
           quantity: row.quantity,
           return_status: row.return_status,
@@ -165,13 +165,13 @@ export const getSellerOrders = async (sellerId) => {
   }
 }
 
-// 4️⃣ تحديث حالة الطلب (مع إعادة المخزون إذا أصبح ملغياً)
+// 4⃣ تحديث حالة الطلب (مع إعادة المخزون إذا أصبح ملغياً)
 export const updateOrderStatus = async (orderId, status) => {
   if (status === 'cancelled') {
     const { data: items, error: itemsError } = await supabase
-      .from('order_items')
-      .select('product_id, quantity')
-      .eq('order_id', orderId)
+     .from('order_items')
+     .select('product_id, quantity')
+     .eq('order_id', orderId)
     if (!itemsError && items) {
       for (const item of items) {
         await updateProductStock(item.product_id, item.quantity)
@@ -180,41 +180,41 @@ export const updateOrderStatus = async (orderId, status) => {
   }
 
   const { data, error } = await supabase
-    .from('orders')
-    .update({ status })
-    .eq('id', orderId)
-    .select()
-    .single()
+   .from('orders')
+   .update({ status })
+   .eq('id', orderId)
+   .select()
+   .maybeSingle()
   if (error) throw error
   return data
 }
 
-// 5️⃣ تأكيد الاستلام (مع تعيين finalized_at بعد 3 أيام)
+// 5⃣ تأكيد الاستلام (مع تعيين finalized_at بعد 3 أيام)
 export const confirmDelivery = async (orderId) => {
   const completedAt = new Date().toISOString();
   const finalizedAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
-    .from('orders')
-    .update({
+   .from('orders')
+   .update({
       status: 'completed',
       completed_at: completedAt,
       finalized_at: finalizedAt
     })
-    .eq('id', orderId)
-    .eq('status', 'delivered')
-    .select()
-    .single()
+   .eq('id', orderId)
+   .eq('status', 'delivered')
+   .select()
+   .maybeSingle()
   if (error) throw error
   return data
 }
 
-// 6️⃣ طلب استرجاع
+// 6⃣ طلب استرجاع
 export const requestReturn = async (orderId, itemsToReturn) => {
   const { data: order, error: fetchError } = await supabase
-    .from('orders')
-    .select('completed_at')
-    .eq('id', orderId)
-    .single();
+   .from('orders')
+   .select('completed_at')
+   .eq('id', orderId)
+   .maybeSingle();
   if (fetchError) throw fetchError;
   if (!order.completed_at) throw new Error('الطلب لم يكتمل بعد، لا يمكن الاسترجاع');
 
@@ -225,14 +225,14 @@ export const requestReturn = async (orderId, itemsToReturn) => {
 
   for (const item of itemsToReturn) {
     const { error: upError } = await supabase
-      .from('order_items')
-      .update({
+     .from('order_items')
+     .update({
         return_status: 'requested',
         return_reason: item.reason,
         return_quantity: item.quantity
       })
-      .eq('order_id', orderId)
-      .eq('product_id', item.product_id);
+     .eq('order_id', orderId)
+     .eq('product_id', item.product_id);
     if (upError) throw upError;
   }
 
@@ -240,7 +240,7 @@ export const requestReturn = async (orderId, itemsToReturn) => {
   return { success: true };
 };
 
-// 7️⃣ الموافقة على الاسترجاع
+// 7⃣ الموافقة على الاسترجاع
 export const approveReturn = async (orderId, approve, adminNotes = '', itemsToApprove = null) => {
   let query = supabase.from('order_items').select('*').eq('order_id', orderId).eq('return_status', 'requested');
   if (itemsToApprove && itemsToApprove.length) {
@@ -254,40 +254,40 @@ export const approveReturn = async (orderId, approve, adminNotes = '', itemsToAp
     for (const item of items) {
       await updateProductStock(item.product_id, item.return_quantity);
       await supabase
-        .from('order_items')
-        .update({ return_status: 'approved', return_approved_at: new Date().toISOString() })
-        .eq('id', item.id);
+       .from('order_items')
+       .update({ return_status: 'approved', return_approved_at: new Date().toISOString() })
+       .eq('id', item.id);
     }
-    const { data: order } = await supabase.from('orders').select('user_id').eq('id', orderId).single();
+    const { data: order } = await supabase.from('orders').select('user_id').eq('id', orderId).maybeSingle();
     if (order?.user_id) {
       await addNotification(order.user_id, 'return', 'تم قبول الاسترجاع', 'تم قبول طلب استرجاع منتجك', orderId);
     }
   } else {
     for (const item of items) {
       await supabase
-        .from('order_items')
-        .update({ return_status: 'rejected', return_admin_notes: adminNotes })
-        .eq('id', item.id);
+       .from('order_items')
+       .update({ return_status: 'rejected', return_admin_notes: adminNotes })
+       .eq('id', item.id);
     }
   }
 
   const { data: allReturnItems } = await supabase
-    .from('order_items')
-    .select('return_status')
-    .eq('order_id', orderId)
-    .in('return_status', ['requested', 'approved', 'rejected']);
+   .from('order_items')
+   .select('return_status')
+   .eq('order_id', orderId)
+   .in('return_status', ['requested', 'approved', 'rejected']);
   const hasRequested = allReturnItems.some(i => i.return_status === 'requested');
   if (!hasRequested) {
     const allApproved = allReturnItems.every(i => i.return_status === 'approved');
     await supabase
-      .from('orders')
-      .update({ return_status: allApproved ? 'approved' : 'rejected' })
-      .eq('id', orderId);
+     .from('orders')
+     .update({ return_status: allApproved? 'approved' : 'rejected' })
+     .eq('id', orderId);
   }
   return { success: true };
 };
 
-// 8️⃣ رفع إيصال الدفع (معدل لمراجعة الأدمن)
+// 8⃣ رفع إيصال الدفع (معدل لمراجعة الأدمن)
 export const uploadReceipt = async (orderId, file, transferData = {}) => {
   console.log('📤 ===== بدء uploadReceipt للطلب:', orderId, '=====');
   try {
@@ -300,8 +300,8 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
 
     console.log('⏳ جاري رفع الملف...');
     const { error: uploadError } = await supabase.storage
-      .from('receipts')
-      .upload(fileName, file);
+     .from('receipts')
+     .upload(fileName, file);
     if (uploadError) {
       console.error('❌ فشل رفع الملف:', uploadError);
       throw new Error(`فشل رفع الملف: ${uploadError.message}`);
@@ -309,8 +309,8 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
     console.log('✅ تم رفع الملف بنجاح');
 
     const { data: { publicUrl } } = supabase.storage
-      .from('receipts')
-      .getPublicUrl(fileName);
+     .from('receipts')
+     .getPublicUrl(fileName);
     console.log('🔗 الرابط العام للصورة:', publicUrl);
 
     const updates = {
@@ -333,10 +333,10 @@ export const uploadReceipt = async (orderId, file, transferData = {}) => {
     console.log('👤 المستخدم الحالي:', userData.user?.id);
 
     const { error: updateError } = await supabase
-      .from('orders')
-      .update(updates)
-      .eq('id', orderId)
-      .eq('user_id', userData.user?.id);
+     .from('orders')
+     .update(updates)
+     .eq('id', orderId)
+     .eq('user_id', userData.user?.id);
 
     if (updateError) {
       console.error('❌ فشل تحديث الطلب:', updateError);
@@ -367,7 +367,7 @@ export const getPendingAdminReceipts = async () => {
   }
 
   if (!receipts || receipts.length === 0) {
-    console.log('⚠️ [getPendingAdminReceipts] لا توجد إيصالات');
+    console.log('⚠ [getPendingAdminReceipts] لا توجد إيصالات');
     return [];
   }
 
@@ -377,9 +377,9 @@ export const getPendingAdminReceipts = async () => {
 
   if (buyerIds.length) {
     const { data: buyers, error: buyersError } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, phone')
-      .in('id', buyerIds);
+     .from('profiles')
+     .select('id, full_name, email, phone')
+     .in('id', buyerIds);
 
     if (!buyersError && buyers) {
       buyersMap = new Map(buyers.map(b => [b.id, b]));
@@ -387,9 +387,9 @@ export const getPendingAdminReceipts = async () => {
   }
 
   return receipts.map(order => ({
-    ...order,
+   ...order,
     buyer: buyersMap.get(order.user_id) || null,
-    order_items: order.product_name ? [{ product_name: order.product_name }] : []
+    order_items: order.product_name? [{ product_name: order.product_name }] : []
   }));
 };
 
@@ -397,27 +397,27 @@ export const getPendingAdminReceipts = async () => {
 export const reviewReceiptByAdmin = async (orderId, approved, rejectionReason = '') => {
   if (approved) {
     const { error } = await supabase
-      .from('orders')
-      .update({
+     .from('orders')
+     .update({
         status: 'processing',
         payment_status: 'paid',
         admin_reviewed_at: new Date().toISOString(),
         admin_notes: null
       })
-      .eq('id', orderId)
+     .eq('id', orderId)
     if (error) throw error
 
     const { data: items } = await supabase
-      .from('order_items')
-      .select('product_id')
-      .eq('order_id', orderId)
-      .limit(1)
+     .from('order_items')
+     .select('product_id')
+     .eq('order_id', orderId)
+     .limit(1)
     if (items && items.length > 0) {
       const { data: product } = await supabase
-        .from('products')
-        .select('seller_id')
-        .eq('id', items[0].product_id)
-        .single()
+       .from('products')
+       .select('seller_id')
+       .eq('id', items[0].product_id)
+       .maybeSingle()
       if (product?.seller_id) {
         await addNotification(
           product.seller_id,
@@ -430,9 +430,9 @@ export const reviewReceiptByAdmin = async (orderId, approved, rejectionReason = 
     }
   } else {
     const { data: items, error: itemsError } = await supabase
-      .from('order_items')
-      .select('product_id, quantity')
-      .eq('order_id', orderId)
+     .from('order_items')
+     .select('product_id, quantity')
+     .eq('order_id', orderId)
     if (!itemsError && items) {
       for (const item of items) {
         await updateProductStock(item.product_id, item.quantity)
@@ -440,21 +440,21 @@ export const reviewReceiptByAdmin = async (orderId, approved, rejectionReason = 
     }
 
     const { error } = await supabase
-      .from('orders')
-      .update({
+     .from('orders')
+     .update({
         status: 'cancelled',
         payment_status: 'unpaid',
         admin_reviewed_at: new Date().toISOString(),
         admin_notes: rejectionReason
       })
-      .eq('id', orderId)
+     .eq('id', orderId)
     if (error) throw error
 
     const { data: order } = await supabase
-      .from('orders')
-      .select('user_id')
-      .eq('id', orderId)
-      .single()
+     .from('orders')
+     .select('user_id')
+     .eq('id', orderId)
+     .maybeSingle()
     if (order?.user_id) {
       await addNotification(
         order.user_id,
@@ -468,23 +468,23 @@ export const reviewReceiptByAdmin = async (orderId, approved, rejectionReason = 
   return { success: true }
 }
 
-// 9️⃣ إحصائيات البائع
+// 9⃣ إحصائيات البائع
 export const getSellerStats = async (sellerId) => {
   console.log('📊 getSellerStats called for seller:', sellerId);
   try {
     const { data: products, error: productsError } = await supabase
-      .from('products')
-      .select('id')
-      .eq('seller_id', sellerId);
+     .from('products')
+     .select('id')
+     .eq('seller_id', sellerId);
     if (productsError) throw productsError;
     const productIds = products?.map(p => p.id) || [];
 
     const productsCount = productIds.length;
 
     const { count: conversationsCount, error: convCountErr } = await supabase
-      .from('conversations')
-      .select('*', { count: 'exact', head: true })
-      .eq('seller_id', sellerId);
+     .from('conversations')
+     .select('*', { count: 'exact', head: true })
+     .eq('seller_id', sellerId);
     if (convCountErr) throw convCountErr;
 
     if (productIds.length === 0) {
@@ -499,9 +499,9 @@ export const getSellerStats = async (sellerId) => {
     }
 
     const { data: orderItems, error: oiError } = await supabase
-      .from('order_items')
-      .select('order_id, product_price, quantity, return_status, return_quantity')
-      .in('product_id', productIds);
+     .from('order_items')
+     .select('order_id, product_price, quantity, return_status, return_quantity')
+     .in('product_id', productIds);
     if (oiError) throw oiError;
 
     if (!orderItems || orderItems.length === 0) {
@@ -517,9 +517,9 @@ export const getSellerStats = async (sellerId) => {
 
     const orderIds = [...new Set(orderItems.map(oi => oi.order_id))];
     const { data: orders, error: ordersError } = await supabase
-      .from('orders')
-      .select('id, status, completed_at, finalized_at')
-      .in('id', orderIds);
+     .from('orders')
+     .select('id, status, completed_at, finalized_at')
+     .in('id', orderIds);
     if (ordersError) throw ordersError;
 
     const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
@@ -538,7 +538,7 @@ export const getSellerStats = async (sellerId) => {
       const isPastReturnWindow = order.completed_at && new Date(order.completed_at) <= threeMinutesAgo;
 
       if (isCompleted && isPastReturnWindow) {
-        const returnedQty = (item.return_status === 'approved') ? (item.return_quantity || 0) : 0;
+        const returnedQty = (item.return_status === 'approved')? (item.return_quantity || 0) : 0;
         const soldQty = item.quantity - returnedQty;
         totalSales += item.product_price * soldQty;
       }
@@ -577,5 +577,6 @@ export const getSellerStats = async (sellerId) => {
 export const getMonthlySales = async (sellerId) => {
   return []
 }
+
 
 
