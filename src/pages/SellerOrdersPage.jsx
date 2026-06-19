@@ -5,6 +5,7 @@ import { addNotification } from '../services/notificationService'
 import { Button } from '../components/ui/Button'
 import { RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { supabase } from '../services/supabase'
 
 export default function SellerOrdersPage() {
   const { user } = useAuth()
@@ -14,6 +15,17 @@ export default function SellerOrdersPage() {
 
   useEffect(() => {
     if (user?.id) loadOrders()
+  }, [user?.id])
+
+  // ✅ تحديث تلقائي عند موافقة الأدمن
+  useEffect(() => {
+    if (!user?.id) return
+    const channel = supabase
+     .channel(`seller-orders-${user.id}`)
+     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadOrders())
+     .subscribe()
+    const interval = setInterval(loadOrders, 20000)
+    return () => { supabase.removeChannel(channel); clearInterval(interval) }
   }, [user?.id])
 
   const loadOrders = async () => {
@@ -157,7 +169,7 @@ export default function SellerOrdersPage() {
                       <select
                         value={order.status}
                         onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                        className="px-4 py-2 rounded-lg bg-white text-gray-800 border-gold/50 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold transition-all duration-200 cursor-pointer hover:bg-gray-100"
+                        className="px-4 py-2 rounded-lg bg-white text-gray-800 border border-gold/50 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold transition-all duration-200 cursor-pointer hover:bg-gray-100"
                       >
                         <option value="pending_payment_review">⏳ انتظار الدفع</option>
                         <option value="payment_approved">💰 تم تأكيد الدفع</option>
@@ -220,6 +232,5 @@ export default function SellerOrdersPage() {
     </div>
   )
 }
-
 
 
