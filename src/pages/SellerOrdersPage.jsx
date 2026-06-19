@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { getSellerOrders, updateOrderStatus, approveReturn } from '../services/orderService'
 import { addNotification } from '../services/notificationService'
 import { Button } from '../components/ui/Button'
+import { RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function SellerOrdersPage() {
@@ -38,7 +39,7 @@ export default function SellerOrdersPage() {
       case 'cancelled':
         return allOrders.filter(o => o.status === 'cancelled')
       case 'returns':
-        return allOrders.filter(o => o.return_status && o.return_status !== 'none')
+        return allOrders.filter(o => o.return_status && o.return_status!== 'none')
       default:
         return allOrders
     }
@@ -52,7 +53,7 @@ export default function SellerOrdersPage() {
       const order = allOrders.find(o => o.id === orderId)
       await updateOrderStatus(orderId, newStatus)
       toast.success('تم تحديث حالة الطلب')
-      
+
       // 2. إضافة إشعار للمشتري
       if (order && order.buyer?.id) {
         const statusMessages = {
@@ -67,7 +68,7 @@ export default function SellerOrdersPage() {
         const message = statusMessages[newStatus] || `تم تغيير حالة طلبك إلى ${newStatus}`
         await addNotification(order.buyer.id, 'order_status', 'تحديث حالة الطلب', message, orderId)
       }
-      
+
       loadOrders()
     } catch (err) {
       toast.error(err.message)
@@ -78,42 +79,51 @@ export default function SellerOrdersPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gold mb-6">طلبات البائع (الواردة)</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gold">طلبات البائع (الواردة)</h1>
+        <Button
+          onClick={loadOrders}
+          disabled={loading}
+          className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-1 shadow-md"
+        >
+          <RefreshCw size={16} className={loading? 'animate-spin' : ''} /> تحديث
+        </Button>
+      </div>
 
       <div className="flex flex-wrap gap-2 border-b border-gold/30 mb-6">
         <button
           onClick={() => setActiveTab('pending_payment')}
-          className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'pending_payment' ? 'bg-gold text-primary-blue font-bold' : 'hover:bg-secondary-blue'}`}
+          className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'pending_payment'? 'bg-gold text-primary-blue font-bold' : 'hover:bg-secondary-blue'}`}
         >
           ⏳ انتظار الدفع
         </button>
         <button
           onClick={() => setActiveTab('payment_approved')}
-          className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'payment_approved' ? 'bg-gold text-primary-blue font-bold' : 'hover:bg-secondary-blue'}`}
+          className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'payment_approved'? 'bg-gold text-primary-blue font-bold' : 'hover:bg-secondary-blue'}`}
         >
           💳 تم الدفع / قيد التجهيز
         </button>
         <button
           onClick={() => setActiveTab('completed')}
-          className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'completed' ? 'bg-gold text-primary-blue font-bold' : 'hover:bg-secondary-blue'}`}
+          className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'completed'? 'bg-gold text-primary-blue font-bold' : 'hover:bg-secondary-blue'}`}
         >
-          ✔️ مكتملة
+          ✔ مكتملة
         </button>
         <button
           onClick={() => setActiveTab('cancelled')}
-          className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'cancelled' ? 'bg-gold text-primary-blue font-bold' : 'hover:bg-secondary-blue'}`}
+          className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'cancelled'? 'bg-gold text-primary-blue font-bold' : 'hover:bg-secondary-blue'}`}
         >
           🚫 ملغية
         </button>
         <button
           onClick={() => setActiveTab('returns')}
-          className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'returns' ? 'bg-gold text-primary-blue font-bold' : 'hover:bg-secondary-blue'}`}
+          className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'returns'? 'bg-gold text-primary-blue font-bold' : 'hover:bg-secondary-blue'}`}
         >
-          ↩️ الاسترجاعات
+          ↩ الاسترجاعات
         </button>
       </div>
 
-      {filteredOrders.length === 0 ? (
+      {filteredOrders.length === 0? (
         <p className="text-center text-text-secondary">لا توجد طلبات في هذا القسم.</p>
       ) : (
         <div className="space-y-4">
@@ -131,11 +141,11 @@ export default function SellerOrdersPage() {
                     <p className="text-text-secondary"><strong>العنوان:</strong> {order.shipping_address || 'لم يحدد'}</p>
                     <p className="text-text-secondary"><strong>المبلغ:</strong> {order.total_amount || order.total_price} ريال</p>
                     <p className="text-text-secondary"><strong>الحالة الحالية:</strong> {order.status}</p>
-                    {order.return_status && order.return_status !== 'none' && (
+                    {order.return_status && order.return_status!== 'none' && (
                       <p className="text-text-secondary mt-2"><strong>حالة الاسترجاع:</strong> {
-                        order.return_status === 'requested' ? 'طلب استرجاع قيد المراجعة' :
-                        order.return_status === 'approved' ? 'تم قبول الاسترجاع' :
-                        order.return_status === 'rejected' ? 'تم رفض الاسترجاع' : order.return_status
+                        order.return_status === 'requested'? 'طلب استرجاع قيد المراجعة' :
+                        order.return_status === 'approved'? 'تم قبول الاسترجاع' :
+                        order.return_status === 'rejected'? 'تم رفض الاسترجاع' : order.return_status
                       }</p>
                     )}
                     {order.return_reason && (
@@ -143,15 +153,15 @@ export default function SellerOrdersPage() {
                     )}
                   </div>
                   <div className="flex gap-2 items-start flex-col">
-                    {!isCompleted ? (
+                    {!isCompleted? (
                       <select
                         value={order.status}
                         onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                        className="px-4 py-2 rounded-lg bg-white text-gray-800 border border-gold/50 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold transition-all duration-200 cursor-pointer hover:bg-gray-100"
+                        className="px-4 py-2 rounded-lg bg-white text-gray-800 border-gold/50 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold transition-all duration-200 cursor-pointer hover:bg-gray-100"
                       >
                         <option value="pending_payment_review">⏳ انتظار الدفع</option>
                         <option value="payment_approved">💰 تم تأكيد الدفع</option>
-                        <option value="processing">⚙️ قيد التجهيز</option>
+                        <option value="processing">⚙ قيد التجهيز</option>
                         <option value="shipped">🚚 تم الشحن</option>
                         <option value="delivered">📦 تم التسليم</option>
                         <option value="completed">✅ مكتمل</option>
@@ -164,7 +174,7 @@ export default function SellerOrdersPage() {
                     )}
                     {order.return_status === 'requested' && (
                       <div className="flex gap-2 mt-2">
-                        <Button 
+                        <Button
                           onClick={async () => {
                             await approveReturn(order.id, true)
                             toast.success('تم قبول الاسترجاع')
@@ -177,7 +187,7 @@ export default function SellerOrdersPage() {
                         >
                           ✅ قبول الاسترجاع
                         </Button>
-                        <Button 
+                        <Button
                           variant="danger"
                           onClick={async () => {
                             const notes = prompt('سبب الرفض (اختياري):')
@@ -210,5 +220,6 @@ export default function SellerOrdersPage() {
     </div>
   )
 }
+
 
 
