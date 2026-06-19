@@ -41,9 +41,9 @@ export default function AdminOrdersTab({ navigate }) {
 
       try {
         const { data: conversations, error: convError } = await supabase
-         .from('conversations')
-         .select('*')
-         .order('last_message_at', { ascending: false });
+        .from('conversations')
+        .select('*')
+        .order('last_message_at', { ascending: false });
         if (convError) throw convError;
         if (!conversations || conversations.length === 0) return [];
 
@@ -51,9 +51,9 @@ export default function AdminOrdersTab({ navigate }) {
         let productsMap = new Map();
         if (productIds.length) {
           const { data: products, error: prodError } = await supabase
-           .from('products')
-           .select('id, name')
-           .in('id', productIds);
+          .from('products')
+          .select('id, name')
+          .in('id', productIds);
           if (prodError) {
             console.error('خطأ في جلب المنتجات:', prodError);
           } else if (products) {
@@ -66,15 +66,15 @@ export default function AdminOrdersTab({ navigate }) {
         }
 
         const userIds = [...new Set([
-         ...conversations.map(c => c.buyer_id),
-         ...conversations.map(c => c.seller_id)
+        ...conversations.map(c => c.buyer_id),
+        ...conversations.map(c => c.seller_id)
         ].filter(Boolean))];
         let profilesMap = new Map();
         if (userIds.length) {
           const { data: profiles, error: profError } = await supabase
-           .from('profiles')
-           .select('id, full_name, email')
-           .in('id', userIds);
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', userIds);
           if (!profError && profiles) {
             profilesMap = new Map(profiles.map(p => [p.id, p]));
           }
@@ -84,11 +84,11 @@ export default function AdminOrdersTab({ navigate }) {
         const lastMessageMap = new Map();
         for (const convId of conversationIds) {
           const { data: msgData } = await supabase
-           .from('messages')
-           .select('sender_id, created_at')
-           .eq('conversation_id', convId)
-           .order('created_at', { ascending: false })
-           .limit(1);
+          .from('messages')
+          .select('sender_id, created_at')
+          .eq('conversation_id', convId)
+          .order('created_at', { ascending: false })
+          .limit(1);
           if (msgData && msgData.length > 0) {
             lastMessageMap.set(convId, {
               sender_id: msgData[0].sender_id,
@@ -118,7 +118,7 @@ export default function AdminOrdersTab({ navigate }) {
           }
 
           return {
-           ...conv,
+          ...conv,
             product,
             buyer: profilesMap.get(conv.buyer_id) || null,
             seller: profilesMap.get(conv.seller_id) || null,
@@ -140,15 +140,15 @@ export default function AdminOrdersTab({ navigate }) {
   });
 
   const sendNotificationToUser = async (userId, message, title = 'إشعار من الإدارة', type = 'info', relatedId = null) => {
-    const { data: { user: adminUser } } = await supabase.auth.getUser();
+    const { data: { user: adminUser } = await supabase.auth.getUser();
     const adminId = adminUser.id;
     let conversationId = null;
 
     const { data: existingList, error: findError } = await supabase
-     .from('conversations')
-     .select('id')
-     .or(`buyer_id.eq.${adminId},seller_id.eq.${userId}`)
-     .limit(1);
+    .from('conversations')
+    .select('id')
+    .or(`buyer_id.eq.${adminId},seller_id.eq.${userId}`)
+    .limit(1);
 
     if (findError) {
       console.error('خطأ في البحث عن المحادثة:', findError);
@@ -159,21 +159,21 @@ export default function AdminOrdersTab({ navigate }) {
     if (existingList && existingList.length > 0) {
       conversationId = existingList[0].id;
       await supabase
-       .from('conversations')
-       .update({ last_message: message, last_message_at: new Date() })
-       .eq('id', conversationId);
+      .from('conversations')
+      .update({ last_message: message, last_message_at: new Date() })
+      .eq('id', conversationId);
     } else {
       const { data: newConv, error: insertError } = await supabase
-       .from('conversations')
-       .insert({
+      .from('conversations')
+      .insert({
           buyer_id: adminId,
           seller_id: userId,
           product_id: relatedId || null,
           last_message: message,
           last_message_at: new Date()
         })
-       .select()
-       .single();
+      .select()
+      .single();
 
       if (insertError) {
         console.error('خطأ في إنشاء المحادثة:', insertError);
@@ -215,16 +215,16 @@ export default function AdminOrdersTab({ navigate }) {
     const targetName = targetRole === 'seller'? conv.seller?.full_name : conv.buyer?.full_name;
 
     const { data: lastMessageData, error: msgError } = await supabase
-     .from('messages')
-     .select(`
+    .from('messages')
+    .select(`
         message,
         created_at,
         sender_id,
         profiles!messages_sender_id_fkey ( full_name )
       `)
-     .eq('conversation_id', conv.id)
-     .order('created_at', { ascending: false })
-     .limit(1);
+    .eq('conversation_id', conv.id)
+    .order('created_at', { ascending: false })
+    .limit(1);
 
     let lastMessageText = 'لا توجد رسائل سابقة في هذه المحادثة';
     if (!msgError && lastMessageData && lastMessageData.length > 0) {
@@ -322,7 +322,7 @@ export default function AdminOrdersTab({ navigate }) {
       </div>
 
       {!conversations || conversations.length === 0? (
-        <div className="bg-primary-card rounded-2xl shadow-lg border border-gold/20 p-6 text-center">
+        <div className="bg-primary-card rounded-2xl shadow-lg border-gold/20 p-6 text-center">
           <p className="text-text-secondary mb-2">⚠ لا توجد محادثات معروضة.</p>
           <p className="text-sm text-gold">تأكد من أن الأدمن يملك صلاحية رؤية جميع المحادثات. قم بتشغيل الأمر التالي في SQL Editor في Supabase:</p>
           <pre className="bg-gray-900 text-white text-right p-3 rounded-md mt-2 overflow-x-auto text-sm">
@@ -361,11 +361,11 @@ export default function AdminOrdersTab({ navigate }) {
                   </td>
                   <td className="p-3">
                     <div className="flex gap-2">
-                      <Link to={`/chat/c/${conv.id}`} className="bg-gold text-primary-blue px-3 py-1 rounded-lg text-sm shadow hover:bg-gold/90 transition inline-flex items-center gap-1">
+                      <Link to={`/chat/c/${conv.id}`} state={{ fromAdminOrders: true }} className="bg-[#0b2f5c] text-white px-3 py-1 rounded-lg text-sm shadow hover:bg-[#041C3A] transition inline-flex items-center gap-1">
                         <MessageCircle size={14} /> فتح المحادثة
                       </Link>
                       {conv.status === 'في انتظار رد البائع' && (
-                        <Button onClick={() => sendReminderForConversation(conv, 'seller')} className="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded-lg text-sm shadow inline-flex items-center gap-1">
+                        <Button onClick={() => sendReminderForConversation(conv, 'seller')} className="bg-[#D4AF37] hover:bg-[#E8C84A] text-[#041C3A] px-3 py-1 rounded-lg text-sm shadow inline-flex items-center gap-1">
                           <Send size={14} /> تذكير البائع
                         </Button>
                       )}
@@ -380,4 +380,6 @@ export default function AdminOrdersTab({ navigate }) {
     </div>
   );
 }
+
+
 

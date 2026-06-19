@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getOrCreateConversation, sendMessage, getMessages, markMessagesAsRead } from '../services/chatService'
 import { getProductById } from '../services/productService'
@@ -19,6 +19,7 @@ export default function ChatPage() {
   const { productId, conversationId } = useParams()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [conversation, setConversation] = useState(null)
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
@@ -75,8 +76,8 @@ export default function ChatPage() {
     }
 
     const channel = supabase
-     .channel(`chat:${conversation.id}`)
-     .on('postgres_changes', {
+    .channel(`chat:${conversation.id}`)
+    .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'messages',
@@ -85,10 +86,10 @@ export default function ChatPage() {
         const newMsg = payload.new
         if (newMsg) {
           const { data: senderProfile } = await supabase
-           .from('profiles')
-           .select('full_name, account_type')
-           .eq('id', newMsg.sender_id)
-           .single()
+          .from('profiles')
+          .select('full_name, account_type')
+          .eq('id', newMsg.sender_id)
+          .single()
           const enrichedMsg = {...newMsg, sender: senderProfile }
 
           setMessages(prev => {
@@ -101,7 +102,7 @@ export default function ChatPage() {
           }
         }
       })
-     .subscribe()
+    .subscribe()
 
     channelRef.current = channel
 
@@ -146,14 +147,19 @@ export default function ChatPage() {
   }
 
   const handleClose = () => {
-    if (window.history.length > 1) navigate(-1)
-    else navigate('/inbox')
+    if (location.state?.fromAdminOrders) {
+      navigate(-1)
+    } else if (window.history.length > 1) {
+      navigate(-1)
+    } else {
+      navigate('/inbox')
+    }
   }
 
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="bg-white rounded-2xl border border-gold/40 shadow-xl overflow-hidden">
+        <div className="bg-white rounded-2xl border-gold/40 shadow-xl overflow-hidden">
           <div className="p-5 border-b border-gold/30 flex justify-between items-center">
             <SkeletonText width="w-48" height="h-7" />
             <SkeletonCircle size="w-8 h-8" />
@@ -177,7 +183,7 @@ export default function ChatPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="bg-white rounded-2xl border border-gold/40 shadow-xl overflow-hidden">
+      <div className="bg-white rounded-2xl border-gold/40 shadow-xl overflow-hidden">
         <div className="p-5 border-b border-gold/30 bg-gradient-to-r from-gray-50 to-white flex justify-between items-center">
           <div className="flex-1">
             <h2 className="text-2xl font-bold text-gold flex items-center gap-2">{pageTitle}</h2>
@@ -195,7 +201,7 @@ export default function ChatPage() {
             return (
               <div key={msg.id} className={`flex flex-col ${isOwn? 'items-end' : 'items-start'} animate-fadeIn`}>
                 <div className={`text-xs text-gray-500 mb-1 ${isOwn? 'text-right' : 'text-left'}`}>{senderDisplayName}</div>
-                <div className={`max-w-[70%] rounded-2xl px-5 py-3 shadow-sm transition-all ${isOwn? 'bg-gold text-gray-900 rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none border border-gray-200'}`}>
+                <div className={`max-w-[70%] rounded-2xl px-5 py-3 shadow-sm transition-all ${isOwn? 'bg-gold text-gray-900 rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none border-gray-200'}`}>
                   <p className="text-base break-words leading-relaxed">{msg.message}</p>
                   <div className={`flex items-center justify-end gap-1 text-xs mt-1 ${isOwn? 'text-gray-700/70' : 'text-gray-500'}`}>
                     <span>{new Date(msg.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}</span>
@@ -215,7 +221,7 @@ export default function ChatPage() {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="اكتب رسالتك..."
-              className="flex-1 px-5 py-3 rounded-full bg-gray-100 text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
+              className="flex-1 px-5 py-3 rounded-full bg-gray-100 text-gray-900 border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
               onKeyPress={(e) => e.key === 'Enter' &&!sending && handleSend()}
             />
             <Button onClick={handleSend} disabled={sending} className="!rounded-full!px-5!py-3 bg-gold text-gray-900 hover:bg-amber-500 transition-all duration-200 shadow-md flex items-center gap-2">
