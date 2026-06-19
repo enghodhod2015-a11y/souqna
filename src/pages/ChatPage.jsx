@@ -61,55 +61,52 @@ export default function ChatPage() {
         const msgs = await getMessages(currentConv.id)
         setMessages(msgs || [])
         await markMessagesAsRead(currentConv.id, user.id)
-        setMessages(await getMessages(currentConv.id))
       }
     } catch (err) { console.error(err); toast.error('حدث خطأ أثناء تحميل المحادثة') }
     finally { setLoading(false) }
   }
 
-  // ✅ إعداد الاستماع للرسائل الجديدة بشكل صحيح
   useEffect(() => {
-    if (!conversation?.id || !user?.id) return
+    if (!conversation?.id ||!user?.id) return
 
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current)
       channelRef.current = null
     }
 
-    console.log(`🟢 إنشاء قناة للمحادثة: ${conversation.id}`)
-
     const channel = supabase
-      .channel(`chat:${conversation.id}`)
-      .on('postgres_changes', {
+     .channel(`chat:${conversation.id}`)
+     .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'messages',
         filter: `conversation_id=eq.${conversation.id}`
-      }, (payload) => {
-        console.log('📩 رسالة جديدة مستلمة في الوقت الفعلي:', payload.new)
+      }, async (payload) => {
         const newMsg = payload.new
-        if (newMsg && !messages.some(m => m.id === newMsg.id)) {
-          setMessages(prev => [...prev, newMsg])
+        if (newMsg) {
+          const { data: senderProfile } = await supabase
+           .from('profiles')
+           .select('full_name, account_type')
+           .eq('id', newMsg.sender_id)
+           .single()
+          const enrichedMsg = {...newMsg, sender: senderProfile }
+
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMsg.id)) return prev
+            return [...prev, enrichedMsg]
+          })
+
           if (newMsg.receiver_id === user.id) {
             markMessagesAsRead(conversation.id, user.id).catch(console.error)
           }
         }
       })
-      .subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ تم الاشتراك في قناة الشات بنجاح')
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ خطأ في قناة الشات:', err)
-        } else if (status === 'TIMED_OUT') {
-          console.warn('⚠️ انتهت مهلة القناة، سيتم إعادة المحاولة قريباً')
-        }
-      })
+     .subscribe()
 
     channelRef.current = channel
 
     return () => {
       if (channelRef.current) {
-        console.log(`🔴 إلغاء الاشتراك من قناة المحادثة: ${conversation.id}`)
         supabase.removeChannel(channelRef.current)
         channelRef.current = null
       }
@@ -121,11 +118,11 @@ export default function ChatPage() {
   }, [messages])
 
   const handleSend = async () => {
-    if (!newMessage.trim() || !conversation) return
+    if (!newMessage.trim() ||!conversation) return
     setSending(true)
     const messageText = newMessage.trim()
     const tempId = Date.now()
-    const receiverId = conversation.buyer_id === user.id ? conversation.seller_id : conversation.buyer_id
+    const receiverId = conversation.buyer_id === user.id? conversation.seller_id : conversation.buyer_id
     const optimisticMessage = {
       id: tempId,
       conversation_id: conversation.id,
@@ -139,9 +136,9 @@ export default function ChatPage() {
     setNewMessage('')
     try {
       const sent = await sendMessage(conversation.id, user.id, receiverId, messageText)
-      setMessages(prev => prev.map(m => m.id === tempId ? sent : m))
+      setMessages(prev => prev.map(m => m.id === tempId? sent : m))
     } catch (err) {
-      setMessages(prev => prev.filter(m => m.id !== tempId))
+      setMessages(prev => prev.filter(m => m.id!== tempId))
       toast.error(err.message)
     } finally {
       setSending(false)
@@ -172,11 +169,11 @@ export default function ChatPage() {
     )
   }
 
-  const isAdminChat = conversation && !product && !productId && conversation.product_id === null
+  const isAdminChat = conversation &&!product &&!productId && conversation.product_id === null
   const isBuyer = conversation?.buyer_id === user?.id
-  const chatPartnerRole = isBuyer ? 'البائع' : 'المشتري المحتمل'
-  const pageTitle = isAdminChat ? '💬 محادثة مع الإدارة' : `💬 محادثة مع: ${chatPartnerRole}`
-  const productInfo = isAdminChat ? null : product
+  const chatPartnerRole = isBuyer? 'البائع' : 'المشتري المحتمل'
+  const pageTitle = isAdminChat? '💬 محادثة مع الإدارة' : `💬 محادثة مع: ${chatPartnerRole}`
+  const productInfo = isAdminChat? null : product
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -193,17 +190,17 @@ export default function ChatPage() {
           {messages.map((msg) => {
             const isOwn = msg.sender_id === user.id
             const senderName = msg.sender?.full_name || 'مستخدم'
-            const senderRole = msg.sender?.account_type === 'seller' ? 'بائع' : (msg.sender?.account_type === 'admin' ? 'أدمن' : 'مشتري')
-            const senderDisplayName = isOwn ? 'أنت' : `${senderName} (${senderRole})`
+            const senderRole = msg.sender?.account_type === 'seller'? 'بائع' : (msg.sender?.account_type === 'admin'? 'أدمن' : 'مشتري')
+            const senderDisplayName = isOwn? 'أنت' : `${senderName} (${senderRole})`
             return (
-              <div key={msg.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} animate-fadeIn`}>
-                <div className={`text-xs text-gray-500 mb-1 ${isOwn ? 'text-right' : 'text-left'}`}>{senderDisplayName}</div>
-                <div className={`max-w-[70%] rounded-2xl px-5 py-3 shadow-sm transition-all ${isOwn ? 'bg-gold text-gray-900 rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none border border-gray-200'}`}>
+              <div key={msg.id} className={`flex flex-col ${isOwn? 'items-end' : 'items-start'} animate-fadeIn`}>
+                <div className={`text-xs text-gray-500 mb-1 ${isOwn? 'text-right' : 'text-left'}`}>{senderDisplayName}</div>
+                <div className={`max-w-[70%] rounded-2xl px-5 py-3 shadow-sm transition-all ${isOwn? 'bg-gold text-gray-900 rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none border border-gray-200'}`}>
                   <p className="text-base break-words leading-relaxed">{msg.message}</p>
-                  <div className={`flex items-center justify-end gap-1 text-xs mt-1 ${isOwn ? 'text-gray-700/70' : 'text-gray-500'}`}>
+                  <div className={`flex items-center justify-end gap-1 text-xs mt-1 ${isOwn? 'text-gray-700/70' : 'text-gray-500'}`}>
                     <span>{new Date(msg.created_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}</span>
                     {isOwn && msg.is_read && <CheckCheck size={14} className="text-blue-500" />}
-                    {isOwn && !msg.is_read && <span className="text-gray-400">✓</span>}
+                    {isOwn &&!msg.is_read && <span className="text-gray-400">✓</span>}
                   </div>
                 </div>
               </div>
@@ -219,9 +216,9 @@ export default function ChatPage() {
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="اكتب رسالتك..."
               className="flex-1 px-5 py-3 rounded-full bg-gray-100 text-gray-900 border border-gold/40 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all duration-200 placeholder:text-gray-400"
-              onKeyPress={(e) => e.key === 'Enter' && !sending && handleSend()}
+              onKeyPress={(e) => e.key === 'Enter' &&!sending && handleSend()}
             />
-            <Button onClick={handleSend} disabled={sending} className="!rounded-full !px-5 !py-3 bg-gold text-gray-900 hover:bg-amber-500 transition-all duration-200 shadow-md flex items-center gap-2">
+            <Button onClick={handleSend} disabled={sending} className="!rounded-full!px-5!py-3 bg-gold text-gray-900 hover:bg-amber-500 transition-all duration-200 shadow-md flex items-center gap-2">
               <Send size={18} /><span>إرسال</span>
             </Button>
           </div>
